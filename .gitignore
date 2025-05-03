@@ -1,0 +1,15 @@
+chess-screenshot.png
+current_board.png
+dist/
+build/
+*.spec
+__pycache__/
+*.pyc
+*.pyo
+myenv/
+.python-version
+stockfish
+stockfish.exe
+tempCodeRunnerFile.py
+release-notes.md
+chess_detection.onnx
