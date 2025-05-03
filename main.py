@@ -268,8 +268,7 @@ class ChessPilot:
             weights = find_maia_weights(weights_dir)
 
             # Launch Maia (lc0) in UCI mode
-            engine = subprocess.Popen(
-                [lc0_path, "--weights", weights],
+            engine = subprocess.Popen([lc0_path, "--backend=onnx-cpu", f"--weights={weights}", "--verbose-move-stats"],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -285,14 +284,23 @@ class ChessPilot:
                 line = engine.stdout.readline()
                 if not line:
                     break
+                if "score mate" in line:
+                    try:
+                        parts = line.split("score mate")
+                        mate_val = int(parts[1].split()[0])
+                        if abs(mate_val) == 1:
+                            mate_flag = True
+                    except (IndexError, ValueError):
+                        pass
                 if line.strip() == 'uciok':
                     break
 
             # Set position
             engine.stdin.write(f"position fen {fen}\n")
-            engine.stdin.write(f"go visits {self.depth_var.get()}\n")
+            engine.stdin.write(f"go nodes {self.depth_var.get()}\n")
             engine.stdin.flush()
-
+            
+            mate_flag = False
             best_move = None
             # Parse bestmove
             while True:
@@ -304,13 +312,23 @@ class ChessPilot:
                     if len(parts) >= 2:
                         best_move = parts[1]
                     break
+            updated_fen = None
+            if best_move:
+                engine.stdin.write(f"position fen {fen} moves {best_move}\n")
+                engine.stdin.write("d\n")
+                engine.stdin.flush()
+                while True:
+                    line = engine.stdout.readline()
+                    if "fen" in line:
+                        updated_fen = line.split("fen")[1].strip()
+                        break
 
             # Clean up
             engine.stdin.write("quit\n")
             engine.stdin.flush()
             engine.wait()
 
-            return best_move
+            return best_move, updated_fen, mate_flag
 
         except Exception as e:
             self.root.after(0, lambda err=e: messagebox.showerror("Error", f"Maia engine error: {err}"))
