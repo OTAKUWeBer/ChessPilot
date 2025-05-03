@@ -286,7 +286,7 @@ class ChessPilot:
                     break
                 if "score mate" in line:
                     try:
-                        parts = line.split("score mate")
+                        parts = line.split("(T)")
                         mate_val = int(parts[1].split()[0])
                         if abs(mate_val) == 1:
                             mate_flag = True
@@ -307,6 +307,14 @@ class ChessPilot:
                 line = engine.stdout.readline()
                 if not line:
                     break
+                if "(T)" in line:
+                    try:
+                        parts = line.split("(T)")
+                        mate_val = int(parts[1].split()[0])
+                        if abs(mate_val) == 1:
+                            mate_flag = True
+                    except (IndexError, ValueError):
+                        pass
                 if line.startswith("bestmove"):
                     parts = line.split()
                     if len(parts) >= 2:
