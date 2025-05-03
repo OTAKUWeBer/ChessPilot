@@ -10,6 +10,7 @@ import shutil
 from boardreader import get_fen_from_position, get_positions
 import mss
 import pyautogui
+import glob
 
 def is_wayland():
     return os.getenv("XDG_SESSION_TYPE") == "wayland"
@@ -250,7 +251,21 @@ class ChessPilot:
         try:
             # Locate the lc0 binary and Maia weights file
             lc0_path = get_binary_path("lc0.exe")
-            weights = resource_path(os.path.join('models', 'maia-1600.pb.gz'))
+            def find_maia_weights(models_dir):
+                pattern = os.path.join(models_dir, "maia-*.pb.gz")
+                files = glob.glob(pattern)
+                if not files:
+                    messagebox.showerror("Error", f"No Maia weights found in {models_dir}")
+                    sys.exit(1)
+                # Optionally, sort by Elo rating embedded in the filename and pick the highest:
+                def elo_from_name(path):
+                    name = os.path.basename(path)
+                    return int(name.split('-')[1].split('.')[0])
+                files.sort(key=elo_from_name, reverse=True)
+                return files[0]
+            
+            weights_dir = resource_path("models")
+            weights = find_maia_weights(weights_dir)
 
             # Launch Maia (lc0) in UCI mode
             engine = subprocess.Popen(
