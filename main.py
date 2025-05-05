@@ -11,6 +11,8 @@ from boardreader import get_fen_from_position, get_positions
 import mss
 import pyautogui
 import glob
+import chess
+import random
 
 def is_wayland():
     return os.getenv("XDG_SESSION_TYPE") == "wayland"
@@ -33,6 +35,28 @@ def get_binary_path(binary):
         messagebox.showerror("Error", f"{binary} is missing! Make sure it's bundled properly.")
         sys.exit(1)
     return path
+
+def find_maia_weights(models_dir: str) -> str:
+    """
+    Search for Maia weight files (*.pb.gz) in models_dir and return the highest-Elo file.
+    """
+    pattern = os.path.join(models_dir, "maia-*.pb.gz")
+    candidates = glob.glob(pattern)
+    if not candidates:
+        raise FileNotFoundError(f"No Maia weights found in {models_dir}")
+
+    def extract_elo(path: str) -> int:
+        name = os.path.basename(path)
+        # Expect filename like 'maia-1500.pb.gz'
+        try:
+            elo = int(name.split('-')[1].split('.')[0])
+        except (IndexError, ValueError):
+            elo = 0
+        return elo
+
+    # Sort descending by Elo
+    candidates.sort(key=extract_elo, reverse=True)
+    return candidates[0]
 
 if is_wayland():
     import io
@@ -64,6 +88,7 @@ class ChessPilot:
         self.auto_mode_var = tk.BooleanVar(value=False)
         self.board_positions = {}
         self.processing_move = False
+        self.models_dir = os.path.abspath(resource_path("models"))
 
         # New: Screenshot delay variable (0.0 to 1.0 seconds)
         self.screenshot_delay_var = tk.DoubleVar(value=0.4)
@@ -126,10 +151,10 @@ class ChessPilot:
         btn_frame.pack(pady=5)
 
         depth_panel = tk.Frame(color_panel, bg=self.frame_color)
-        tk.Label(depth_panel, text="Stockfish Depth:", font=('Segoe UI', 10),
+        tk.Label(depth_panel, text="lc0 nodes:", font=('Segoe UI', 10),
                 bg=self.frame_color, fg=self.text_color).pack(anchor='w')
         
-        self.depth_slider = ttk.Scale(depth_panel, from_=10, to=30, variable=self.depth_var,
+        self.depth_slider = ttk.Scale(depth_panel, from_=50, to=500, variable=self.depth_var,
                                     style="TScale", command=self.update_depth_label)
         self.depth_slider.pack(fill='x', pady=5)
         
@@ -243,95 +268,71 @@ class ChessPilot:
             return None
         
 
-    def get_best_move(self, fen):
+
+    def get_best_move(self, fen: str):
         """
-        Use Maia (LCZero binary with Maia weights) to suggest the human-like move.
-        Depth var represents visit count.
+        Use Maia (lc0 with Maia weights) to suggest a human-like move.
+        Returns (best_move_uci, resulting_fen, is_mate).
         """
         try:
-            # Locate the lc0 binary and Maia weights file
-            lc0_path = get_binary_path("lc0.exe")
-            def find_maia_weights(models_dir):
-                pattern = os.path.join(models_dir, "maia-*.pb.gz")
-                files = glob.glob(pattern)
-                if not files:
-                    messagebox.showerror("Error", f"No Maia weights found in {models_dir}")
-                    sys.exit(1)
-                # Optionally, sort by Elo rating embedded in the filename and pick the highest:
-                def elo_from_name(path):
-                    name = os.path.basename(path)
-                    return int(name.split('-')[1].split('.')[0])
-                files.sort(key=elo_from_name, reverse=True)
-                return files[0]
-            
-            weights_dir = resource_path("models")
-            weights = find_maia_weights(weights_dir)
+            lc0_path = get_binary_path("lc0")
+            weights = find_maia_weights(self.models_dir)
 
-            # Launch Maia (lc0) in UCI mode
-            engine = subprocess.Popen([lc0_path, "--backend=onnx-cpu", f"--weights={weights}", "--verbose-move-stats"],
+            popen_kwargs = dict(
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+            if os.name == "nt":
+                popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+            engine = subprocess.Popen(
+                [lc0_path,
+                 "--backend=onnx-cpu",
+                 f"--weights={weights}",
+                 "--verbose-move-stats"],
+                **popen_kwargs
             )
 
-            # Initialize UCI
             engine.stdin.write("uci\n")
             engine.stdin.flush()
-            # Wait for 'uciok'
-            while True:
-                line = engine.stdout.readline()
-                if not line:
-                    break
+            for line in engine.stdout:
                 if line.strip() == 'uciok':
                     break
 
-            # Set position
             engine.stdin.write(f"position fen {fen}\n")
             engine.stdin.write(f"go nodes {self.depth_var.get()}\n")
             engine.stdin.flush()
-            
-            mate_flag = False
+
             best_move = None
-            # Parse bestmove
-            while True:
-                line = engine.stdout.readline()
-                if not line:
-                    break
-                # if "(T)" in line:
-                #     try:
-                #         parts = line.split("(T)")
-                #         mate_val = int(parts[1].split()[0])
-                #         if abs(mate_val) == 1:
-                #             mate_flag = True
-                #     except (IndexError, ValueError):
-                #         pass
+            for line in engine.stdout:
                 if line.startswith("bestmove"):
                     parts = line.split()
-                    if len(parts) >= 2:
-                        best_move = parts[1]
+                    best_move = parts[1] if len(parts) > 1 else None
                     break
-            updated_fen = None
-            if best_move:
-                engine.stdin.write(f"position fen {fen} moves {best_move}\n")
-                engine.stdin.write("d\n")
-                engine.stdin.flush()
-                while True:
-                    line = engine.stdout.readline()
-                    if "fen" in line:
-                        updated_fen = line.split("fen")[1].strip()
-                        break
 
-            # Clean up
+            board = chess.Board(fen)
+            
+            is_mate = False
+            updated_fen = None
+            
+            if best_move and best_move != '(none)':
+                board.push_uci(best_move)
+                is_mate = board.is_checkmate()
+                updated_fen = board.fen()
+
+            # 7. Cleanup
             engine.stdin.write("quit\n")
             engine.stdin.flush()
             engine.wait()
 
-            return best_move, updated_fen, mate_flag
+            return best_move, updated_fen, is_mate
 
         except Exception as e:
-            self.root.after(0, lambda err=e: messagebox.showerror("Error", f"Maia engine error: {err}"))
+            # Show error in GUI and disable auto mode
+            self.root.after(0, lambda err=e: messagebox.showerror(
+                "Engine Error", f"Maia engine error:\n{err}"))
             self.auto_mode_var.set(False)
             return None
 
@@ -388,6 +389,10 @@ class ChessPilot:
         start_x, start_y = start_pos
         end_x, end_y = end_pos
 
+        def random_delay(min_delay=0.1, max_delay=0.5):
+            time.sleep(random.uniform(min_delay, max_delay))
+
+
         try:
             # Use appropriate click method based on the platform
             if os.name == "nt":  # Windows
@@ -398,10 +403,10 @@ class ChessPilot:
                         
                 def win_click(x, y):
                     win32api.SetCursorPos((x, y))
-                    time.sleep(0.05)
+                    random_delay(0.05, 0.15)
                     shake_mouse(x, y)
                     win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-                    time.sleep(0.02)
+                    random_delay(0.05, 0.15)
                     win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
                 
                 # Click on the start position

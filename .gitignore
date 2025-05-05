@@ -13,3 +13,4 @@ stockfish.exe
 tempCodeRunnerFile.py
 release-notes.md
 chess_detection.onnx
+models/
