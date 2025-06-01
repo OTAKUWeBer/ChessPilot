@@ -8,12 +8,18 @@ import sys
 
 from utils.logging_setup import setup_console_logging
 from utils.resource_path import resource_path
-from utils.chess_resources_manager import rename_onnx_model
+from utils.chess_resources_manager import rename_onnx_model, extract_lc0
 
 # Initialize Logging
 setup_console_logging()
 logger = logging.getLogger("main")
 
+if not extract_lc0():
+    logger.error(
+        "Lc0 extraction failed. Please check the logs "
+        "and ensure the Lc0 binary is downloaded correctly."
+    )
+    sys.exit(1)
 
 if not rename_onnx_model():
     logger.error(
