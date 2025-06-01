@@ -3,6 +3,11 @@ import pyautogui
 from input_capture.wayland import WaylandInput
 from tkinter import messagebox
 import logging
+import os
+
+if os.name == 'nt':
+    import win32api
+    import win32con
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -17,7 +22,12 @@ def move_cursor_to_button(root, auto_mode_var, btn_play):
         center_y = y + (height // 2)
         if is_wayland():
             client = WaylandInput()
-            client.click(int(center_x), int(center_y))
+            client.click(int(center_x), int(center_y))        
+        elif os.name == 'nt':
+            import win32api
+            import win32con
+            win32api.SetCursorPos((int(center_x), int(center_y)))
+            win32api.mouse_event(win32con.MOUSEEVENTF_MOVE, 0, 0)
         else:
             pyautogui.moveTo(center_x, center_y, duration=0.1)
     except Exception as e:
