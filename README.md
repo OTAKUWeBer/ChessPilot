@@ -56,6 +56,7 @@ Make sure you have:
   * `onnxruntime`
   * `numpy`
   * `tkinter`
+  * `pywin32`
   * `python-chess`
 
 ### Installing Dependencies
