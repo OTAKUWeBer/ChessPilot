@@ -1,26 +1,6 @@
 import subprocess
 import re
-import os
-import sys
-import shutil
-
-def get_binary_path(binary):
-    # Append .exe for Windows if necessary.
-    if os.name == "nt" and not binary.endswith(".exe"):
-        binary += ".exe"
-        
-    if getattr(sys, 'frozen', False):
-        # When bundled, look in the _MEIPASS directory.
-        path = os.path.join(sys._MEIPASS, binary)
-    else:
-        # Look for the binary in the system PATH.
-        path = shutil.which(binary)
-        if path is None:
-            path = binary
-
-    if not (path and os.path.exists(path)):
-        raise FileNotFoundError(f"{binary} is missing! Make sure it's bundled properly.")
-    return path
+from utils.get_binary_path import get_binary_path
 
 def get_resolution():
     try:

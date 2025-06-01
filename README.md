@@ -1,112 +1,199 @@
-# Chess Position Evaluator (Cross-Platform Maia Edition)
+# Chess Position Evaluator
 
 <p align="center">
   <img src="assets/chess-banner.jpg" alt="Chess Banner" width="600" />
 </p>
 
-## What’s Changed & Why
+## Features
 
-* **Maia Integration**
+* **FEN Extraction**: Detects the board position from your screen using [Zai-Kun's Chess Pieces Detection](https://github.com/Zai-Kun/2d-chess-pieces-detection).
+* **Local Model Inference**: Uses a local ONNX model to ensure fast, offline board recognition.
+* **Maia (Lc0) Integration**: Analyzes the board and suggests a human-like move using the [Maia chess model](https://maiachess.com/) running through [Lc0](https://github.com/LeelaChessZero/lc0).
+* **Auto Move Execution**: Automatically plays the best move on your screen.
+* **Manual Play**: Use a **"Play Next Move"** button to control when the move is made.
+* **Board Flipping**: Automatically flips the board if you're playing as Black.
+* **Castling Support**: Tick checkboxes to indicate castling rights before each move.
+* **Depth Control**: A slider lets you set Lc0’s search depth via nodes (default: \~8000 nodes).
+* **Retry Mechanism**: Retries the move up to 3 times if it doesn't execute correctly.
+* **ESC Key Functionality**: Press ESC to reselect playing color.
+* **GUI Interface**: Uses Tkinter for a user-friendly, interactive experience.
+* **Performance Optimized**: All processing is done locally—no external API calls.
 
-  * Stockfish replaced with the human-like Maia engine (`lc0` + `maia-*.pb.gz` weights).
-  * Maia’s suggestions mimic a \~1600 Elo human, reducing cheat flags on sites like Chess.com.
+---
 
-* **Visits Slider**
+## Download
 
-  * Renamed **"Maia Visits"** to control Monte‑Carlo Tree Search visits (default **100**, range 10–500).
+Get the latest release from [GitHub Releases](https://github.com/OTAKUWeBer/ChessPilot/releases/latest/).
 
-* **Cross-Platform Input Support**
+### Required Downloads (Place These in the Project Folder)
 
-  * **Windows**: native Win32 API (`win32api`/`win32con`) for click-click controls.
-  * **Wayland**: uses `grim` for screenshots and `input_capture.WaylandInput` for clicks.
-  * **X11/Linux**: falls back to `mss` screenshots and `pyautogui` for cursor movement & clicks.
+1. **Chess Detection Model**
+   Download the ONNX model from:
+   [Download ONNX Model](https://github.com/Zai-Kun/2d-chess-pieces-detection/releases/download/v0.0.4/chess_detectionv0.0.4.onnx)
 
-* **Roblox 2D Chess Club**
+2. **Lc0 Engine (Leela Chess Zero)**
+   Download the latest version of Lc0 for your platform:
+   [Download Lc0](https://github.com/LeelaChessZero/lc0/releases)
 
-  * Adapted to click-click (no drag) for compatibility with Roblox’s 2D input model.
+3. **Maia Weights for Lc0 (ONNX)**
+   Download a Maia weights file in ONNX format (e.g. `maia-1100.onnx`) from:
+   [Download Maia Weights](https://maiachess.com/#downloads)
 
-## Installation & Setup
+> 🗂️ **Important:** Do **not** rename the files. Just place the ONNX model, Lc0 binary, and Maia weight file directly inside the `ChessPilot` directory (same folder as `main.py`). The script will automatically detect and use them.
 
-1. **Clone the Repository**
+---
+
+## Prerequisites
+
+Make sure you have:
+
+* **Python 3.10+**
+* **Python Packages**:
+
+  * `mss`
+  * `Pillow`
+  * `pyautogui`
+  * `onnxruntime`
+  * `numpy`
+  * `tkinter`
+  * `python-chess`
+
+### Installing Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### If `tkinter` is Missing
+
+Tkinter is usually bundled with Python on Windows and macOS, but if you're on Linux or using a minimal Python build, you may need to install it manually:
+
+* **Ubuntu / Debian:**
+
+  ```bash
+  sudo apt install python3-tk
+  ```
+
+* **Arch Linux:**
+
+  ```bash
+  sudo pacman -S tk
+  ```
+
+* **Fedora:**
+
+  ```bash
+  sudo dnf install python3-tkinter
+  ```
+
+---
+
+## Installation
+
+1. **Clone the Repository:**
 
    ```bash
-   git clone --branch maia-support --single-branch https://github.com/OTAKUWeBer/ChessPilot.git
+   git clone https://github.com/OTAKUWeBer/ChessPilot.git
    cd ChessPilot
    ```
 
-3. **Install Python Dependencies**
+2. **Install Python Dependencies:**
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Board Detection Model**
+3. **Add Required Files:**
 
-   * Download `chess_detection.onnx` from:
-     [https://github.com/Zai-Kun/2d-chess-pieces-detection/releases/latest](https://github.com/Zai-Kun/2d-chess-pieces-detection/releases/latest)
-   * Rename to `chess_detection.onnx` and place alongside `main.py`.
+   * Place the downloaded ONNX model (`chess_detectionv0.0.4.onnx`)
+   * The `lc0` binary appropriate for your OS
+   * And a Maia `.onnx` weights file (e.g., `maia-1100.onnx`)
+     into the `ChessPilot` folder (same directory as `main.py`).
 
-5. **LCZero (lc0)**
+---
 
-   * Download the Windows binary (or Linux) from:
-     [https://github.com/LeelaChessZero/lc0/releases](https://github.com/LeelaChessZero/lc0/releases)
-   * Place `lc0.exe` (Windows) or `lc0` (Linux) in the project root.
+## Platform Notes
 
-6. **Maia Weights**
+### Linux Users
 
-   * Download `maia-1600.pb.gz` from:
-     [https://github.com/CSSLab/maia-chess/releases/latest](https://github.com/CSSLab/maia-chess/releases/latest)
-   * Create a folder `models/` next to `main.py` and add the weights.
+Install Lc0 via your package manager or from the GitHub releases:
 
-7. **Wayland Support (Linux)**
+```bash
+# Arch Linux
+paru -S lc0
 
-   * Install `grim` for screenshots: e.g. `sudo pacman -S grim`.
-   * Ensure `input_capture` module is available in your PYTHONPATH.
+# Or build/install manually for full ONNX support
+```
 
-8. **Run the App**
+#### Wayland Users (Hyprland, Sway)
+
+You will need additional tools for screenshots and screen size detection:
+
+```bash
+sudo pacman -S grim wayland-utils
+```
+
+---
+
+## Usage
+
+1. **Run the Script:**
 
    ```bash
    python main.py
    ```
 
-## Usage
+2. **Choose Your Color:**
 
-1. Choose **White** or **Black** in the GUI.
-2. Adjust **Maia Visits** slider (10–500).
-3. **Play Next Move**:
+   * Select **White** or **Black**.
+   * Press **ESC** to reselect.
 
-   * Manual: click **Play Next Move**.
-   * Auto: enable **Auto Play Moves**.
-4. Tick **Kingside/Queenside** for castling rights as needed.
-5. Press **ESC** to reset color selection.
+3. **Enable Castling (If Applicable):**
 
-## Branch Workflow
+   * Tick **Kingside** or **Queenside** before each move if you still retain castling rights.
 
-To keep Maia work separate from `main`:
+4. **Set Move Depth (Optional):**
 
-```bash
-# Ensure on main
-git checkout main
-# Create feature branch
-git checkout -b maia-support
-# Commit and push
-git push -u origin maia-support
-```
+   * Adjust the slider to change the number of nodes Lc0 will search.
+   * Higher values improve accuracy but slow down move calculation.
 
-Continue committing on `maia-support` without merging into `main`.
+5. **Play Modes:**
 
-## Conversational Context
+   * **Manual Mode**: Click **"Play Next Move"** for each move.
+   * **Auto Mode**: Enable **Auto Play** to let the script make your next move automatically.
 
-* **Chess.com**: Maia’s human‑like mistakes reduce cheating flags.
-* **Roblox Chess Club**: Win32 click‑click ensures reliable piece movement.
+6. **Retry System:**
+
+   * The tool will retry move execution up to **3 times** if it fails initially.
+
+7. **Tips for Accuracy:**
+
+   * Use **100% zoom** in your browser or chess interface.
+   * Keep the Tkinter window out of the way of the board.
+   * Keep your board square and aligned.
+
+---
 
 ## Disclaimer
 
-🛑 **Use at Your Own Risk**: Even human-like engines may violate ToS on some platforms.
+🛑 **Use at Your Own Risk**: Automating chess play may violate terms of service on online platforms. You are responsible for how you use this tool.
 
-## License & Contributing
+---
 
-* **MIT License**.
-* Contributions welcome for additional Maia levels, input support, or new platforms.
+## License
 
-Enjoy realistic, cross-platform chess automation! 🎉
+This project is licensed under the [MIT License](LICENSE).
+
+---
+
+## Contributing
+
+Contributions are welcome! Feel free to open issues or submit pull requests if you have suggestions or improvements.
+
+---
+
+## Acknowledgments
+
+* Thanks to [Zai-Kun](https://github.com/Zai-Kun) for the ONNX chessboard detection model.
+* [Lc0 Team](https://github.com/LeelaChessZero/lc0) for the powerful open-source chess engine.
+* [Maia Chess Project](https://maiachess.com/) for the human-like evaluation weights.

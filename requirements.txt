@@ -3,5 +3,3 @@ pyautogui
 Pillow
 onnxruntime
 numpy
-pywin32
-python-chess

@@ -1,16 +1,75 @@
-chess-screenshot.png
-current_board.png
-dist/
-build/
-*.spec
+# Python environment folders
+myenv/
+venv/
+.venv/
+env/
+.python-version
+
+# Python cache and compiled files
 __pycache__/
 *.pyc
 *.pyo
-myenv/
-.python-version
+*.pyd
+*.py[cod]
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+*.spec
+
+# Logs and debug files
+*.log
+*.out
+*.err
+debug.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.bak
+*.tmp
+*.orig
+*.~*
+
+# System-specific files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Test and coverage files
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.tox/
+.pytest_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Temporary files
+tempCodeRunnerFile.py
+
+# Project-specific files
+release-notes.md
 stockfish
 stockfish.exe
-tempCodeRunnerFile.py
-release-notes.md
 chess_detection.onnx
-models/
+*.zip
+
+# Maia-specific files
+*.pb
+*.pb.gz
+*.gz

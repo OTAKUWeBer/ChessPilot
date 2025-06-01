@@ -1,0 +1,147 @@
+import logging
+import tkinter as tk
+import time
+from boardreader import get_positions, get_fen_from_position
+from engine.capture_screenshot_in_memory import capture_screenshot_in_memory
+from engine.get_best_move import get_best_move
+from engine.is_castling_possible import is_castling_possible
+from engine.update_fen_castling_rights import update_fen_castling_rights
+from engine.execute_normal_move import execute_normal_move
+from engine.store_board_positions import store_board_positions
+from engine.get_current_fen import get_current_fen
+from engine.verify_move import verify_move
+from engine.move_piece import move_piece
+from engine.processing_sync import processing_event
+
+# Logger setup
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+
+def process_move(
+    root,
+    color_indicator,
+    auto_mode_var,
+    btn_play,
+    board_positions,
+    update_status,
+    kingside_var,
+    queenside_var,
+    update_last_fen_for_color,
+    last_fen_by_color,
+    screenshot_delay_var,
+):
+    # If another move is already running, just return
+    if processing_event.is_set():
+        logger.warning("Move already being processed; aborting this call.")
+        return
+
+    # Mark “we are processing a move”
+    processing_event.set()
+    root.after(0, lambda: btn_play.config(state=tk.DISABLED))
+    root.after(0, lambda: update_status("\nAnalyzing board..."))
+
+    try:
+        logger.info("Capturing screenshot")
+        screenshot_image = capture_screenshot_in_memory(root, auto_mode_var)
+        if not screenshot_image:
+            logger.warning("Screenshot capture failed.")
+            return
+
+        boxes = get_positions(screenshot_image)
+        if not boxes:
+            logger.error("No chessboard found in screenshot.")
+            root.after(0, lambda: update_status("\nNo board detected"))
+            auto_mode_var.set(False)
+            return
+
+        try:
+            chessboard_x, chessboard_y, square_size, fen = get_fen_from_position(
+                color_indicator, boxes
+            )
+            logger.debug(f"FEN extracted: {fen}")
+        except ValueError as e:
+            logger.error(f"FEN extraction failed: {e}")
+            root.after(0, lambda err=e: update_status(f"Error: {str(err)}"))
+            auto_mode_var.set(False)
+            return
+
+        fen = update_fen_castling_rights(
+            color_indicator,
+            kingside_var,
+            queenside_var,
+            fen
+        )
+        logger.debug(f"FEN after castling update: {fen}")
+
+        store_board_positions(board_positions, chessboard_x, chessboard_y, square_size)
+
+        depth = root.depth_var.get() if hasattr(root, "depth_var") else 15
+        logger.info(f"Asking engine for best move at depth {depth}")
+        best_move, updated_fen, mate_flag = get_best_move(depth, fen, root, auto_mode_var)
+
+        update_last_fen_for_color(updated_fen)
+
+        if not best_move:
+            logger.warning("No move returned by engine.")
+            root.after(0, lambda: update_status("No valid move found!"))
+            return
+
+        logger.info(f"Best move suggested: {best_move}")
+        castling_moves = {"e1g1", "e1c1", "e8g8", "e8c8"}
+        if best_move in castling_moves:
+            side = 'kingside' if best_move in {"e1g1", "e8g8"} else 'queenside'
+            logger.info(f"Castling move detected: {side}")
+
+            if ((side == 'kingside' and kingside_var.get()) or 
+                (side == 'queenside' and queenside_var.get())):
+                if is_castling_possible(fen, color_indicator, side):
+                    move_piece(color_indicator, best_move, board_positions, auto_mode_var, root, btn_play)
+                    status_msg = f"\nBest Move: {best_move}\nCastling move executed: {best_move}"
+                    if mate_flag:
+                        status_msg += "\n𝘾𝙝𝙚𝙘𝙠𝙢𝙖𝙩𝙚"
+                        auto_mode_var.set(False)
+                    root.after(0, lambda: update_status(status_msg))
+                    time.sleep(0.3)
+
+                    success, _ = verify_move(color_indicator, best_move, updated_fen)
+                    if not success:
+                        logger.error("Move verification failed after castling.")
+                        root.after(0, lambda: update_status(f"Move verification failed on checkmate move\nBest Move: {best_move}"))
+                    else:
+                        fen_after = get_current_fen(color_indicator)
+                        if fen_after:
+                            last_fen_by_color[color_indicator] = fen_after.split()[0]
+                        logger.info("Castling move verified and updated.")
+                else:
+                    logger.warning("Castling not possible according to board state.")
+            else:
+                logger.info("Castling option was disabled via UI.")
+        else:
+            logger.info("Executing normal move.")
+            success = execute_normal_move(
+                board_positions,
+                color_indicator,
+                best_move,
+                mate_flag,
+                updated_fen,
+                root,
+                auto_mode_var,
+                update_status,
+                btn_play
+            )
+            if not success:
+                logger.error("Normal move execution failed.")
+                return
+
+    except Exception as e:
+        logger.exception("Unexpected error during process_move")
+        root.after(0, lambda err=e: update_status(f"Error: {str(err)}"))
+        auto_mode_var.set(False)
+
+    finally:
+        # Clear the Event so auto_move_loop knows we’re done
+        processing_event.clear()
+        if not auto_mode_var.get():
+            root.after(0, lambda: btn_play.config(state=tk.NORMAL))
+        logger.info("process_move completed.")
