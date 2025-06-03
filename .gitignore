@@ -73,3 +73,7 @@ chess_detection.onnx
 *.pb
 *.pb.gz
 *.gz
+*.zip
+wayland-info
+grim
+*.AppDir

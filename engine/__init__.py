@@ -13,6 +13,7 @@ from .verify_move                 import verify_move
 from .auto_move                   import auto_move_loop
 from .get_best_move               import get_best_move
 from .get_current_fen             import get_current_fen
+from .is_two_square_king_move     import is_two_square_king_move
 
 __all__ = [
     "capture_screenshot_in_memory",
@@ -30,4 +31,5 @@ __all__ = [
     "auto_move_loop",
     "get_best_move",
     "get_current_fen",
+    "is_two_square_king_move"
 ]

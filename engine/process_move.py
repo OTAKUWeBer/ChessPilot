@@ -1,7 +1,6 @@
 import logging
 import tkinter as tk
 import time
-from types import Tuple
 from boardreader import get_positions, get_fen_from_position
 from engine.capture_screenshot_in_memory import capture_screenshot_in_memory
 from engine.get_best_move import get_best_move
@@ -12,6 +11,7 @@ from engine.store_board_positions import store_board_positions
 from engine.get_current_fen import get_current_fen
 from engine.verify_move import verify_move
 from engine.move_piece import move_piece
+from engine.is_two_square_king_move import is_two_square_king_move
 from engine.processing_sync import processing_event
 
 # Logger setup
@@ -90,55 +90,14 @@ def process_move(
 
         logger.info(f"Best move suggested: {best_move}")
 
-        def is_two_square_king_move(move_str: str, current_fen: str, color: str) -> Tuple[(bool, str)]:
-            """
-            Return (True, side) if `move_str` is a legal castling-style king move
-            from current_fen for this color.  side is either 'kingside' or 'queenside'.
-            Otherwise returns (False, "").
-            """
-            # move_str is always four characters, e.g. 'e8c8'.
-            f_file, f_rank, t_file, t_rank = move_str[0], move_str[1], move_str[2], move_str[3]
-
-            if f_rank != t_rank:
-                return False, ""
-
-            col_diff = abs(ord(f_file) - ord(t_file))
-            if col_diff != 2:
-                return False, ""
-
-            placement = current_fen.split()[0]
-            rows = placement.split("/")
-            try:
-                rank_idx = 8 - int(f_rank)  # rank '8' → index 0, rank '1' → index 7.
-            except ValueError:
-                return False, ""
-
-            row_str = rows[rank_idx]
-            expanded = []
-            for ch in row_str:
-                if ch.isdigit():
-                    expanded += [""] * int(ch)
-                else:
-                    expanded.append(ch)
-
-            file_idx = ord(f_file) - ord("a")
-            if file_idx < 0 or file_idx > 7:
-                return False, ""
-
-            piece_at_source = expanded[file_idx]
-            if color == "w" and piece_at_source != "K":
-                return False, ""
-            if color == "b" and piece_at_source != "k":
-                return False, ""
-
-            side_choice = "kingside" if (ord(t_file) > ord(f_file)) else "queenside"
-            return True, side_choice
-
+        # Detect if the engine wants to castle:
         is_castle_move, side = is_two_square_king_move(best_move, fen, color_indicator)
-        if is_castle_move:
+
+        # If neither castling checkbox is checked, skip castling logic entirely:
+        if is_castle_move and (kingside_var.get() or queenside_var.get()):
             logger.info(f"Castling move detected by pattern: {side} (move={best_move})")
 
-            # Auto-enable the checkbox if it’s not already checked:
+            # Auto-enable the appropriate checkbox if it’s not already checked:
             if side == "kingside" and not kingside_var.get():
                 logger.info("Auto-checking 'Kingside Castle' checkbox")
                 kingside_var.set(True)
@@ -148,6 +107,7 @@ def process_move(
                 queenside_var.set(True)
                 root.after(0, lambda: update_status("Auto-enabled Queenside Castle"))
 
+            # Verify that castling is actually possible on the board:
             if is_castling_possible(fen, color_indicator, side):
                 move_piece(color_indicator, best_move, board_positions, auto_mode_var, root, btn_play)
                 status_msg = f"\nBest Move: {best_move}\nCastling move executed: {best_move}"
@@ -161,7 +121,7 @@ def process_move(
                 if not success:
                     logger.error("Move verification failed after castling.")
                     root.after(0, lambda: update_status(
-                        f"Move verification failed on checkmate move\nBest Move: {best_move}"
+                        f"Move verification failed on castling move\nBest Move: {best_move}"
                     ))
                 else:
                     fen_after = get_current_fen(color_indicator)

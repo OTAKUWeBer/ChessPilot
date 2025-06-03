@@ -34,6 +34,8 @@ Get the latest release from [GitHub Releases](https://github.com/OTAKUWeBer/Ches
 2. **Lc0 Engine (Leela Chess Zero)**
    Download the latest version of Lc0 for your platform:
    [Download Lc0](https://github.com/LeelaChessZero/lc0/releases)
+   
+   > ⚙️ **Note:** The ONNX runtime may require the Microsoft Visual C++ Redistributable on Windows. Download the latest supported version from the official Microsoft site: [Visual C++ Redistributable Downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
 
 3. **Maia Weights for Lc0 (ONNX)**
    Download a Maia weights file in ONNX format (e.g. `maia-1100.onnx`) from:
