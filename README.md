@@ -59,6 +59,7 @@ Make sure you have:
   * `numpy`
   * `tkinter`
   * `pywin32`
+  * `colorama`
   * `python-chess`
 
 ### Installing Dependencies
