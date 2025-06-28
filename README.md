@@ -1,203 +1,145 @@
-# Chess Position Evaluator
+<p align="center">
+  <img src="assets/logo.png" alt="ChessPilot Logo" width="150" />
+</p>
+<hr />
+
+<h1 align="center">ChessPilot (Maia Edition)</h1>
 
 <p align="center">
-  <img src="assets/chess-banner.jpg" alt="Chess Banner" width="600" />
+  A fully offline chess position evaluator and autoplayer for Windows and Linux, powered by ONNX, Lc0, and Maia.
 </p>
 
-## Features
-
-* **FEN Extraction**: Detects the board position from your screen using [Zai-Kun's Chess Pieces Detection](https://github.com/Zai-Kun/2d-chess-pieces-detection).
-* **Local Model Inference**: Uses a local ONNX model to ensure fast, offline board recognition.
-* **Maia (Lc0) Integration**: Analyzes the board and suggests a human-like move using the [Maia chess model](https://maiachess.com/) running through [Lc0](https://github.com/LeelaChessZero/lc0).
-* **Auto Move Execution**: Automatically plays the best move on your screen.
-* **Manual Play**: Use a **"Play Next Move"** button to control when the move is made.
-* **Board Flipping**: Automatically flips the board if you're playing as Black.
-* **Castling Support**: Tick checkboxes to indicate castling rights before each move.
-* **Depth Control**: A slider lets you set Lc0’s search depth via nodes (default: \~8000 nodes).
-* **Retry Mechanism**: Retries the move up to 3 times if it doesn't execute correctly.
-* **ESC Key Functionality**: Press ESC to reselect playing color.
-* **GUI Interface**: Uses Tkinter for a user-friendly, interactive experience.
-* **Performance Optimized**: All processing is done locally—no external API calls.
+<p align="center">
+<a href="https://img.shields.io/github/license/OTAKUWeBer/ChessPilot?style=for-the-badge"><img src="https://img.shields.io/github/license/OTAKUWeBer/ChessPilot?style=for-the-badge&color=F48041"></a>
+<a href="https://img.shields.io/github/v/release/OTAKUWeBer/ChessPilot?style=for-the-badge"><img src="https://img.shields.io/github/v/release/OTAKUWeBer/ChessPilot?style=for-the-badge&color=0E80C0"></a>
+<a href="https://img.shields.io/codefactor/grade/github/OTAKUWeBer/ChessPilot?style=for-the-badge&color=03A363"><img src="https://img.shields.io/codefactor/grade/github/OTAKUWeBer/ChessPilot?style=for-the-badge&color=03A363"></a>
+<a href="https://img.shields.io/github/downloads/OTAKUWeBer/ChessPilot/total.svg?style=for-the-badge"><img src="https://img.shields.io/github/downloads/OTAKUWeBer/ChessPilot/total.svg?style=for-the-badge&color=CAF979"></a>
+<a href="https://img.shields.io/github/issues/OTAKUWeBer/ChessPilot?style=for-the-badge"><img src="https://img.shields.io/github/issues/OTAKUWeBer/ChessPilot?style=for-the-badge&color=CE5842"></a>
+<br>
+<a href="https://img.shields.io/badge/Made_For-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=white"><img src="https://img.shields.io/badge/Made_For-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=white"></a>
+<a href="https://img.shields.io/badge/Made_For-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"><img src="https://img.shields.io/badge/Made_For-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"></a>
 
 ---
 
-## Download
+## 🚀 Features
 
-Get the latest release from [GitHub Releases](https://github.com/OTAKUWeBer/ChessPilot/releases/latest/).
-
-### Required Downloads (Place These in the Project Folder)
-
-1. **Chess Detection Model**
-   Download the ONNX model from:
-   [Download ONNX Model](https://github.com/Zai-Kun/2d-chess-pieces-detection/releases/download/v0.0.4/chess_detectionv0.0.4.onnx)
-
-2. **Lc0 Engine (Leela Chess Zero)**
-   Download the latest version of Lc0 for your platform:
-   [Download Lc0](https://github.com/LeelaChessZero/lc0/releases)
-   
-   > ⚙️ **Note:** The ONNX runtime may require the Microsoft Visual C++ Redistributable on Windows. Download the latest supported version from the official Microsoft site: [Visual C++ Redistributable Downloads](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
-
-3. **Maia Weights for Lc0 (ONNX)**
-   Download a Maia weights file in ONNX format (e.g. `maia-1100.onnx`) from:
-   [Download Maia Weights](https://maiachess.com/#downloads)
-
-> 🗂️ **Important:** Do **not** rename the files. Just place the ONNX model, Lc0 binary, and Maia weight file directly inside the `ChessPilot` directory (same folder as `main.py`). The script will automatically detect and use them.
+* **FEN Extraction**: Captures your board state with a local ONNX model ([Zai-Kun’s 2D Chess Detection](https://github.com/Zai-Kun/2d-chess-pieces-detection)).
+* **Lc0 (Maia) Analysis**: Integrates with [Lc0](https://github.com/LeelaChessZero/lc0) to play human-like moves using Maia weights.
+* **Auto-Move Execution**: Plays the suggested move on your screen automatically.
+* **Manual Play**: Click **“Play Next Move”** when you’re ready to proceed.
+* **Board Flipping**: Supports playing as Black by flipping the board.
+* **Castling Rights**: Toggle Kingside/Queenside castling.
+* **Node Control**: Adjust analysis depth by setting max nodes (default: ~8000).
+* **Retry Logic**: Retries failed moves up to three times.
+* **ESC Shortcut**: Press **ESC** to reselect playing color at any time.
+* **Cross-Platform GUI**: Built with Tkinter for simplicity.
+* **100% Offline**: No external API calls—your data stays local.
 
 ---
 
-## Prerequisites
+## 📦 Download
 
-Make sure you have:
+👉 [Download the latest release](https://github.com/OTAKUWeBer/ChessPilot/releases/latest)
 
-* **Python 3.10+**
-* **Python Packages**:
+### Included in Binary Releases
 
-  * `mss`
-  * `Pillow`
-  * `pyautogui`
-  * `onnxruntime`
-  * `numpy`
-  * `tkinter`
-  * `pywin32`
-  * `colorama`
-  * `python-chess`
+The ONNX model (`chess_detectionv0.0.4.onnx`) is already bundled in official **AppImage**, **EXE**, and **DEB** builds. You only need to provide:
 
-### Installing Dependencies
+- **Lc0 executable**
+- **Maia ONNX weights**
+
+> ❗ Place both files in the project root or next to the `main.py`.
+
+---
+
+## 🔧 Requirements (For Source Builds)
+
+### System Requirements
+
+```bash
+sudo apt install python3-tk      # Ubuntu / Debian
+sudo pacman -S tk                # Arch Linux
+sudo dnf install python3-tkinter # Fedora
+```
+
+### Python Dependencies
+
+Install required Python packages:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### If `tkinter` is Missing
+---
 
-Tkinter is usually bundled with Python on Windows and macOS, but if you're on Linux or using a minimal Python build, you may need to install it manually:
+## 📂 Assets Needed (Manual Setup)
 
-* **Ubuntu / Debian:**
+1. [chess_detectionv0.0.4.onnx](https://github.com/Zai-Kun/2d-chess-pieces-detection/releases/download/v0.0.4/chess_detectionv0.0.4.onnx)  
+2. [Lc0 Engine](https://github.com/LeelaChessZero/lc0/releases)  
+3. [Maia Weights (ONNX)](https://maiachess.com/#downloads) (e.g. `maia-1100.onnx`)
 
-  ```bash
-  sudo apt install python3-tk
-  ```
+> ⚠️ Do not rename these files. Place them in the root of the project (same as `main.py`).
 
-* **Arch Linux:**
-
-  ```bash
-  sudo pacman -S tk
-  ```
-
-* **Fedora:**
-
-  ```bash
-  sudo dnf install python3-tkinter
-  ```
+> **Windows Note**: You may also need the [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
 
 ---
 
-## Installation
-
-1. **Clone the Repository:**
-
-   ```bash
-   git clone https://github.com/OTAKUWeBer/ChessPilot.git
-   cd ChessPilot
-   ```
-
-2. **Install Python Dependencies:**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **Add Required Files:**
-
-   * Place the downloaded ONNX model (`chess_detectionv0.0.4.onnx`)
-   * The `lc0` binary appropriate for your OS
-   * And a Maia `.onnx` weights file (e.g., `maia-1100.onnx`)
-     into the `ChessPilot` folder (same directory as `main.py`).
-
----
-
-## Platform Notes
-
-### Linux Users
-
-Install Lc0 via your package manager or from the GitHub releases:
+## 🛠️ Installation (From Source)
 
 ```bash
-# Arch Linux
-paru -S lc0
-
-# Or build/install manually for full ONNX support
-```
-
-#### Wayland Users (Hyprland, Sway)
-
-You will need additional tools for screenshots and screen size detection:
-
-```bash
-sudo pacman -S grim wayland-utils
+git clone https://github.com/OTAKUWeBer/ChessPilot.git
+cd ChessPilot
+pip install -r requirements.txt
+# Add chess_detectionv0.0.4.onnx, lc0 binary, and Maia ONNX weights
 ```
 
 ---
 
-## Usage
+## ▶️ Usage
 
-1. **Run the Script:**
+From the project root:
 
-   ```bash
-   python main.py
-   ```
+```bash
+python src/main.py
+```
 
-2. **Choose Your Color:**
+**Workflow**:
 
-   * Select **White** or **Black**.
-   * Press **ESC** to reselect.
-
-3. **Enable Castling (If Applicable):**
-
-   * Tick **Kingside** or **Queenside** before each move if you still retain castling rights.
-
-4. **Set Move Depth (Optional):**
-
-   * Adjust the slider to change the number of nodes Lc0 will search.
-   * Higher values improve accuracy but slow down move calculation.
-
-5. **Play Modes:**
-
-   * **Manual Mode**: Click **"Play Next Move"** for each move.
-   * **Auto Mode**: Enable **Auto Play** to let the script make your next move automatically.
-
-6. **Retry System:**
-
-   * The tool will retry move execution up to **3 times** if it fails initially.
-
-7. **Tips for Accuracy:**
-
-   * Use **100% zoom** in your browser or chess interface.
-   * Keep the Tkinter window out of the way of the board.
-   * Keep your board square and aligned.
+1. Choose **White** or **Black**.
+2. Enable castling rights if needed.
+3. Adjust Lc0 node search depth.
+4. Select **Manual** or **Auto** play.
 
 ---
 
-## Disclaimer
+## 💻 Platform Support
 
-🛑 **Use at Your Own Risk**: Automating chess play may violate terms of service on online platforms. You are responsible for how you use this tool.
-
----
-
-## License
-
-This project is licensed under the [MIT License](LICENSE).
+* **Windows**: ✅ Tested
+* **Linux**: ✅ Tested (Wayland via `grim` supported)
+* **macOS**: ❌ Untested (PRs welcome!)
 
 ---
 
-## Contributing
+## ⌨️ Shortcuts
 
-Contributions are welcome! Feel free to open issues or submit pull requests if you have suggestions or improvements.
+See [SHORTCUTS.md](SHORTCUTS.md) for a full list of hotkeys and actions.
 
 ---
 
-## Acknowledgments
+## 🙌 Contributing
 
-* Thanks to [Zai-Kun](https://github.com/Zai-Kun) for the ONNX chessboard detection model.
-* [Lc0 Team](https://github.com/LeelaChessZero/lc0) for the powerful open-source chess engine.
-* [Maia Chess Project](https://maiachess.com/) for the human-like evaluation weights.
+Contributions are welcome! Open issues or submit PRs.
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+
+---
+
+## 🙏 Acknowledgments
+
+* **Zai-Kun** for the ONNX chessboard detector.
+* **Lc0 Team** for the neural net chess engine.
+* **Maia Chess Project** for their human-centric evaluation models.
