@@ -124,17 +124,25 @@ def rename_lc0():
                 logger.info(f"Moved {dll.name} to {dest}")
     return True
 
-def rename_onnx_model():
-    cwd = Path.cwd()
-    target = cwd / "chess_detection.onnx"
+
+def rename_onnx_model(target_dir: Path = None) -> bool:
+    """
+    Ensures chess_detection.onnx is moved into target_dir (or cwd) from project or parent.
+    """
+    dest = target_dir or Path.cwd()
+    target = dest / "chess_detection.onnx"
     if getattr(sys, 'frozen', False):
         bundled = Path(sys._MEIPASS) / "chess_detection.onnx"
-        if bundled.exists(): return True
+        if bundled.exists():
+            return True
         logger.error("Bundled ONNX not found.")
         return False
-    if target.exists(): return True
-    found = find_file_with_keyword("chess_detection", ".onnx", cwd) \
-         or find_file_with_keyword("chess_detection", ".onnx", cwd.parent)
+    if target.exists():
+        logger.info(f"ONNX model already exists at {target}")
+        return True
+    # search in cwd and parent
+    found = find_file_with_keyword("chess_detection", ".onnx", Path.cwd()) \
+         or find_file_with_keyword("chess_detection", ".onnx", Path.cwd().parent)
     if not found:
         logger.error(f"No ONNX model found. See {README_ONNX_URL}")
         return False
@@ -154,7 +162,6 @@ def rename_maia_model(target_dir: Path = None) -> bool:
         logger.error("No Maia model found. Place a maia-*.pb.gz file in project or parent directory.")
         return False
 
-    # pick first candidate
     maia_file = candidates[0]
     target_path = dest / maia_file.name
     if not target_path.exists():
@@ -200,9 +207,18 @@ def find_maia_weights() -> str:
 
 
 def setup_resources(script_dir: Path, project_dir: Path) -> bool:
+    """
+    Prepare LC0, ONNX, and Maia resources in the src directory for all platforms.
+    """
+    # Always ensure models are in the script directory
+    rename_onnx_model(script_dir)
+    rename_maia_model(script_dir)
+
+    # On non-Windows, nothing more is needed
     if os.name != "nt":
         return True
 
+    # On Windows, handle LC0 ZIP, binary, and copy artifacts
     if not rename_lc0() or not extract_lc0():
         return False
 
@@ -217,11 +233,10 @@ def setup_resources(script_dir: Path, project_dir: Path) -> bool:
     # Move Maia model into script_dir
     rename_maia_model(script_dir)
 
-    # Finally, ensure ONNX and Maia are correctly named/placed
-    return rename_onnx_model(), True
+    return True
 
 
 if __name__ == "__main__":
-    logger.info("Starting LC0/MAIA setup...")
+    logger.info("Starting resource setup...")
     success = extract_lc0() and rename_onnx_model() and rename_maia_model()
     logger.info("Setup complete." if success else "Setup incomplete—check logs.")

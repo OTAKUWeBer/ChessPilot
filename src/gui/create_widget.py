@@ -37,7 +37,7 @@ def create_widgets(app):
     depth_panel = tk.Frame(color_panel, bg=app.frame_color)
     tk.Label(
         depth_panel,
-        text="Stockfish Depth:",
+        text="LC0 Nodes:",
         font=('Segoe UI', 10),
         bg=app.frame_color,
         fg=app.text_color
