@@ -174,20 +174,25 @@ def rename_maia_model(target_dir: Path = None) -> bool:
 
 def find_maia_weights() -> str:
     """
-    Search for Maia weight files (*.pb.gz) in the current working directory
-    and return the highest-Elo file.
+    Search for Maia weight files (*.pb.gz).
+    If running as frozen exe, search next to exe.
+    Otherwise, search in current working directory.
     """
-    models_dir = Path.cwd()
-    pattern = str(models_dir / "maia-*.pb.gz")
+    if getattr(sys, 'frozen', False):
+        base_dir = Path(sys.executable).parent  # Folder where exe lives
+    else:
+        base_dir = Path.cwd()
+
+    pattern = str(base_dir / "maia-*.pb.gz")
     candidates = glob.glob(pattern)
 
-    logger.debug(f"Looking for Maia weight files in {models_dir}")
+    logger.debug(f"Looking for Maia weight files in {base_dir}")
 
     if not candidates:
-        logger.error("No Maia weights found.")
+        logger.error(f"No Maia weights found in {base_dir}.")
         raise FileNotFoundError(
-            f"No Maia weights found in {models_dir}. "
-            f"Please download them using the link in the README: {README_ONNX_URL}"
+            f"No Maia weights found in {base_dir}. "
+            f"Please download them using the link in the README: {README_LC0_URL}"
         )
 
     def extract_elo(path: str) -> int:
