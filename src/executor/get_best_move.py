@@ -30,7 +30,6 @@ def get_best_move(depth_var, fen, root=None, auto_mode_var=None):
             popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
         engine = subprocess.Popen(
             [lc0_path,
-             "--backend=onnx-cpu",
              f"--weights={weights}",
              "--verbose-move-stats"],
             **popen_kwargs

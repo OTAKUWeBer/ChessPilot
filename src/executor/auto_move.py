@@ -2,10 +2,10 @@ import time
 import threading
 import logging
 
-from boardreader import get_positions, get_fen_from_position
-from engine.capture_screenshot_in_memory import capture_screenshot_in_memory
-from engine.process_move import process_move
-from engine.processing_sync import processing_event   # shared Event
+from board_detection import get_positions, get_fen_from_position
+from executor.capture_screenshot_in_memory import capture_screenshot_in_memory
+from executor.process_move import process_move
+from executor.processing_sync import processing_event
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -76,15 +76,17 @@ def auto_move_loop(
         if seed_img:
             boxes = get_positions(seed_img)
             if boxes:
-                _, _, _, seed_fen = get_fen_from_position(color_indicator, boxes)
-                parts = seed_fen.split()
-                if len(parts) >= 2:
-                    placement = parts[0]
-                    last_fen_by_color['w'] = placement
-                    last_fen_by_color['b'] = placement
-                    logger.info(f"Seeded placement = {placement}")
-                else:
-                    logger.warning("Seed FEN malformed; skipping initial seed")
+                result = get_fen_from_position(color_indicator, boxes)
+                if result is not None:
+                    _, _, _, seed_fen = result
+                    parts = seed_fen.split()
+                    if len(parts) >= 2:
+                        placement = parts[0]
+                        last_fen_by_color['w'] = placement
+                        last_fen_by_color['b'] = placement
+                        logger.info(f"Seeded placement = {placement}")
+                    else:
+                        logger.warning("Seed FEN malformed; skipping initial seed")
             else:
                 logger.warning("No board detected in seed capture")
         else:
@@ -110,8 +112,8 @@ def auto_move_loop(
             logger.debug("Capturing screenshot for auto-move…")
             screenshot = capture_screenshot_in_memory(root, auto_mode_var)
             if not screenshot:
-                logger.warning("Screenshot returned None; retrying in 0.2s…")
-                time.sleep(0.2)
+                logger.warning("Screenshot returned None; retrying in 0.02s…")
+                time.sleep(0.02)
                 continue
 
             boxes = get_positions(screenshot)
@@ -138,22 +140,22 @@ def auto_move_loop(
                     last_fen_by_color[opp_color] = placement
                 else:
                     logger.debug("Opponent placement unchanged.")
-                time.sleep(0.2)
+                time.sleep(0.02)
                 continue
 
             if active == color_indicator:
                 if opp_color not in last_fen_by_color:
                     logger.debug(
-                        "Our turn detected but no previous opponent-FEN known; sleeping 0.2s…"
+                        "Our turn detected but no previous opponent-FEN known; sleeping 0.02s…"
                     )
-                    time.sleep(0.2)
+                    time.sleep(0.02)
                     continue
 
                 if placement == last_fen_by_color[opp_color]:
                     logger.debug(
-                        "It's our turn but opponent didn’t move; sleeping 0.2s…"
+                        "It's our turn but opponent didn’t move; sleeping 0.02s…"
                     )
-                    time.sleep(0.2)
+                    time.sleep(0.02)
                     continue
 
                 last_fen_by_color[opp_color] = placement

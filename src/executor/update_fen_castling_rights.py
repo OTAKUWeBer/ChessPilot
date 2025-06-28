@@ -1,5 +1,5 @@
 import logging
-from engine.is_castling_possible import is_castling_possible
+from executor.is_castling_possible import is_castling_possible
 
 # Logger setup
 logger = logging.getLogger(__name__)

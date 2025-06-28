@@ -101,7 +101,7 @@ def get_positions(image_input):
         return []
 
     predictions = predict(image)
-    return predictions if predictions else "Nothing"
+    return predictions if predictions else None
 
 if __name__ == "__main__":
     image_path = "screenshot.png"

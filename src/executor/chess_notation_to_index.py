@@ -17,8 +17,8 @@ def chess_notation_to_index(color_indicator, root, auto_mode_var, move):
     try:
         start_col = col_map[move[0]]
         start_row = row_map[move[1]]
-        end_col   = col_map[move[2]]
-        end_row   = row_map[move[3]]
+        end_col = col_map[move[2]]
+        end_row = row_map[move[3]]
         logger.info(f"Parsed move: {move} -> ({start_col}, {start_row}) to ({end_col}, {end_row})")
         return (start_col, start_row), (end_col, end_row)
 

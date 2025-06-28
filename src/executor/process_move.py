@@ -1,18 +1,18 @@
 import logging
 import tkinter as tk
 import time
-from boardreader import get_positions, get_fen_from_position
-from engine.capture_screenshot_in_memory import capture_screenshot_in_memory
-from engine.get_best_move import get_best_move
-from engine.is_castling_possible import is_castling_possible
-from engine.update_fen_castling_rights import update_fen_castling_rights
-from engine.execute_normal_move import execute_normal_move
-from engine.store_board_positions import store_board_positions
-from engine.get_current_fen import get_current_fen
-from engine.verify_move import verify_move
-from engine.move_piece import move_piece
-from engine.is_two_square_king_move import is_two_square_king_move
-from engine.processing_sync import processing_event
+from board_detection import get_positions, get_fen_from_position
+from executor.capture_screenshot_in_memory import capture_screenshot_in_memory
+from executor.get_best_move import get_best_move
+from executor.is_castling_possible import is_castling_possible
+from executor.update_fen_castling_rights import update_fen_castling_rights
+from executor.execute_normal_move import execute_normal_move
+from executor.store_board_positions import store_board_positions
+from executor.get_current_fen import get_current_fen
+from executor.verify_move import verify_move
+from executor.move_piece import move_piece
+from executor.is_two_square_king_move import is_two_square_king_move
+from executor.processing_sync import processing_event
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -57,10 +57,24 @@ def process_move(
             return
 
         try:
-            chessboard_x, chessboard_y, square_size, fen = get_fen_from_position(
-                color_indicator, boxes
-            )
+            result = get_fen_from_position(color_indicator, boxes)
+            
+            if result is None:
+                logger.error("FEN extraction failed: get_fen_from_position returned None")
+                root.after(0, lambda: update_status("Error: Could not detect board/FEN"))
+                auto_mode_var.set(False)
+                return
+
+            chessboard_x, chessboard_y, square_size, fen = result
             logger.debug(f"FEN extracted: {fen}")
+            
+        except IndexError:
+            # This usually means one of the 'box' entries was too short (e.g. wrong screenshot)
+            logger.error("FEN extraction failed: encountered unexpected box format (IndexError)")
+            root.after(0, lambda: update_status("Error: Bad screenshot"))
+            auto_mode_var.set(False)
+            return
+        
         except ValueError as e:
             logger.error(f"FEN extraction failed: {e}")
             root.after(0, lambda err=e: update_status(f"Error: {str(err)}"))

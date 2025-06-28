@@ -1,10 +1,17 @@
-from .getpositions import get_positions
+import logging
+from .get_positions import get_positions
+
+# Setup Logger
+# Logger setup
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 def get_fen_from_position(color, boxes):
     # Find the chessboard (class_id 12.0)
     chessboard_boxes = [box for box in boxes if box[5] == 12.0]
     if not chessboard_boxes:
-        raise ValueError("Chessboard not detected in the image.")
+        logger.warning("Error: Bad Screenshot")
+        return None
     chessboard_box = chessboard_boxes[0]
     chessboard_x = chessboard_box[0]
     chessboard_y = chessboard_box[1]

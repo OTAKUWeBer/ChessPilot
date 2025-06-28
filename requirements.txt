@@ -5,3 +5,4 @@ onnxruntime
 numpy
 pywin32
 colorama
+chess

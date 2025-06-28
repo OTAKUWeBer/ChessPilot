@@ -1,7 +1,7 @@
 import time
 import logging
-from boardreader import get_positions, get_fen_from_position
-from engine import capture_screenshot_in_memory
+from board_detection import get_positions, get_fen_from_position
+from executor import capture_screenshot_in_memory
 
 # Logger setup
 logger = logging.getLogger(__name__)

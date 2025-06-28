@@ -1,11 +1,11 @@
 import time
 import logging
-from boardreader import get_positions, get_fen_from_position
-from engine.capture_screenshot_in_memory import capture_screenshot_in_memory
-from engine.get_current_fen import get_current_fen
-from engine.chess_notation_to_index import chess_notation_to_index
-from engine.move_piece import move_piece
-from engine.did_my_piece_move import did_my_piece_move
+from board_detection import get_positions, get_fen_from_position
+from executor.capture_screenshot_in_memory import capture_screenshot_in_memory
+from executor.get_current_fen import get_current_fen
+from executor.chess_notation_to_index import chess_notation_to_index
+from executor.move_piece import move_piece
+from executor.did_my_piece_move import did_my_piece_move
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ def execute_normal_move(
 
         try:
             start_pos = board_positions[start_idx]
-            end_pos   = board_positions[end_idx]
+            end_pos = board_positions[end_idx]
         except KeyError:
             logger.warning(f"Start or end position not found in board_positions: {start_idx}, {end_idx}")
             time.sleep(0.1)
