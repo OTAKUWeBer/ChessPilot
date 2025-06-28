@@ -46,8 +46,8 @@ def create_widgets(app):
     # Create, pack slider, then label
     app.depth_slider = ttk.Scale(
         depth_panel,
-        from_=10,
-        to=30,
+        from_=500,
+        to=2000,
         variable=app.depth_var,
         style="TScale",
         command=lambda val: update_depth_label(app, val)

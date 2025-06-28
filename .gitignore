@@ -66,8 +66,11 @@ tempCodeRunnerFile.py
 release-notes.md
 stockfish
 stockfish.exe
+lc0
+lc0.exe
 chess_detection.onnx
 *.zip
+*.dll
 
 # Maia-specific files
 *.pb

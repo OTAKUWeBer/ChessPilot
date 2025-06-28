@@ -62,7 +62,7 @@ class ChessPilot:
         self.color_indicator = None
         self.last_fen = ""
         self.last_fen_by_color = {'w': None, 'b': None}
-        self.depth_var = tk.IntVar(value=100)
+        self.depth_var = tk.IntVar(value=600)
         self.auto_mode_var = tk.BooleanVar(value=False)
         self.board_positions = {}
 

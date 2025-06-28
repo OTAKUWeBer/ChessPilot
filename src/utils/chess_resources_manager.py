@@ -1,5 +1,6 @@
 import os
 import zipfile
+import glob
 from pathlib import Path
 import shutil
 import logging
@@ -16,7 +17,7 @@ README_ONNX_URL = "https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
 
 def find_file_with_keyword(keyword, extension=None, search_path=None):
     """
-    Finds the first file in `search_path` containing the keyword in its name
+    Finds the first file in search_path containing the keyword in its name
     and optionally matching extension.
     """
     base_path = Path(search_path or Path.cwd())
@@ -79,13 +80,14 @@ def extract_lc0():
 
     # Move DLL on Windows
     if os.name == "nt":
-        lc0_dll = next((p for p in extract_to.rglob("*.dll") if "lc0" in p.name.lower()), None)
-        if lc0_dll:
-            dll_target = cwd / lc0_dll.name
-            shutil.move(str(lc0_dll), dll_target)
-            logger.info(f"LC0 DLL moved to {dll_target}")
+        dlls = list(extract_to.rglob("*.dll"))
+        if dlls:
+            for dll in dlls:
+                dll_target = cwd / dll.name
+                shutil.move(str(dll), dll_target)
+                logger.info(f"DLL moved to {dll_target}")
         else:
-            logger.warning("LC0 DLL not found in extracted files.")
+            logger.warning("No DLL files found in extracted files.")
 
     shutil.rmtree(extract_to)
     if os.name != "nt":
@@ -95,15 +97,14 @@ def extract_lc0():
 
 def rename_lc0():
     """
-    Ensures lc0.zip or the raw LC0 binary and DLL live in cwd.
+    Ensures lc0.zip, binary, and any DLLs live in cwd.
     """
     cwd = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path.cwd()
     zip_target = cwd / "lc0.zip"
     bin_target = cwd / ("lc0.exe" if os.name == "nt" else "lc0")
 
-    if zip_target.exists() or bin_target.exists():
-        logger.info("LC0 ZIP or binary already present.")
-    else:
+    # Move ZIP or binary if not already present
+    if not zip_target.exists() and not bin_target.exists():
         parent_zip = find_file_with_keyword("lc0", ".zip", cwd.parent)
         if parent_zip:
             shutil.move(parent_zip, zip_target)
@@ -114,18 +115,14 @@ def rename_lc0():
                 shutil.move(parent_bin, bin_target)
                 logger.info(f"Moved {parent_bin.name} to {bin_target}")
 
-    # Copy DLL on Windows
+    # Move any DLLs from parent into cwd
     if os.name == "nt":
-        dll_target = cwd / "lc0.dll"
-        if not dll_target.exists():
-            parent_dll = find_file_with_keyword("lc0", ".dll", cwd.parent)
-            if parent_dll:
-                shutil.move(parent_dll, dll_target)
-                logger.info(f"Moved {parent_dll.name} to {dll_target}")
-            else:
-                logger.warning("No LC0 DLL found in parent directory.")
+        for dll in Path(cwd.parent).glob("*.dll"):
+            dest = cwd / dll.name
+            if not dest.exists():
+                shutil.move(dll, dest)
+                logger.info(f"Moved {dll.name} to {dest}")
     return True
-
 
 def rename_onnx_model():
     cwd = Path.cwd()
@@ -136,7 +133,8 @@ def rename_onnx_model():
         logger.error("Bundled ONNX not found.")
         return False
     if target.exists(): return True
-    found = find_file_with_keyword("chess_detection", ".onnx", cwd) or find_file_with_keyword("chess_detection", ".onnx", cwd.parent)
+    found = find_file_with_keyword("chess_detection", ".onnx", cwd) \
+         or find_file_with_keyword("chess_detection", ".onnx", cwd.parent)
     if not found:
         logger.error(f"No ONNX model found. See {README_ONNX_URL}")
         return False
@@ -145,25 +143,70 @@ def rename_onnx_model():
     return True
 
 
-def rename_maia_model():
+def rename_maia_model(target_dir: Path = None) -> bool:
     """
-    Detects any maia-*.pb.gz model in cwd or parent. No renaming or moving.
+    Finds the first maia-*.pb.gz model in cwd or parent and moves it to target_dir.
     """
     cwd = Path.cwd()
+    dest = target_dir or cwd
     candidates = list(cwd.glob("maia-*.pb.gz")) + list(cwd.parent.glob("maia-*.pb.gz"))
-    if candidates:
-        logger.info(f"Using Maia model: {candidates[0].name}")
-        return True
-    else:
+    if not candidates:
         logger.error("No Maia model found. Place a maia-*.pb.gz file in project or parent directory.")
         return False
 
+    # pick first candidate
+    maia_file = candidates[0]
+    target_path = dest / maia_file.name
+    if not target_path.exists():
+        shutil.move(str(maia_file), target_path)
+        logger.info(f"Maia model moved to {target_path}")
+    else:
+        logger.info(f"Maia model already at {target_path}")
+    return True
+
+
+def find_maia_weights() -> str:
+    """
+    Search for Maia weight files (*.pb.gz) in the current working directory
+    and return the highest-Elo file.
+    """
+    models_dir = Path.cwd()
+    pattern = str(models_dir / "maia-*.pb.gz")
+    candidates = glob.glob(pattern)
+
+    logger.debug(f"Looking for Maia weight files in {models_dir}")
+
+    if not candidates:
+        logger.error("No Maia weights found.")
+        raise FileNotFoundError(
+            f"No Maia weights found in {models_dir}. "
+            f"Please download them using the link in the README: {README_ONNX_URL}"
+        )
+
+    def extract_elo(path: str) -> int:
+        name = os.path.basename(path)
+        try:
+            elo = int(name.split('-')[1].split('.')[0])
+            logger.debug(f"Extracted Elo {elo} from {name}")
+        except (IndexError, ValueError):
+            logger.warning(f"Could not extract Elo from {name}, defaulting to 0")
+            elo = 0
+        return elo
+
+    candidates.sort(key=extract_elo, reverse=True)
+    best_weight = candidates[0]
+    logger.info(f"Selected Maia weights file: {best_weight}")
+    return best_weight
+
 
 def setup_resources(script_dir: Path, project_dir: Path) -> bool:
-    if os.name != "nt": return True
-    if not rename_lc0() or not extract_lc0(): return False
+    if os.name != "nt":
+        return True
 
-    # Move artifacts into script_dir
+    if not rename_lc0() or not extract_lc0():
+        return False
+
+    # Move LC0 and ONNX artifacts into script_dir
     for name in ["lc0.zip", "lc0.exe", "lc0.dll", "chess_detection.onnx"]:
         root = project_dir / name
         dest = script_dir / name
@@ -171,7 +214,12 @@ def setup_resources(script_dir: Path, project_dir: Path) -> bool:
             shutil.move(root, dest)
             logger.info(f"Copied {name} to src/: {dest}")
 
-    return rename_onnx_model(), rename_maia_model()
+    # Move Maia model into script_dir
+    rename_maia_model(script_dir)
+
+    # Finally, ensure ONNX and Maia are correctly named/placed
+    return rename_onnx_model(), True
+
 
 if __name__ == "__main__":
     logger.info("Starting LC0/MAIA setup...")
