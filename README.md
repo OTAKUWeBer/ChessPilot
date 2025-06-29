@@ -75,8 +75,8 @@ pip install -r requirements.txt
 ## 📂 Assets Needed (Manual Setup)
 
 1. [chess_detectionv0.0.4.onnx](https://github.com/Zai-Kun/2d-chess-pieces-detection/releases/download/v0.0.4/chess_detectionv0.0.4.onnx)  
-2. [Lc0 Engine](https://github.com/LeelaChessZero/lc0/releases)  
-3. [Maia Weights (ONNX)](https://maiachess.com/#downloads) (e.g. `maia-1100.onnx`)
+2. [Lc0 Engine](https://github.com/LeelaChessZero/lc0/releases/latest)  
+3. [Maia Weights (ONNX)](https://github.com/CSSLab/maia-chess/releases/latest) (e.g. `maia-1100.onnx`)
 
 > ⚠️ Do not rename these files. Place them in the root of the project (same as `main.py`).
 
