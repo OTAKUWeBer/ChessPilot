@@ -40,22 +40,43 @@ def move_piece(color_indicator, move, board_positions, auto_mode_var, root, btn_
 
     try:
         if os.name == 'nt':
-            logger.debug("Using win32api for Windows input (drag simulation)")
+            logger.debug("Using win32api for Windows input (click-click approach)")
+            
+            # Step 1: Click on the window to focus it
             win32api.SetCursorPos((int(start_x), int(start_y)))
-            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
             time.sleep(0.05)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+            time.sleep(0.05)
+            
+            # Step 2: Click on the chess piece to select it
+            win32api.SetCursorPos((int(start_x), int(start_y)))
+            time.sleep(0.05)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+            time.sleep(0.05)
+            
+            # Step 3: Click on the destination square to move the piece
             win32api.SetCursorPos((int(end_x), int(end_y)))
             time.sleep(0.05)
+            win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
             win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
+            
         elif is_wayland():
-            logger.debug("Using Wayland input method")
+            logger.debug("Using Wayland input method (click-click approach)")
             client = WaylandInput()
-            client.swipe(int(start_x), int(start_y), int(end_x), int(end_y), 0.001)
+            # Click on piece to select it
+            client.click(int(start_x), int(start_y))
+            time.sleep(0.05)
+            # Click on destination to move it
+            client.click(int(end_x), int(end_y))
         else:
-            logger.debug("Using PyAutoGUI for input")
-            pyautogui.mouseDown(start_x, start_y)
-            pyautogui.moveTo(end_x, end_y)
-            pyautogui.mouseUp(end_x, end_y)
+            logger.debug("Using PyAutoGUI for input (click-click approach)")
+            # Click on piece to select it
+            pyautogui.click(start_x, start_y)
+            time.sleep(0.05)
+            # Click on destination to move it
+            pyautogui.click(end_x, end_y)
         logger.info("Move simulated successfully")
     except Exception as e:
         logger.error(f"Failed to move piece: {e}")
