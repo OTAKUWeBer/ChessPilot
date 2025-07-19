@@ -52,6 +52,30 @@ The ONNX model (`chess_detectionv0.0.4.onnx`) is already bundled in official **A
 
 ---
 
+## 🔧 Engine Configuration (v1.0.1)
+
+You can now fine‑tune Stockfish’s performance without touching any code.  
+Simply place an `engine_config.txt` file next to the ChessPilot executable:
+
+```ini
+# ================================
+# ChessPilot Engine Configuration
+# ================================
+# Memory used in MB (64–1024+ recommended)
+setoption name Hash value 512
+
+# CPU threads to use (1–8; match your CPU core count)
+setoption name Threads value 2
+````
+
+1. Edit `Hash` to adjust how much RAM (in MB) Stockfish uses.
+2. Edit `Threads` to match your CPU cores.
+3. Save and restart ChessPilot to apply the new settings.
+
+> ⚡ Get optimal multi‑core & memory tuning out‑of‑the‑box!
+
+---
+
 ## 🔧 Requirements (For Source Builds)
 
 ### System Requirements
