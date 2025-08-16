@@ -22,7 +22,7 @@ def run_lc0(fen, depth_var, weights, lc0_path, extra_args=None):
     if os.name == "nt":
         popen_kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
 
-    args = [lc0_path, f"--weights={weights}", "--verbose-move-stats"]
+    args = [lc0_path, "--backend=eigen", f"--weights={weights}", "--verbose-move-stats"]
     if extra_args:
         args.extend(extra_args)
 
@@ -71,8 +71,8 @@ def get_best_move(depth_var, fen, root=None, auto_mode_var=None):
             return run_lc0(fen, depth_var, weights, lc0_path)
         except Exception as primary_error:
             logger.warning(f"LC0 default backend failed: {primary_error}")
-            logger.info("Retrying with --backend=eigen")
-            return run_lc0(fen, depth_var, weights, lc0_path, extra_args=["--backend=eigen"])
+            logger.info("Retrying with --backend=trivial")
+            return run_lc0(fen, depth_var, weights, lc0_path, extra_args=["--backend=trivial"])
 
     except Exception as e:
         logger.error(f"Maia error: {e}")

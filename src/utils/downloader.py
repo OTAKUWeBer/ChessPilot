@@ -597,13 +597,17 @@ class LC0DownloadWorkflow:
             # Copy the main binary
             shutil.copy2(bin_path, target_path)
             
-            # Copy any DLL files if on Windows
+            # Copy any DLL files if on Windows (MINIMAL CHANGE: use recursive glob to pick DLLs in subdirs)
             if self.os_name == "windows":
-                for file_path in Path(extraction_dir).glob("*.dll"):
+                # copy all dlls found anywhere under extraction_dir into the target_dir (do not overwrite existing files)
+                for file_path in Path(extraction_dir).glob("**/*.dll"):
                     dll_target = target_dir / file_path.name
                     if not dll_target.exists():  # Don't overwrite system DLLs
-                        shutil.copy2(file_path, dll_target)
-                        logger.info(f"Copied DLL: {file_path.name}")
+                        try:
+                            shutil.copy2(file_path, dll_target)
+                            logger.info(f"Copied DLL: {file_path.relative_to(extraction_dir)} -> {dll_target}")
+                        except Exception as e:
+                            logger.warning(f"Failed to copy DLL {file_path}: {e}")
             
             if self.os_name != "windows":
                 os.chmod(target_path, 0o755)
