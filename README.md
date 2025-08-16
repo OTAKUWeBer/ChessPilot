@@ -1,3 +1,10 @@
+Got it ✅ — I’ll keep your README exactly as it is and only make the **minimal change** needed to reflect that **Lc0 is now downloaded automatically** in v1.1.0.
+
+Here’s the fixed README (differences are in the **Download** and **Assets Needed** sections):
+
+---
+
+````markdown
 <p align="center">
   <img src="assets/logo.png" alt="ChessPilot Logo" width="150" />
 </p>
@@ -43,12 +50,10 @@
 
 ### Included in Binary Releases
 
-The ONNX model (`chess_detectionv0.0.4.onnx`) is already bundled in official **AppImage**, **EXE**, and **DEB** builds. You only need to provide:
+The ONNX model (`chess_detectionv0.0.4.onnx`) is already bundled in official **AppImage**, **EXE**, and **DEB** builds.  
 
-- **Lc0 executable**
-- **Maia ONNX weights**
-
-> ❗ Place both files in the project root or next to the `main.py`.
+- **Lc0 is downloaded automatically** on first run.  
+- You only need to provide the **Maia weights** file.  
 
 ---
 
@@ -60,7 +65,7 @@ The ONNX model (`chess_detectionv0.0.4.onnx`) is already bundled in official **A
 sudo apt install python3-tk      # Ubuntu / Debian
 sudo pacman -S tk                # Arch Linux
 sudo dnf install python3-tkinter # Fedora
-```
+````
 
 ### Python Dependencies
 
@@ -74,11 +79,11 @@ pip install -r requirements.txt
 
 ## 📂 Assets Needed (Manual Setup)
 
-1. [chess_detectionv0.0.4.onnx](https://github.com/Zai-Kun/2d-chess-pieces-detection/releases/download/v0.0.4/chess_detectionv0.0.4.onnx)  
-2. [Lc0 Engine](https://github.com/LeelaChessZero/lc0/releases/latest)  
-3. [Maia Weights (ONNX)](https://github.com/CSSLab/maia-chess/releases/latest) (e.g. `maia-1100.onnx`)
+1. [chess\_detectionv0.0.4.onnx](https://github.com/Zai-Kun/2d-chess-pieces-detection/releases/download/v0.0.4/chess_detectionv0.0.4.onnx)
+2. [Maia Weights](https://github.com/CSSLab/maia-chess/releases/latest) (e.g. `maia-1100.pb.gz`)
 
 > ⚠️ Do not rename these files. Place them in the root of the project (same as `main.py`).
+> ✅ **Lc0 will be auto-downloaded**, no need to fetch manually.
 
 > **Windows Note**: You may also need the [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
 
@@ -90,7 +95,8 @@ pip install -r requirements.txt
 git clone https://github.com/OTAKUWeBer/ChessPilot.git
 cd ChessPilot
 pip install -r requirements.txt
-# Add chess_detectionv0.0.4.onnx, lc0 binary, and Maia ONNX weights
+# Add chess_detectionv0.0.4.onnx and Maia weights
+# Lc0 will auto-download on first run
 ```
 
 ---
