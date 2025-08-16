@@ -89,24 +89,48 @@ def _download_lc0_with_fallback(candidates: list[Path]) -> str | None:
 
 
 def _handle_lc0_unix() -> str:
-    """Handle lc0 binary resolution on Unix-like systems."""
+    """Handle lc0 binary resolution on Unix-like systems.
+
+    Minimal fix: explicitly check common system locations (/usr/bin, /usr/local/bin, /bin, /snap/bin)
+    and DO NOT attempt to auto-download on Linux if not found. Instead raise a helpful error.
+    """
     # 1) prefer system PATH if available
     system_path = _find_system_lc0()
     if system_path:
         return system_path
-    
-    # 2) check common local locations
+
+    # 2) explicit common system locations (some systems might not have PATH set as expected)
+    common_paths = [
+        Path("/usr/bin/lc0"),
+        Path("/usr/local/bin/lc0"),
+        Path("/bin/lc0"),
+        Path("/snap/bin/lc0"),
+    ]
+    for p in common_paths:
+        try:
+            if p.exists():
+                logger.debug(f"Found lc0 at common path: {p}")
+                return str(p)
+        except Exception as e:
+            logger.debug(f"Could not access {p}: {e}")
+
+    # 3) check common local locations (cwd, dev layout, frozen exe folder)
     candidates = _get_local_lc0_candidates()
     local_path = _find_existing_candidate(candidates)
     if local_path:
         return local_path
-    
-    # 3) attempt to download
-    downloaded_path = _download_lc0_with_fallback(candidates)
-    if downloaded_path:
-        return downloaded_path
-    
-    raise FileNotFoundError("lc0 not found in PATH or local directories after download attempt")
+
+    # 4) On Linux, do NOT attempt the downloader automatically — prefer package manager / source.
+    # Provide a clear error message instructing the user how to install.
+    msg = (
+        "lc0 not found in PATH, /usr/bin, /usr/local/bin, or local dirs. "
+        "On Linux, please install lc0 using your distribution package manager "
+        "(e.g. `sudo apt install lc0`, `sudo pacman -S lc0`, or `snap install lc0`), "
+        "or build lc0 from source. If you have lc0 installed in a non-standard location, "
+        "set the LC0_PATH environment variable or provide explicit_lc0_path to the caller."
+    )
+    logger.error(msg)
+    raise FileNotFoundError(msg)
 
 
 def _handle_frozen_app_resources(relative_path: str) -> str:

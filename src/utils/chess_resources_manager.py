@@ -39,7 +39,16 @@ def find_file_with_keyword(keyword, extension=None, search_path=None):
 def download_lc0_if_needed():
     """
     Downloads LC0 using the downloader if not found locally.
+
+    Minimal change: On Linux we do NOT attempt to auto-download. Instead we
+    tell the user to install via package manager or build from source.
     """
+    # If running on Linux, do not try to auto-download — prefer package manager / source.
+    if sys.platform.startswith("linux"):
+        logger.info("Detected Linux. Please install lc0 using your distribution's package manager (e.g. apt, pacman) or build from source.")
+        logger.info(f"See {README_URL} for details.")
+        return False
+
     try:
         logger.info("LC0 not found locally. Starting download...")
         download_lc0()
@@ -57,6 +66,8 @@ def extract_lc0():
     Ensures an LC0 binary exists at ./lc0 or ./lc0.exe in cwd.
     Extracts from ZIP in cwd if needed, including DLL on Windows.
     If not found, attempts to download using the downloader.
+
+    Minimal change: for Linux we won't attempt to download; just show a message.
     """
     if getattr(sys, 'frozen', False):
         bundled_name = "lc0.exe" if os.name == "nt" else "lc0"
@@ -78,7 +89,15 @@ def extract_lc0():
 
     zip_path = find_file_with_keyword("lc0", ".zip", search_path=cwd)
     if not zip_path:
-        logger.warning(f"No LC0 ZIP found in {cwd}. Attempting to download...")
+        logger.warning(f"No LC0 ZIP found in {cwd}.")
+
+        # Minimal change: on Linux, don't attempt to download automatically.
+        if sys.platform.startswith("linux"):
+            logger.info("On Linux, please install lc0 through your package manager (e.g. `sudo apt install lc0`, `sudo pacman -S lc0`) or build from source.")
+            logger.info(f"See {README_URL} for build instructions and downloads.")
+            return False
+
+        logger.warning("Attempting to download (non-Linux platforms only)...")
         if not download_lc0_if_needed():
             logger.error(f"Failed to download LC0. See README: {README_URL}")
             return False
