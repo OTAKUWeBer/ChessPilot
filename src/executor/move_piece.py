@@ -5,6 +5,7 @@ import os
 import time
 from .is_wayland import is_wayland
 from wayland_capture.wayland import WaylandInput
+import random
 from executor.chess_notation_to_index import chess_notation_to_index
 from executor.move_cursor_to_button import move_cursor_to_button
 
@@ -17,7 +18,8 @@ if os.name == 'nt':
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-def move_piece(color_indicator, move, board_positions, auto_mode_var, root, btn_play):
+def move_piece(color_indicator, move, board_positions, auto_mode_var, root, btn_play,
+               humanize=True, offset_range=(-16, 16)):
     logger.info(f"Attempting move: {move}")
     
     start_idx, end_idx = chess_notation_to_index(color_indicator, root, auto_mode_var, move)
@@ -37,6 +39,27 @@ def move_piece(color_indicator, move, board_positions, auto_mode_var, root, btn_
 
     start_x, start_y = start_pos
     end_x, end_y = end_pos
+
+    if humanize and offset_range is not None:
+        try:
+            min_off, max_off = offset_range
+            # clamp sensible values if user passed reversed tuple
+            if min_off > max_off:
+                min_off, max_off = max_off, min_off
+            sx_off = random.uniform(min_off, max_off)
+            sy_off = random.uniform(min_off, max_off)
+            ex_off = random.uniform(min_off, max_off)
+            ey_off = random.uniform(min_off, max_off)
+
+            start_x = float(start_x) + sx_off
+            start_y = float(start_y) + sy_off
+            end_x = float(end_x) + ex_off
+            end_y = float(end_y) + ey_off
+
+            logger.debug(f"Applied humanized offsets: start +({sx_off:.2f},{sy_off:.2f}), "
+                         f"end +({ex_off:.2f},{ey_off:.2f})")
+        except Exception as e:
+            logger.warning(f"Failed to apply humanize offsets: {e}")
 
     try:
         if os.name == 'nt':
