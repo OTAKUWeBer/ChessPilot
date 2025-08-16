@@ -7,6 +7,8 @@ import logging
 from shutil import which
 import sys
 
+from .downloader import download_lc0
+
 # Logger setup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -34,10 +36,27 @@ def find_file_with_keyword(keyword, extension=None, search_path=None):
     return None
 
 
+def download_lc0_if_needed():
+    """
+    Downloads LC0 using the downloader if not found locally.
+    """
+    try:
+        logger.info("LC0 not found locally. Starting download...")
+        download_lc0()
+        return True
+    except ImportError:
+        logger.error("LC0 downloader not available. Please download LC0 manually.")
+        return False
+    except Exception as e:
+        logger.error(f"Failed to download LC0: {e}")
+        return False
+
+
 def extract_lc0():
     """
     Ensures an LC0 binary exists at ./lc0 or ./lc0.exe in cwd.
     Extracts from ZIP in cwd if needed, including DLL on Windows.
+    If not found, attempts to download using the downloader.
     """
     if getattr(sys, 'frozen', False):
         bundled_name = "lc0.exe" if os.name == "nt" else "lc0"
@@ -59,8 +78,19 @@ def extract_lc0():
 
     zip_path = find_file_with_keyword("lc0", ".zip", search_path=cwd)
     if not zip_path:
-        logger.error(f"No LC0 ZIP found in {cwd}. See README: {README_URL}")
-        return False
+        logger.warning(f"No LC0 ZIP found in {cwd}. Attempting to download...")
+        if not download_lc0_if_needed():
+            logger.error(f"Failed to download LC0. See README: {README_URL}")
+            return False
+        
+        # Check again after download
+        zip_path = find_file_with_keyword("lc0", ".zip", search_path=cwd)
+        if not zip_path and final_path.exists():
+            logger.info("LC0 binary downloaded successfully.")
+            return True
+        elif not zip_path:
+            logger.error("Download completed but no LC0 ZIP or binary found.")
+            return False
 
     extract_to = cwd / "temp_lc0_extract"
     extract_to.mkdir(exist_ok=True)
