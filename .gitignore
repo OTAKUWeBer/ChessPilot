@@ -1,0 +1,88 @@
+# Python environment folders
+myenv/
+venv/
+.venv/
+env/
+.python-version
+
+# Python cache and compiled files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.py[cod]
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+*.spec
+
+# Logs and debug files
+*.log
+*.out
+*.err
+debug.log
+pip-log.txt
+pip-delete-this-directory.txt
+
+# IDE and editor settings
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.bak
+*.tmp
+*.orig
+*.~*
+
+# System-specific files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Test and coverage files
+htmlcov/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.tox/
+.pytest_cache/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Temporary files
+tempCodeRunnerFile.py
+
+# Project-specific files
+release-notes.md
+stockfish
+stockfish.exe
+chess_detection.onnx
+*.zip
+wayland-info
+grim
+
+# AUR / AppImage packaging
+.SRCINFO
+chesspilot.desktop
+chesspilot.png
+ChessPilot-*.AppImage
+
+# AppImage extraction
+*.AppDir/
+*.AppDir
+
+# Editor/patch backup files
+*.orig
+*.rej
+*~
+.env

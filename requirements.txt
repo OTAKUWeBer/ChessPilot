@@ -1,0 +1,9 @@
+mss
+pyautogui
+Pillow
+onnxruntime
+numpy
+colorama
+requests
+pywin32; platform_system == "Windows"
+PyQt6

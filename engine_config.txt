@@ -1,0 +1,11 @@
+# ================================
+# ChessPilot Engine Configuration
+# ================================
+# You can edit these values to change engine behavior.
+# Be sure to restart the app after editing this file.
+
+# Memory used in MB (64–1024+ recommended depending on your system)
+setoption name Hash value 1024
+
+# CPU threads to use (1–8 usually; match your CPU core count)
+setoption name Threads value 4
