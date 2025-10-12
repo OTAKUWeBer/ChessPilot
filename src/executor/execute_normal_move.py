@@ -11,6 +11,37 @@ from executor.did_my_piece_move import did_my_piece_move
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+def _disable_auto_mode(auto_mode_var, root):
+    """
+    Disable auto mode by:
+    1. Setting the auto_mode_var to False
+    2. Unchecking the auto_mode_check checkbox
+    3. Re-enabling the play button
+    """
+    try:
+        if root is not None:
+            # Set the variable
+            if hasattr(root, "auto_mode_var"):
+                root.auto_mode_var = False
+                logger.info("Set auto_mode_var to False")
+            
+            # Uncheck the checkbox (this is the key fix)
+            if hasattr(root, "auto_mode_check"):
+                root.auto_mode_check.setChecked(False)
+                logger.info("Unchecked auto_mode_check checkbox")
+            
+            # Re-enable the play button
+            if hasattr(root, "btn_play"):
+                root.btn_play.setEnabled(True)
+                logger.info("Re-enabled play button")
+        
+        # Also try to set via the auto_mode_var parameter if it has a set method
+        if hasattr(auto_mode_var, "set") and callable(auto_mode_var.set):
+            auto_mode_var.set(False)
+            
+    except Exception as e:
+        logger.error(f"Error disabling auto mode: {e}", exc_info=True)
+
 def execute_normal_move(
     board_positions,
     color_indicator,
@@ -87,7 +118,7 @@ def execute_normal_move(
 
             if mate_flag:
                 status += "\n𝘾𝙝𝙚𝙘𝙠𝙢𝙖𝙩𝙚"
-                auto_mode_var.set(False)
+                _disable_auto_mode(auto_mode_var, root)
                 logger.info("Checkmate detected. Auto mode disabled.")
 
             update_status(status)
@@ -95,5 +126,6 @@ def execute_normal_move(
 
     logger.error(f"Move {move} failed after {max_retries} attempts")
     update_status(f"Move failed to register after {max_retries} attempts")
-    auto_mode_var.set(False)
+    _disable_auto_mode(auto_mode_var, root)
+    logger.info("Auto mode disabled due to move failure")
     return False

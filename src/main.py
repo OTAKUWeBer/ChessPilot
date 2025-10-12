@@ -1,15 +1,14 @@
 import threading
-import tkinter as tk
-from tkinter import ttk
-import logging
 import sys
+import logging
 from pathlib import Path
 import os
+from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
+from PyQt6.QtCore import Qt
 
 from utils.logging_setup import setup_console_logging
 from utils.chess_resources_manager import setup_resources
 
-# Initialize Logging
 setup_console_logging()
 logger = logging.getLogger("main")
 
@@ -18,8 +17,20 @@ project_dir = script_dir.parent
 
 os.chdir(script_dir)
 
+logger.info("ChessPilot starting...")
 if not setup_resources(script_dir, project_dir):
     logger.error("Resource setup failed")
+    # Show error dialog before exiting
+    app = QApplication(sys.argv)
+    QMessageBox.critical(
+        None,
+        "Setup Failed",
+        "Failed to setup required resources (Stockfish or ONNX model).\n\n"
+        "Please check:\n"
+        "1. Your internet connection\n"
+        "2. That you have write permissions\n"
+        "3. The logs for more details"
+    )
     sys.exit(1)
 
 from executor import process_move, execute_normal_move
@@ -29,7 +40,7 @@ from services import EngineService
 
 from gui.set_window_icon import set_window_icon
 from gui.create_widget import create_widgets
-from gui.shortcuts import handle_esc_key, bind_shortcuts
+from gui.shortcuts import bind_shortcuts
 from gui.button_and_checkboxes import (
     color_button,
     action_button,
@@ -37,15 +48,15 @@ from gui.button_and_checkboxes import (
     move_mode,
 )
 
-class ChessPilot:
-    def __init__(self, root):
+class ChessPilot(QMainWindow):
+    def __init__(self):
+        super().__init__()
         logger.info("Initializing ChessPilot application")
-        self.root = root
-        self.root.title(AppConfig.WINDOW_TITLE)
-        self.root.geometry(f"{AppConfig.WINDOW_WIDTH}x{AppConfig.WINDOW_HEIGHT}")
-        self.root.resizable(False, False)
-        self.root.attributes('-topmost', True)
-        self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
+
+        self.setWindowTitle(AppConfig.WINDOW_TITLE)
+        self.setGeometry(100, 100, AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT)
+        self.setFixedSize(AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
 
         self.game_state = GameState()
         self.move_executor = MoveExecutor()
@@ -56,11 +67,11 @@ class ChessPilot:
         self.color_indicator = None
         self.last_fen = ""
         self.last_fen_by_color = {'w': None, 'b': None}
-        self.depth_var = tk.IntVar(value=AppConfig.DEFAULT_DEPTH)
-        self.auto_mode_var = tk.BooleanVar(value=False)
+        self.depth_var = AppConfig.DEFAULT_DEPTH
+        self.auto_mode_var = False
         self.board_positions = {}
 
-        self.screenshot_delay_var = tk.DoubleVar(value=AppConfig.DEFAULT_SCREENSHOT_DELAY)
+        self.screenshot_delay_var = AppConfig.DEFAULT_SCREENSHOT_DELAY
         self.move_mode = AppConfig.DEFAULT_MOVE_MODE
 
         self.chessboard_x = None
@@ -72,152 +83,117 @@ class ChessPilot:
         self.accent_color = AppConfig.ACCENT_COLOR
         self.text_color = AppConfig.TEXT_COLOR
         self.hover_color = AppConfig.HOVER_COLOR
-        
-        self.style = ttk.Style()
-        self.style.theme_use('clam')
-        self.style.configure("TScale", troughcolor=self.frame_color, background=self.bg_color)
-        self.style.configure("TCheckbutton", background=self.bg_color, foreground=self.text_color)
-        
+
+        # Initialize GUI components
         set_window_icon(self)
         create_widgets(self)
         bind_shortcuts(self)
 
-        # Log initial window size for debugging
-        self.root.update_idletasks()
-        width = self.root.winfo_width()
-        height = self.root.winfo_height()
-        logger.debug(f"Initial window size: {width}x{height}")
-        
+        logger.debug(f"Initial window size: {self.width()}x{self.height()}")
 
-        self.root.bind('<Escape>', self.take_esc_key)
-        self.root.focus_set()
-        logger.info("ChessPilot UI initialized")
-        
         if not self.engine_service.initialize():
-            logger.warning("Stockfish initialization failed at startup")
-        
-    def on_closing(self):
-        logger.info("Application closing - cleaning up Stockfish process")
-        self.engine_service.cleanup()
-        self.root.destroy()
-        
-    # Handle ESC key to return to color selection
-    def take_esc_key(self, event=None):
-        if self.color_indicator is not None:
-            handle_esc_key(self, event)
-        
-    # def log_button_sizes(self):
-    #     w_w = self.btn_white.winfo_width()
-    #     w_h = self.btn_white.winfo_height()
-    #     b_w = self.btn_black.winfo_width()
-    #     b_h = self.btn_black.winfo_height()
-    #     logger.debug(f"[SIZE DEBUG] White button size: {w_w}×{w_h}")
-    #     logger.debug(f"[SIZE DEBUG] Black button size: {b_w}×{b_h}")
+            logger.error("Stockfish initialization failed at startup")
+            QMessageBox.warning(
+                self,
+                "Engine Warning",
+                "Stockfish engine failed to initialize.\n\n"
+                "The app will continue, but move analysis won't work.\n"
+                "Please restart the application or check the logs."
+            )
 
     def create_color_button(self, parent, text, color):
         return color_button(self, parent, text, color)
 
     def create_action_button(self, parent, text, command):
         return action_button(self, parent, text, command)
-    
+
     def create_move_method_radiobuttons(self, parent, text, method):
         return move_mode(self, parent, text, method)
-    
+
     def create_castling_checkboxes(self):
         castling_checkboxes(self)
-
-    def update_last_fen_for_color(self, fen: str):
-        parts = fen.split()
-        placement, active_color = parts[0], parts[1]
-        self.last_fen_by_color[active_color] = placement
-        logger.debug(f"Updated last FEN for {active_color}: {placement}")
 
     def set_color(self, color):
         logger.info(f"Color selected: {'White' if color == 'w' else 'Black'}")
         self.color_indicator = color
-        self.color_frame.pack_forget()
-        self.main_frame.pack(expand=True, fill=tk.BOTH)
-        self.btn_play.config(state=tk.NORMAL)
+        self.color_frame.hide()
+        self.main_frame.show()
+        self.btn_play.setEnabled(True)
         self.update_status(f"\nPlaying as {'White' if color == 'w' else 'Black'}")
 
     def set_move_mode(self, mode):
-        """Set the move mode (drag or click)"""
         logger.info(f"Move method set to: {mode}")
         self.move_mode = mode
         self.update_status(f"\nMove method: {mode.capitalize()}")
-        
+
     def update_status(self, message):
         logger.debug(f"Status update: {message.strip()}")
-        self.status_label.config(text=message)
-        self.depth_label.config(text=f"Depth: {self.depth_var.get()}")
-        self.root.update_idletasks()
+        self.status_label.setText(message)
+        self.depth_label.setText(f"Depth: {self.depth_var}")
 
     def process_move_thread(self):
         logger.info("Play Next Move button pressed; starting process_move thread")
         threading.Thread(
             target=process_move,
             args=(
-                self.root,
+                self,
                 self.color_indicator,
-                self.auto_mode_var,
+                lambda: self.auto_mode_var,
                 self.btn_play,
                 self.move_mode,
                 self.board_positions,
                 self.update_status,
-                self.kingside_var,
-                self.queenside_var,
+                lambda: self.kingside_var,
+                lambda: self.queenside_var,
                 self.update_last_fen_for_color,
                 self.last_fen_by_color,
-                self.screenshot_delay_var,
+                lambda: self.screenshot_delay_var,
             ),
             daemon=True,
         ).start()
 
     def toggle_auto_mode(self):
-        if self.auto_mode_var.get():
+        if self.auto_mode_var:
             logger.info("Auto mode enabled")
-            self.btn_play.config(state=tk.DISABLED)
-            # First, play a single move to initialize if needed
+            self.btn_play.setEnabled(False)
             self.process_move_thread()
-            # Then start continuous auto loop
             threading.Thread(
                 target=AutoPlayController.start_auto_play,
                 args=(
-                    self.root,
+                    self,
                     self.color_indicator,
-                    self.auto_mode_var,
+                    lambda: self.auto_mode_var,
                     self.btn_play,
                     self.move_mode,
                     self.board_positions,
                     self.last_fen_by_color,
-                    self.screenshot_delay_var,
+                    lambda: self.screenshot_delay_var,
                     self.update_status,
-                    self.kingside_var,
-                    self.queenside_var,
+                    lambda: self.kingside_var,
+                    lambda: self.queenside_var,
                     self.update_last_fen_for_color
                 ),
                 daemon=True
             ).start()
-
         else:
             logger.info("Auto mode disabled")
-            self.btn_play.config(state=tk.NORMAL)
+            self.btn_play.setEnabled(True)
 
     def capture_board_screenshot(self):
-        return self.board_analyzer.capture_screenshot(self.root, self.auto_mode_var)
+        return self.board_analyzer.capture_screenshot(self, lambda: self.auto_mode_var)
 
     def convert_move_to_indices(self, move: str):
         return self.move_executor.convert_move_to_indices(
-            self.color_indicator, self.root, self.auto_mode_var, move
+            self.color_indicator, self, lambda: self.auto_mode_var, move
         )
 
     def relocate_cursor_to_play_button(self):
-        self.move_executor.relocate_cursor_to_button(self.root, self.auto_mode_var, self.btn_play)
+        self.move_executor.relocate_cursor_to_button(self, lambda: self.auto_mode_var, self.btn_play)
 
     def drag_piece(self, move: str):
         self.move_executor.execute_move(
             self.color_indicator, move, self.board_positions,
-            self.auto_mode_var, self.root, self.btn_play, self.move_mode
+            lambda: self.auto_mode_var, self, self.btn_play, self.move_mode
         )
 
     def expand_fen_row(self, row: str):
@@ -228,7 +204,7 @@ class ChessPilot:
 
     def adjust_castling_fen(self, fen: str):
         return self.board_analyzer.adjust_castling_fen(
-            self.color_indicator, self.kingside_var, self.queenside_var, fen
+            self.color_indicator, lambda: self.kingside_var, lambda: self.queenside_var, fen
         )
 
     def check_move_validity(self, before_fen: str, after_fen: str, move: str):
@@ -244,8 +220,8 @@ class ChessPilot:
             move,
             mate_flag,
             expected_fen,
-            self.root,
-            self.auto_mode_var,
+            self,
+            lambda: self.auto_mode_var,
             self.update_status,
             self.btn_play,
             self.move_mode,
@@ -253,7 +229,7 @@ class ChessPilot:
 
     def query_best_move(self, fen: str):
         return self.engine_service.get_best_move(
-            self.depth_var.get(), fen, self.root, self.auto_mode_var
+            self.depth_var, fen, self, lambda: self.auto_mode_var
         )
 
     def read_current_fen(self):
@@ -269,21 +245,36 @@ class ChessPilot:
             self.color_indicator, before_fen, expected_fen, attempts_limit
         )
 
+    def closeEvent(self, event):
+        logger.info("Application closing - cleaning up Stockfish process")
+        self.engine_service.cleanup()
+        event.accept()
+
+    def update_last_fen_for_color(self, fen: str):
+        parts = fen.split()
+        placement, active_color = parts[0], parts[1]
+        self.last_fen_by_color[active_color] = placement
+        logger.debug(f"Updated last FEN for {active_color}: {placement}")
+
 if __name__ == "__main__":
-    logger.info("Stockfish and ONNX model setup completed successfully")
-
-    from services import EngineService
-    if not EngineService.initialize():
-        logger.error("Stockfish initialization failed — exiting.")
-        sys.exit(1)
-
     logger.info("Starting ChessPilot main loop")
-    root = tk.Tk()
-    app = ChessPilot(root)
+    app = QApplication(sys.argv)
+    
     try:
-        root.mainloop()
+        window = ChessPilot()
+        window.show()
+        sys.exit(app.exec())
     except KeyboardInterrupt:
         logger.info("Exiting APP")
-        EngineService.cleanup()
-        root.destroy()
-    logger.info("ChessPilot application closed")
+        if 'window' in locals() and hasattr(window, 'engine_service'):
+            window.engine_service.cleanup()
+    except Exception as e:
+        logger.exception("Fatal error in main loop")
+        QMessageBox.critical(
+            None,
+            "Fatal Error",
+            f"An unexpected error occurred:\n\n{str(e)}\n\nPlease check the logs."
+        )
+        sys.exit(1)
+    finally:
+        logger.info("ChessPilot application closed")

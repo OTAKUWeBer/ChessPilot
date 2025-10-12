@@ -162,9 +162,12 @@ def extract_stockfish():
     If missing, attempts to download via downloader.download_stockfish().
     Returns True on success (binary available), False otherwise.
     """
+    logger.info("Checking for Stockfish binary...")
+    
     # Check if bundled by PyInstaller
     bundled_stockfish = _check_bundled_stockfish()
     if bundled_stockfish:
+        logger.info("Using bundled Stockfish")
         return True
     
     # Determine target path
@@ -175,13 +178,16 @@ def extract_stockfish():
     # Check if system installed
     system_stockfish = _check_system_stockfish()
     if system_stockfish:
+        logger.info(f"Using system Stockfish: {system_stockfish}")
         return True
     
     # Check if already present in target location
     if _check_existing_stockfish(final_path):
+        logger.info(f"Stockfish found at: {final_path}")
         return True
     
     # Download and handle result
+    logger.info("Stockfish not found locally. Starting download...")
     return _download_and_handle_stockfish(final_path)
 
 
@@ -230,6 +236,8 @@ def rename_onnx_model():
     """
     Ensures chess_detection.onnx lives in cwd. Searches cwd first, then parent dir.
     """
+    logger.info("Checking for ONNX model...")
+    
     cwd = Path.cwd()
     target_name = "chess_detection.onnx"
     target_path = cwd / target_name
@@ -237,22 +245,26 @@ def rename_onnx_model():
     # Check if bundled
     bundled_result = _check_bundled_onnx()
     if bundled_result is True:
+        logger.info("Using bundled ONNX model")
         return True
     elif bundled_result is False:
+        logger.error("ONNX model missing from bundle")
         return False
     
     # Find ONNX model
     onnx_file = _find_onnx_model(cwd, target_path)
     if onnx_file == target_path:  # Already exists at target
+        logger.info(f"ONNX model found at: {target_path}")
         return True
     
     if not onnx_file:
         logger.error(
-            f"No ONNX model file found in {cwd} or {cwd.parent}. See README: {README_ONNX_URL}"
+            f"ONNX model not found. Please download it from: {README_ONNX_URL}"
         )
         return False
     
     # Move to target location
+    logger.info(f"Moving ONNX model to: {target_path}")
     return _move_onnx_model(onnx_file, target_path)
 
 
@@ -270,7 +282,21 @@ def _move_resource_from_project_root(project_dir, script_dir, filename, resource
 
 
 def setup_resources(script_dir: Path, project_dir: Path) -> bool:
+    """
+    Setup all required resources (Stockfish and ONNX model).
+    Returns True if all resources are ready, False otherwise.
+    """
+    logger.info("Setting up ChessPilot resources...")
+    
     if os.name != "nt":
+        logger.info("Non-Windows system detected, skipping resource moves")
+        # Still need to check for resources
+        if not extract_stockfish():
+            logger.error("Stockfish setup failed")
+            return False
+        if not rename_onnx_model():
+            logger.error("ONNX model setup failed")
+            return False
         return True
     
     # Move Stockfish binary from project root if present
@@ -280,7 +306,7 @@ def setup_resources(script_dir: Path, project_dir: Path) -> bool:
     
     # Ensure stockfish is present (download if missing)
     if not extract_stockfish():
-        logger.error("Stockfish setup failed")
+        logger.error("Stockfish setup failed. Please check your internet connection.")
         return False
     
     # Move ONNX model from project root if present
@@ -290,9 +316,10 @@ def setup_resources(script_dir: Path, project_dir: Path) -> bool:
     
     # Ensure ONNX model is present
     if not rename_onnx_model():
-        logger.error("ONNX rename/move failed")
+        logger.error("ONNX model setup failed. Please download it manually.")
         return False
     
+    logger.info("All resources ready!")
     return True
 
 

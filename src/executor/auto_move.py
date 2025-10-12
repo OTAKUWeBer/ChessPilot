@@ -11,6 +11,86 @@ from executor.processing_sync import processing_event
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+
+def _get_var_value(var):
+    """
+    Safely extract value from various variable types.
+    
+    Handles:
+    - Callables (lambdas/functions) - call them
+    - Objects with .get() method
+    - Objects with .isChecked() method
+    - Objects with .value attribute
+    - Direct values
+    """
+    if callable(var):
+        try:
+            result = var()
+            if callable(result) or hasattr(result, 'get') or hasattr(result, 'isChecked') or hasattr(result, 'value'):
+                return _get_var_value(result)
+            return result
+        except Exception as e:
+            logger.warning(f"Error calling variable function: {e}")
+            return None
+    
+    if hasattr(var, 'isChecked'):
+        try:
+            return var.isChecked()
+        except Exception as e:
+            logger.warning(f"Error calling .isChecked(): {e}")
+            return None
+    
+    if hasattr(var, 'get'):
+        try:
+            return var.get()
+        except Exception as e:
+            logger.warning(f"Error calling .get(): {e}")
+            return None
+    
+    if hasattr(var, 'value'):
+        try:
+            return var.value
+        except Exception as e:
+            logger.warning(f"Error accessing .value: {e}")
+            return None
+    
+    return var
+
+
+def _set_var_value(var, value):
+    """
+    Safely set value for various variable types.
+    
+    Handles:
+    - Objects with .set() method
+    - Objects with .setChecked() method
+    - Direct attribute assignment
+    """
+    if hasattr(var, 'set') and callable(var.set):
+        try:
+            var.set(value)
+            return True
+        except Exception as e:
+            logger.warning(f"Error calling .set(): {e}")
+    
+    if hasattr(var, 'setChecked') and callable(var.setChecked):
+        try:
+            var.setChecked(value)
+            return True
+        except Exception as e:
+            logger.warning(f"Error calling .setChecked(): {e}")
+    
+    if hasattr(var, 'value'):
+        try:
+            var.value = value
+            return True
+        except Exception as e:
+            logger.warning(f"Error setting .value: {e}")
+    
+    logger.warning(f"Unable to set value on variable type: {type(var)}")
+    return False
+
+
 def process_move_thread(
     root,
     color_indicator,
@@ -144,7 +224,7 @@ def _run_move_detection_loop(
     """
     Main loop that continuously checks for moves and processes them.
     """
-    while auto_mode_var.get():
+    while _get_var_value(auto_mode_var):
         logger.debug("Loop tick")
         
         if not _should_continue_processing(board_positions):
@@ -277,7 +357,7 @@ def _process_detected_move(
     """
     Process a detected opponent move by calculating and executing our response.
     """
-    delay = screenshot_delay_var.get()
+    delay = _get_var_value(screenshot_delay_var)
     logger.debug(f"Sleeping for {delay}s before calculating move…")
     time.sleep(delay)
     
@@ -296,5 +376,27 @@ def _handle_loop_error(error, root, update_status_callback, auto_mode_var):
     Handle errors that occur in the main processing loop.
     """
     logger.error(f"Exception in auto_move_loop: {error}", exc_info=True)
-    root.after(0, lambda err=error: update_status_callback(f"Error: {str(err)}"))
-    auto_mode_var.set(False)
+    
+    try:
+        if root is not None:
+            # Set the variable
+            if hasattr(root, "auto_mode_var"):
+                root.auto_mode_var = False
+            
+            # Uncheck the checkbox
+            if hasattr(root, "auto_mode_check"):
+                root.auto_mode_check.setChecked(False)
+                logger.info("Unchecked auto_mode_check due to error")
+            
+            # Re-enable the play button
+            if hasattr(root, "btn_play"):
+                root.btn_play.setEnabled(True)
+                logger.info("Re-enabled play button due to error")
+            
+            # Update status
+            root.after(0, lambda err=error: update_status_callback(f"Error: {str(err)}\nAuto mode disabled"))
+    except Exception as e:
+        logger.error(f"Error in error handler: {e}", exc_info=True)
+    
+    # Also try the _set_var_value helper
+    _set_var_value(auto_mode_var, False)

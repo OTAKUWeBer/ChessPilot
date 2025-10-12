@@ -80,10 +80,61 @@ def _should_add_castling_right(target_color, side, player_color, side_var, fen):
     
     # If it's the player's color, check if the corresponding variable is set
     if target_color == player_color:
-        return side_var.get()
+        return _get_var_value(side_var)
     
     # If it's not the player's color, always include if possible
     return True
+
+
+def _get_var_value(var):
+    """
+    Safely extract boolean value from various variable types.
+    
+    Handles:
+    - Callables (lambdas/functions) - call them
+    - Objects with .get() method (Tkinter variables, Qt checkboxes)
+    - Objects with .isChecked() method (Qt checkboxes)
+    - Objects with .value attribute
+    - Direct boolean values
+    """
+    # If it's callable, call it to get the value
+    if callable(var):
+        try:
+            result = var()
+            # The result might be another object, so recursively check
+            if callable(result) or hasattr(result, 'get') or hasattr(result, 'isChecked') or hasattr(result, 'value'):
+                return _get_var_value(result)
+            return bool(result)
+        except Exception as e:
+            logger.warning(f"Error calling variable function: {e}")
+            return False
+    
+    # Try .isChecked() method (for PyQt6 checkboxes)
+    if hasattr(var, 'isChecked'):
+        try:
+            return bool(var.isChecked())
+        except Exception as e:
+            logger.warning(f"Error calling .isChecked() on variable: {e}")
+            return False
+    
+    # Try .get() method (for Tkinter variables, etc.)
+    if hasattr(var, 'get'):
+        try:
+            return bool(var.get())
+        except Exception as e:
+            logger.warning(f"Error calling .get() on variable: {e}")
+            return False
+    
+    # Try .value attribute
+    if hasattr(var, 'value'):
+        try:
+            return bool(var.value)
+        except Exception as e:
+            logger.warning(f"Error accessing .value on variable: {e}")
+            return False
+    
+    # Direct boolean value
+    return bool(var)
 
 
 def _reconstruct_fen_with_castling(fen_fields, new_castling):

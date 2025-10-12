@@ -1,5 +1,5 @@
 import logging
-import tkinter as tk
+from PyQt6.QtCore import QTimer
 import time
 from board_detection import get_positions, get_fen_from_position
 from executor.capture_screenshot_in_memory import capture_screenshot_in_memory
@@ -78,8 +78,8 @@ def _initialize_move_processing(root, btn_play, update_status):
     Set up the initial state for move processing.
     """
     processing_event.set()
-    root.after(0, lambda: btn_play.config(state=tk.DISABLED))
-    root.after(0, lambda: update_status("\nAnalyzing board..."))
+    QTimer.singleShot(0, lambda: btn_play.setEnabled(False))
+    QTimer.singleShot(0, lambda: update_status("\nAnalyzing board..."))
 
 
 def _extract_board_position(root, auto_mode_var, color_indicator, update_status):
@@ -97,8 +97,10 @@ def _extract_board_position(root, auto_mode_var, color_indicator, update_status)
     boxes = get_positions(screenshot_image)
     if not boxes:
         logger.error("No chessboard found in screenshot.")
-        root.after(0, lambda: update_status("\nNo board detected"))
-        auto_mode_var.set(False)
+        QTimer.singleShot(0, lambda: update_status("\nNo board detected"))
+        if callable(auto_mode_var):
+            root.auto_mode_var = False
+            root.auto_mode_check.setChecked(False)
         return None
     
     fen_data = _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mode_var)
@@ -123,8 +125,10 @@ def _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mo
         
         if result is None:
             logger.error("FEN extraction failed: get_fen_from_position returned None")
-            root.after(0, lambda: update_status("Error: Could not detect board/FEN"))
-            auto_mode_var.set(False)
+            QTimer.singleShot(0, lambda: update_status("Error: Could not detect board/FEN"))
+            if callable(auto_mode_var):
+                root.auto_mode_var = False
+                root.auto_mode_check.setChecked(False)
             return None
         
         chessboard_x, chessboard_y, square_size, fen = result
@@ -139,14 +143,18 @@ def _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mo
         
     except IndexError:
         logger.error("FEN extraction failed: encountered unexpected box format (IndexError)")
-        root.after(0, lambda: update_status("Error: Bad screenshot"))
-        auto_mode_var.set(False)
+        QTimer.singleShot(0, lambda: update_status("Error: Bad screenshot"))
+        if callable(auto_mode_var):
+            root.auto_mode_var = False
+            root.auto_mode_check.setChecked(False)
         return None
         
     except ValueError as e:
         logger.error(f"FEN extraction failed: {e}")
-        root.after(0, lambda err=e: update_status(f"Error: {str(err)}"))
-        auto_mode_var.set(False)
+        QTimer.singleShot(0, lambda err=e: update_status(f"Error: {str(err)}"))
+        if callable(auto_mode_var):
+            root.auto_mode_var = False
+            root.auto_mode_check.setChecked(False)
         return None
 
 
@@ -202,14 +210,14 @@ def _calculate_best_move(root, fen, auto_mode_var, update_status):
     """
     Get the best move from the chess engine.
     """
-    depth = root.depth_var.get() if hasattr(root, "depth_var") else 15
+    depth = root.depth_var if hasattr(root, "depth_var") else 15
     logger.info(f"Asking engine for best move at depth {depth}")
     
     best_move, updated_fen, mate_flag = get_best_move(depth, fen, root, auto_mode_var)
     
     if not best_move:
         logger.warning("No move returned by engine.")
-        root.after(0, lambda: update_status("No valid move found!"))
+        QTimer.singleShot(0, lambda: update_status("No valid move found!"))
         return None
     
     logger.info(f"Best move suggested: {best_move}")
@@ -246,7 +254,9 @@ def _should_execute_castling(is_castle_move, kingside_var, queenside_var):
     """
     Determine if we should execute castling logic.
     """
-    return is_castle_move and (kingside_var.get() or queenside_var.get())
+    k_val = kingside_var() if callable(kingside_var) else kingside_var
+    q_val = queenside_var() if callable(queenside_var) else queenside_var
+    return is_castle_move and (k_val or q_val)
 
 
 def _execute_castling_move(
@@ -276,14 +286,17 @@ def _auto_enable_castling_checkbox(side, kingside_var, queenside_var, root, upda
     """
     Automatically enable the appropriate castling checkbox if not already checked.
     """
-    if side == "kingside" and not kingside_var.get():
+    k_val = kingside_var() if callable(kingside_var) else kingside_var
+    q_val = queenside_var() if callable(queenside_var) else queenside_var
+
+    if side == "kingside" and not k_val:
         logger.info("Auto-checking 'Kingside Castle' checkbox")
-        kingside_var.set(True)
-        root.after(0, lambda: update_status("Auto-enabled Kingside Castle"))
-    elif side == "queenside" and not queenside_var.get():
+        root.kingside_check.setChecked(True)
+        QTimer.singleShot(0, lambda: update_status("Auto-enabled Kingside Castle"))
+    elif side == "queenside" and not q_val:
         logger.info("Auto-checking 'Queenside Castle' checkbox")
-        queenside_var.set(True)
-        root.after(0, lambda: update_status("Auto-enabled Queenside Castle"))
+        root.queenside_check.setChecked(True)
+        QTimer.singleShot(0, lambda: update_status("Auto-enabled Queenside Castle"))
 
 
 def _perform_castling_move(
@@ -298,9 +311,11 @@ def _perform_castling_move(
     status_msg = f"\nBest Move: {best_move}\nCastling move executed: {best_move}"
     if mate_flag:
         status_msg += "\n𝘾𝙝𝙚𝙘𝙠𝙢𝙖𝙩𝙚"
-        auto_mode_var.set(False)
-    
-    root.after(0, lambda: update_status(status_msg))
+        if callable(auto_mode_var):
+            root.auto_mode_var = False
+            root.auto_mode_check.setChecked(False)
+
+    QTimer.singleShot(0, lambda: update_status(status_msg))
     time.sleep(0.3)
     
     _verify_castling_move(best_move, updated_fen, color_indicator, root, update_status, last_fen_by_color)
@@ -314,7 +329,7 @@ def _verify_castling_move(best_move, updated_fen, color_indicator, root, update_
     
     if not success:
         logger.error("Move verification failed after castling.")
-        root.after(0, lambda: update_status(
+        QTimer.singleShot(0, lambda: update_status(
             f"Move verification failed on castling move\nBest Move: {best_move}"
         ))
     else:
@@ -329,8 +344,10 @@ def _handle_processing_error(error, root, update_status, auto_mode_var):
     Handle unexpected errors during move processing.
     """
     logger.exception("Unexpected error during process_move")
-    root.after(0, lambda err=error: update_status(f"Error: {str(err)}"))
-    auto_mode_var.set(False)
+    QTimer.singleShot(0, lambda err=error: update_status(f"Error: {str(err)}"))
+    if callable(auto_mode_var):
+        root.auto_mode_var = False
+        root.auto_mode_check.setChecked(False)
 
 
 def _finalize_move_processing(root, auto_mode_var, btn_play):
@@ -338,6 +355,7 @@ def _finalize_move_processing(root, auto_mode_var, btn_play):
     Clean up after move processing is complete.
     """
     processing_event.clear()
-    if not auto_mode_var.get():
-        root.after(0, lambda: btn_play.config(state=tk.NORMAL))
+    auto_val = auto_mode_var() if callable(auto_mode_var) else auto_mode_var
+    if not auto_val:
+        QTimer.singleShot(0, lambda: btn_play.setEnabled(True))
     logger.info("process_move completed.")
