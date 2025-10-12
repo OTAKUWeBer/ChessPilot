@@ -2,7 +2,8 @@ import os
 import subprocess
 import shutil
 import logging
-from tkinter import messagebox
+from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import QTimer
 import sys
 from utils.resource_path import resource_path
 
@@ -293,7 +294,7 @@ def _show_error_dialog(root, message):
     Show error dialog if root window is available.
     """
     if root:
-        root.after(0, lambda: messagebox.showerror("Error", message))
+        QTimer.singleShot(0, lambda: QMessageBox.critical(root, "Error", message))
 
 
 def _disable_auto_mode(auto_mode_var):
@@ -301,4 +302,6 @@ def _disable_auto_mode(auto_mode_var):
     Disable auto mode if the variable is available.
     """
     if auto_mode_var:
-        auto_mode_var.set(False)
+        if callable(auto_mode_var):
+            root.auto_mode_var = False
+            root.auto_mode_check.setChecked(False)

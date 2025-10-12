@@ -3,7 +3,7 @@
 </p>
 <hr />
 
-<h1 align="center">ChessPilot</h1>
+# ChessPilot — v2.0.0
 
 <p align="center">
   A fully offline chess position evaluator and autoplayer for Windows and Linux, powered by ONNX and Stockfish.
@@ -19,24 +19,35 @@
 <a href="https://img.shields.io/badge/Made_For-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=white"><img src="https://img.shields.io/badge/Made_For-Linux-FCC624?style=for-the-badge&logo=linux&logoColor=white"></a>
 <a href="https://img.shields.io/badge/Made_For-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"><img src="https://img.shields.io/badge/Made_For-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"></a>
 
-<br>
+---
+
+## 🚀 What's new in v2.0.0 — PyQt6 UI (minor, polished)
+
+This release advances the project to **v2.0.0** and keeps the previously introduced PyQt6 frontend while remaining intentionally minimal in behavioral changes. The core functionality is unchanged; the update focuses on a more polished, stable PyQt6 experience and small fixes under the hood.
+
+Highlights:
+
+* ✅ **Version bumped to v2.0.0**.
+* ✅ **PyQt6 GUI** (continued — replaces Tkinter) — improved stability and polish.
+* ✅ No workflow changes: FEN extraction, Stockfish analysis, auto-move execution, board flipping, castling toggles, depth control, retry logic, and ESC shortcut remain the same.
+* ⚠️ Source-build users: ensure PyQt6 is installed (see prerequisites).
 
 ---
 
 ## 🚀 Features
 
-* **Automatic Stockfish Download**: Automatically detects your CPU and downloads the best Stockfish version—no manual setup required.
-* **FEN Extraction**: Captures your board state with a local ONNX model ([Zai-Kun’s 2D Chess Detection](https://github.com/Zai-Kun/2d-chess-pieces-detection)).
-* **Stockfish Analysis**: Integrates with the Stockfish engine to compute the optimal move.
-* **Auto-Move Execution**: Plays the suggested move on your screen automatically.
-* **Manual Play**: Click **“Play Next Move”** when you’re ready to proceed.
-* **Board Flipping**: Supports playing as Black by flipping the board.
+* **Automatic Stockfish Download**: Detects your CPU and downloads the best Stockfish build automatically.
+* **FEN Extraction**: Local ONNX model ([Zai-Kun’s 2D Chess Detection](https://github.com/Zai-Kun/2d-chess-pieces-detection)).
+* **Stockfish Analysis**: Integrates Stockfish for optimal move suggestions.
+* **Auto-Move Execution**: Plays the chosen move on your screen automatically.
+* **Manual Play**: Click **“Play Next Move”** when you want to proceed manually.
+* **Board Flipping**: Play as Black by flipping the board.
 * **Castling Rights**: Toggle Kingside/Queenside castling.
-* **Depth Control**: Adjust analysis depth via a slider (default: 15).
+* **Depth Control**: Slider to adjust analysis depth (default: 15).
 * **Retry Logic**: Retries failed moves up to three times.
 * **ESC Shortcut**: Press **ESC** to reselect playing color at any time.
-* **Cross-Platform GUI**: Built with Tkinter for simplicity.
-* **100% Offline**: No external API calls—your data stays local.
+* **Cross-Platform GUI**: Built with **PyQt6** for a modern desktop UI.
+* **100% Offline**: No external API calls — all processing stays local.
 
 ---
 
@@ -44,17 +55,13 @@
 
 👉 [Download the latest release](https://github.com/OTAKUWeBer/ChessPilot/releases/latest)
 
-### Included in Binary Releases
-
-The ONNX model (`chess_detectionv0.0.4.onnx`) is already bundled in official **AppImage**, **EXE**, and **DEB** builds.
-Stockfish will be **downloaded automatically** on first run according to your CPU.
+> The ONNX model (`chess_detectionv0.0.4.onnx`) is bundled in official **AppImage**, **EXE**, and **DEB** builds. Stockfish will be downloaded automatically on first run.
 
 ---
 
 ## 🔧 Engine Configuration (v1.0.1)
 
-You can fine-tune Stockfish’s performance without touching any code.
-Simply place an `engine_config.txt` file next to the ChessPilot executable:
+You can fine-tune Stockfish’s performance using an `engine_config.txt` file next to the ChessPilot executable:
 
 ```ini
 # ================================
@@ -67,36 +74,44 @@ setoption name Hash value 512
 setoption name Threads value 2
 ```
 
-1. Edit `Hash` to adjust how much RAM (in MB) Stockfish uses.
+1. Edit `Hash` to adjust RAM (in MB) Stockfish uses.
 2. Edit `Threads` to match your CPU cores.
-3. Save and restart ChessPilot to apply the new settings.
+3. Save and restart ChessPilot to apply settings.
 
 ---
 
 ## ⚙️ Prerequisites (For Source Builds / Raw File Users)
 
-If you're running from source or using the **raw files** (not packaged AppImage/EXE/DEB), you need:
+**PyQt6 is required when running from source.**
+
+### Linux
 
 ```bash
-sudo apt install python3-tk      # Ubuntu / Debian
-sudo pacman -S tk                # Arch Linux
-sudo dnf install python3-tkinter # Fedora
+# system packages (examples — adapt to your distro)
+sudo apt install python3-pyqt6        # Ubuntu / Debian
+sudo pacman -S python-pyqt6           # Arch Linux
+sudo dnf install python3-qt6          # Fedora (package name may vary)
 ```
 
-Install Python dependencies:
+### Windows
+
+Install PyQt6 via pip in your virtualenv:
+
+```bash
+pip install PyQt6
+```
+
+### General (Python packages)
 
 ```bash
 pip install -r requirements.txt
 ```
 
-* **Assets Needed (Source only)**:
+**Assets Needed (Source only)**:
 
-  1. [chess\_detectionv0.0.4.onnx](https://github.com/Zai-Kun/2d-chess-pieces-detection/releases/download/v0.0.4/chess_detectionv0.0.4.onnx)
+* `chess_detectionv0.0.4.onnx` — included in binaries; if running from raw files, download from the detector release.
 
-> Stockfish will be downloaded automatically when you run ChessPilot.
-
-> **Windows Raw File Users Only**: You may also need the Microsoft Visual C++ Redistributable if it's not already installed.
-> [Download here](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
+> **Windows Raw File Users Only**: You may still need the Microsoft Visual C++ Redistributable if not already installed. [Microsoft VC++ Redistributable](https://learn.microsoft.com/en-us/cpp/windows/latest-supported-vc-redist?view=msvc-170)
 
 ---
 
@@ -119,12 +134,14 @@ From the project root:
 python src/main.py
 ```
 
-**Workflow**:
+Workflow:
 
 1. Choose **White** or **Black**.
 2. Enable castling rights if needed.
 3. Adjust analysis depth.
 4. Select **Manual** or **Auto** play.
+
+(Behavior and shortcuts are unchanged — ESC still reopens color selection.)
 
 ---
 
@@ -144,7 +161,7 @@ See [SHORTCUTS.md](SHORTCUTS.md) for a full list of hotkeys and actions.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please open an issue or submit a pull request.
+Contributions welcome! Open an issue or submit a pull request. If you'd like to help port or test macOS builds, let us know.
 
 ---
 

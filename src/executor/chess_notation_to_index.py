@@ -1,4 +1,5 @@
-from tkinter import messagebox
+from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import QTimer
 import logging
 
 # Logger setup
@@ -24,11 +25,8 @@ def chess_notation_to_index(color_indicator, root, auto_mode_var, move):
 
     except (KeyError, IndexError) as e:
         logger.error(f"Invalid move notation: {move}, Error: {e}")
-        root.after(
-            0,
-            lambda: messagebox.showerror(
-                "Error", f"Invalid move notation: {move}"
-            )
-        )
-        auto_mode_var.set(False)
+        QTimer.singleShot(0, lambda: QMessageBox.critical(root, "Error", f"Invalid move notation: {move}"))
+        if callable(auto_mode_var):
+            root.auto_mode_var = False
+            root.auto_mode_check.setChecked(False)
         return None, None

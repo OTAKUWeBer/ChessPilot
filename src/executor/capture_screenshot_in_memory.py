@@ -3,11 +3,11 @@ from PIL import Image
 import io
 from .is_wayland import is_wayland
 import subprocess
-from tkinter import messagebox
+from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import QTimer
 import logging
 from utils.get_binary_path import get_binary_path
 
-# Logger setup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
@@ -30,7 +30,9 @@ def capture_screenshot_in_memory(root=None, auto_mode_var=None):
     except Exception as e:
         logger.error(f"Screenshot failed: {e}")
         if root:
-            root.after(0, lambda err=e: messagebox.showerror("Error", f"Screenshot failed: {str(err)}"))
+            QTimer.singleShot(0, lambda: QMessageBox.critical(root, "Error", f"Screenshot failed: {str(e)}"))
         if auto_mode_var:
-            auto_mode_var.set(False)
+            if callable(auto_mode_var):
+                root.auto_mode_var = False
+                root.auto_mode_check.setChecked(False)
         return None

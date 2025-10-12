@@ -7,19 +7,26 @@ import shutil
 import tempfile
 import threading
 import requests
-import tkinter as tk
-from tkinter import ttk
+from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar, QPushButton
+from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal
 from pathlib import Path
 import logging
 import sys
 import time
 
-# ------------------------ Logger ------------------------
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 _ch = logging.StreamHandler(sys.stdout)
 _ch.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
 logger.addHandler(_ch)
+
+class ProgressSignals(QObject):
+    """Signals for thread-safe UI updates"""
+    progress_update = pyqtSignal(int)  # percentage
+    label_update = pyqtSignal(str)
+    sub_label_update = pyqtSignal(str)
+    show_retry = pyqtSignal()
+    close_window = pyqtSignal(int)  # delay in ms
 
 # ------------------------ Visual style (match ChessPilot) ------------------------
 BG_COLOR = "#2D2D2D"
@@ -47,12 +54,18 @@ def detect_cpu_info():
     vendor = "unknown"
     flags = set()
     
-    if os_name == "linux":
-        vendor, flags = _detect_linux_cpu_info()
-    elif os_name == "mac":
-        vendor, flags = _detect_mac_cpu_info()
-    elif os_name == "windows":
-        vendor, flags = _detect_windows_cpu_info()
+    try:
+        if os_name == "linux":
+            vendor, flags = _detect_linux_cpu_info()
+        elif os_name == "mac":
+            vendor, flags = _detect_mac_cpu_info()
+        elif os_name == "windows":
+            vendor, flags = _detect_windows_cpu_info()
+    except Exception as e:
+        logger.warning(f"CPU detection failed, using defaults: {e}")
+        # Fallback to safe defaults
+        vendor = "generic"
+        flags = {"sse4_1", "sse4_2", "popcnt"}
     
     logger.info(f"CPU Vendor: {vendor}, Flags: {sorted(flags)[:10]}...")
     return arch, vendor, flags
@@ -250,7 +263,7 @@ def _calculate_cpu_score(name, vendor, flags):
         if any(f.startswith("avx512") for f in flags):
             score += 100
         else:
-            score -= 50  # Penalize if we don't have it
+            score -= 100  # Strong penalty if we don't have it
     
     elif "bmi2" in name:
         # BMI2 is common on modern Intel (Haswell+) and AMD (Zen+)
@@ -262,42 +275,42 @@ def _calculate_cpu_score(name, vendor, flags):
             elif vendor == "intel" and "intel" in name:
                 score += 10
         else:
-            score -= 30
+            score -= 50  # Penalty if we don't have it
     
     elif "avx2" in name:
         # AVX2 is widely supported
         if "avx2" in flags or "avx" in flags:
             score += 60
         else:
-            score -= 20
+            score -= 30
     
     elif "popcnt" in name or "sse41" in name or "sse4" in name:
         # SSE4.1 + POPCNT is baseline modern
         if any(x in flags for x in ["sse4_1", "sse4_2", "popcnt", "sse4.1", "sse4.2"]):
-            score += 40
+            score += 50  # Higher score for compatibility
     
     elif "modern" in name:
-        # Generic modern build
-        score += 30
+        # Generic modern build - safe fallback
+        score += 40
     
     elif "x86-64" in name or "x86_64" in name:
-        # Basic x86-64 fallback
-        score += 10
+        # Basic x86-64 fallback - most compatible
+        score += 35
     
     # Prefer compressed archives
     if name.endswith((".tar.gz", ".tgz", ".zip", ".tar")):
         score += 5
     
     # Small penalty for non-matching vendor specifics
-    if "amd" in name and vendor != "amd":
+    if "amd" in name and vendor not in ["amd", "generic", "unknown"]:
         score -= 5
-    if "intel" in name and vendor != "intel":
+    if "intel" in name and vendor not in ["intel", "generic", "unknown"]:
         score -= 5
     
     return score
 
 # ------------------------ Download & extraction ------------------------
-def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeout=30):
+def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeout=60):
     """
     Downloads a file while calling progress_callback(downloaded_bytes, total_bytes_or_None, speed_bytes_per_sec)
     """
@@ -307,7 +320,7 @@ def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeo
     last_report_time = start_time
 
     try:
-        with requests.get(url, stream=True, timeout=timeout) as r:
+        with requests.get(url, stream=True, timeout=timeout, allow_redirects=True) as r:
             r.raise_for_status()
             total = r.headers.get("Content-Length")
             total = int(total) if total else None
@@ -321,7 +334,7 @@ def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeo
                         elapsed = now - start_time if (now - start_time) > 0 else 1e-6
                         speed = downloaded / elapsed
                         
-                        if (now - last_report_time) >= 0.4 or downloaded == total:
+                        if (now - last_report_time) >= 0.1 or (total and downloaded >= total):
                             last_report_time = now
                             if progress_callback:
                                 try:
@@ -329,12 +342,18 @@ def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeo
                                 except Exception as e:
                                     logger.warning(f"Progress callback error: {e}")
                                     
+    except requests.exceptions.Timeout as e:
+        logger.error(f"Download timeout: {e}")
+        raise Exception(f"Download timed out. Please check your internet connection.")
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"Connection error: {e}")
+        raise Exception(f"Connection failed. Please check your internet connection.")
     except requests.exceptions.RequestException as e:
         logger.error(f"Download failed: {e}")
-        raise
+        raise Exception(f"Download failed: {str(e)}")
     except IOError as e:
         logger.error(f"File write error: {e}")
-        raise
+        raise Exception(f"Could not write file: {str(e)}")
         
     logger.debug("Download finished")
 
@@ -436,8 +455,8 @@ def extract_binary(archive_path):
 
 # ------------------------ Download workflow ------------------------
 class DownloadWorkflow:
-    def __init__(self, ui_callbacks):
-        self.ui = ui_callbacks
+    def __init__(self, signals):
+        self.signals = signals
         self.os_name = detect_os()
         self.arch, self.vendor, self.flags = detect_cpu_info()
         
@@ -468,18 +487,18 @@ class DownloadWorkflow:
             
         except Exception as ex:
             logger.exception("Unexpected error during download/install")
-            self.ui.set_label("Error occurred")
-            self.ui.set_sub_label(str(ex))
-            self.ui.close_after(1600)
+            self.signals.label_update.emit("Error occurred")
+            self.signals.sub_label_update.emit(str(ex))
+            self.signals.show_retry.emit()
     
     def _is_already_installed(self):
         target_path = self._get_target_path()
         if target_path.exists():
             logger.info(f"Stockfish already installed at {target_path} — exiting")
-            self.ui.set_label("Already installed")
-            self.ui.set_sub_label(str(target_path))
-            self.ui.set_progress(100)
-            self.ui.close_after(800)
+            self.signals.label_update.emit("Already installed")
+            self.signals.sub_label_update.emit(str(target_path))
+            self.signals.progress_update.emit(100)
+            self.signals.close_window.emit(800)
             return True
         return False
     
@@ -496,11 +515,11 @@ class DownloadWorkflow:
                 return Path.cwd() / "stockfish"
     
     def _fetch_release_data(self):
-        self.ui.set_label("Fetching latest release metadata...")
+        self.signals.label_update.emit("Fetching latest release metadata...")
         logger.info("Fetching latest Stockfish release metadata from GitHub")
         
         try:
-            r = requests.get("https://api.github.com/repos/official-stockfish/Stockfish/releases/latest", timeout=15)
+            r = requests.get("https://api.github.com/repos/official-stockfish/Stockfish/releases/latest", timeout=30)
             r.raise_for_status()
             rel = r.json()
             
@@ -510,11 +529,17 @@ class DownloadWorkflow:
             
             return {"tag_name": tag, "assets": assets}
             
+        except requests.exceptions.Timeout:
+            logger.error("Timeout fetching release metadata")
+            self.signals.label_update.emit("Connection timeout")
+            self.signals.sub_label_update.emit("Please check your internet connection")
+            self.signals.show_retry.emit()
+            return None
         except requests.exceptions.RequestException as e:
             logger.error(f"Failed to fetch release metadata: {e}")
-            self.ui.set_label("Network error")
-            self.ui.set_sub_label("Could not fetch release info")
-            self.ui.close_after(1200)
+            self.signals.label_update.emit("Network error")
+            self.signals.sub_label_update.emit("Could not fetch release info. Check your connection.")
+            self.signals.show_retry.emit()
             return None
     
     def _select_asset(self, release_data):
@@ -522,34 +547,34 @@ class DownloadWorkflow:
                                        self.arch, self.vendor, self.flags)
         if not best_asset:
             logger.error("No matching build found for this OS/arch")
-            self.ui.set_label("No matching build found")
-            self.ui.set_sub_label("See logs for details")
-            self.ui.close_after(1200)
+            self.signals.label_update.emit("No matching build found")
+            self.signals.sub_label_update.emit("See logs for details")
+            self.signals.show_retry.emit()
             return None
             
         logger.info(f"Selected asset: {best_asset['name']} (release {release_data['tag_name']})")
-        self.ui.set_sub_label(f"CPU: {self.vendor.upper()} | Selected: {best_asset['name']}")
+        self.signals.sub_label_update.emit(f"CPU: {self.vendor.upper()} | Selected: {best_asset['name']}")
         return best_asset
     
     def _download_asset(self, best_asset, tag_name):
-        self.ui.set_label(f"{tag_name} — {best_asset['name']}")
+        self.signals.label_update.emit(f"{tag_name} — {best_asset['name']}")
         asset_name = best_asset["name"]
         archive_path = os.path.join(tempfile.gettempdir(), asset_name)
 
         if self._is_cached_and_valid(archive_path, best_asset):
-            self.ui.set_sub_label("Using existing archive")
-            self.ui.set_progress(5)
+            self.signals.sub_label_update.emit("Using cached download")
+            self.signals.progress_update.emit(5)
             return archive_path
 
-        self.ui.set_label(f"Downloading {asset_name}...")
+        self.signals.label_update.emit(f"Downloading {asset_name}...")
         try:
             download_file(best_asset["url"], archive_path, progress_callback=self._create_progress_callback())
             return archive_path
         except Exception as e:
             logger.error(f"Download failed: {e}")
-            self.ui.set_label("Download failed")
-            self.ui.set_sub_label("See logs for details")
-            self.ui.close_after(1400)
+            self.signals.label_update.emit("Download failed")
+            self.signals.sub_label_update.emit(str(e))
+            self.signals.show_retry.emit()
             return None
     
     def _is_cached_and_valid(self, archive_path, asset):
@@ -574,31 +599,31 @@ class DownloadWorkflow:
     def _create_progress_callback(self):
         def progress_cb(d, t, speed_bytes_per_s):
             pct = (d * 100 / t) if t else min(99.9, d / 1024 / 1024)
-            self.ui.set_progress(pct)
+            self.signals.progress_update.emit(int(pct))
             mbps = (speed_bytes_per_s * 8) / (1000 * 1000)
             speed_mb_s = speed_bytes_per_s / (1024 * 1024)
             if t:
-                self.ui.set_sub_label(f"{format_bytes(d)} / {format_bytes(t)} — {speed_mb_s:.2f} MB/s ({mbps:.2f} Mbps)")
+                self.signals.sub_label_update.emit(f"{format_bytes(d)} / {format_bytes(t)} — {speed_mb_s:.2f} MB/s ({mbps:.2f} Mbps)")
             else:
-                self.ui.set_sub_label(f"{format_bytes(d)} — {speed_mb_s:.2f} MB/s ({mbps:.2f} Mbps)")
+                self.signals.sub_label_update.emit(f"{format_bytes(d)} — {speed_mb_s:.2f} MB/s ({mbps:.2f} Mbps)")
         return progress_cb
     
     def _extract_binary(self, archive_path):
-        self.ui.set_label("Extracting binary...")
+        self.signals.label_update.emit("Extracting binary...")
         logger.info("Extracting binary from archive")
         bin_path = extract_binary(archive_path)
         if not bin_path:
             logger.error("Could not find Stockfish binary inside the archive")
-            self.ui.set_label("Binary not found in archive")
-            self.ui.set_sub_label("See logs")
-            self.ui.close_after(1400)
+            self.signals.label_update.emit("Binary not found in archive")
+            self.signals.sub_label_update.emit("See logs")
+            self.signals.show_retry.emit()
             return None
         
-        self.ui.set_progress(75)
+        self.signals.progress_update.emit(75)
         return bin_path
     
     def _install_binary(self, bin_path):
-        self.ui.set_label("Installing...")
+        self.signals.label_update.emit("Installing...")
         target_path = self._get_target_path()
         
         if self.os_name == "windows":
@@ -610,95 +635,173 @@ class DownloadWorkflow:
         try:
             shutil.copy2(bin_path, target_path)
             logger.info("Installed Stockfish to %s", target_path)
-            self.ui.set_label(f"Installed to {target_path.name}")
-            self.ui.set_progress(100)
-            self.ui.close_after(700)
+            self.signals.label_update.emit(f"Installed to {target_path.name}")
+            self.signals.progress_update.emit(100)
+            self.signals.close_window.emit(700)
         except (OSError, IOError) as e:
             logger.error(f"Failed to copy binary on Windows: {e}")
-            self.ui.set_label("Install failed")
-            self.ui.set_sub_label(str(e))
-            self.ui.close_after(1400)
+            self.signals.label_update.emit("Install failed")
+            self.signals.sub_label_update.emit(str(e))
+            self.signals.show_retry.emit()
     
     def _install_unix(self, bin_path, target_path):
         try:
             shutil.copy2(bin_path, target_path)
             os.chmod(target_path, 0o700)
             logger.info("Installed Stockfish to %s", target_path)
-            self.ui.set_label(f"Installed to {target_path.name}")
-            self.ui.set_progress(100)
-            self.ui.close_after(700)
+            self.signals.label_update.emit(f"Installed to {target_path.name}")
+            self.signals.progress_update.emit(100)
+            self.signals.close_window.emit(700)
         except (OSError, IOError) as e:
             logger.error(f"Failed to copy binary on Unix-like OS: {e}")
-            self.ui.set_label("Install failed")
-            self.ui.set_sub_label(str(e))
-            self.ui.close_after(1400)
+            self.signals.label_update.emit("Install failed")
+            self.signals.sub_label_update.emit(str(e))
+            self.signals.show_retry.emit()
 
 # ------------------------ Downloader UI ------------------------
-class StockfishDownloaderApp:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Stockfish Downloader")
-        self.root.geometry("360x140")
-        self.root.resizable(False, False)
-        self.root.attributes("-topmost", True)
+class StockfishDownloaderApp(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Stockfish Downloader")
+        self.setFixedSize(420, 180)
+        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+
+        self.signals = ProgressSignals()
+        self.signals.progress_update.connect(self._update_progress)
+        self.signals.label_update.connect(self._update_label)
+        self.signals.sub_label_update.connect(self._update_sub_label)
+        self.signals.show_retry.connect(self._show_retry_button)
+        self.signals.close_window.connect(self._close_after)
 
         self._setup_styles()
         self._create_widgets()
-        
-        # Start the operation in a daemon thread
+
         threading.Thread(target=self._start_download_flow, daemon=True).start()
 
     def _setup_styles(self):
-        self.style = ttk.Style()
-        try:
-            self.style.theme_use("clam")
-        except tk.TclError:
-            logger.warning("Could not set clam theme")
-            
-        self.style.configure("TLabel", background=BG_COLOR, foreground=TEXT_COLOR)
-        self.style.configure("TButton", background=FRAME_COLOR, foreground=TEXT_COLOR)
-        self.style.configure("TProgressbar", troughcolor=FRAME_COLOR)
-        self.root.configure(bg=BG_COLOR)
-    
+        self.setStyleSheet(f"""
+            QWidget {{
+                background-color: {BG_COLOR};
+            }}
+            QLabel {{
+                color: {TEXT_COLOR};
+                background-color: {BG_COLOR};
+            }}
+            QProgressBar {{
+                border: 1px solid {FRAME_COLOR};
+                background-color: {FRAME_COLOR};
+                text-align: center;
+                color: {TEXT_COLOR};
+                border-radius: 3px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {ACCENT_COLOR};
+                border-radius: 2px;
+            }}
+            QPushButton {{
+                background-color: {ACCENT_COLOR};
+                color: {TEXT_COLOR};
+                border: none;
+                border-radius: 3px;
+                font-family: 'Segoe UI';
+                font-size: 10pt;
+                font-weight: bold;
+                padding: 8px 15px;
+            }}
+            QPushButton:hover {{
+                background-color: {HOVER_COLOR};
+            }}
+        """)
+
     def _create_widgets(self):
-        self.label = ttk.Label(self.root, text="Preparing...", anchor="w")
-        self.label.pack(fill="x", padx=12, pady=(12, 6))
+        layout = QVBoxLayout()
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(8)
 
-        self.progress = tk.DoubleVar(value=0.0)
-        self.pb = ttk.Progressbar(self.root, orient="horizontal", mode="determinate", 
-                                 variable=self.progress, length=320)
-        self.pb.pack(padx=12, pady=(0, 6))
+        self.label = QLabel("Preparing download...")
+        self.label.setWordWrap(True)
+        layout.addWidget(self.label)
 
-        self.sub_label = ttk.Label(self.root, text="", anchor="w")
-        self.sub_label.pack(fill="x", padx=12)
+        self.pb = QProgressBar()
+        self.pb.setMinimum(0)
+        self.pb.setMaximum(100)
+        self.pb.setValue(0)
+        self.pb.setFixedHeight(25)
+        layout.addWidget(self.pb)
 
-    def set_label(self, text):
-        self.root.after(0, lambda: self.label.config(text=text))
-        
-    def set_sub_label(self, text):
-        self.root.after(0, lambda: self.sub_label.config(text=text))
-        
-    def set_progress(self, pct):
-        self.root.after(0, lambda: self.progress.set(pct))
+        self.sub_label = QLabel("")
+        self.sub_label.setWordWrap(True)
+        layout.addWidget(self.sub_label)
 
-    def close_after(self, ms=900):
+        self.retry_button = QPushButton("Retry Download")
+        self.retry_button.clicked.connect(self._retry_download)
+        self.retry_button.hide()
+        layout.addWidget(self.retry_button)
+
+        self.setLayout(layout)
+
+    def _update_label(self, text):
+        self.label.setText(text)
+
+    def _update_sub_label(self, text):
+        self.sub_label.setText(text)
+
+    def _update_progress(self, pct):
+        self.pb.setValue(pct)
+
+    def _show_retry_button(self):
+        self.retry_button.show()
+
+    def _close_after(self, ms):
         logger.debug("Window will close in %d ms", ms)
-        self.root.after(ms, self.root.destroy)
+        QTimer.singleShot(ms, self.close)
+
+    def _retry_download(self):
+        self.retry_button.hide()
+        self.pb.setValue(0)
+        threading.Thread(target=self._start_download_flow, daemon=True).start()
 
     def _start_download_flow(self):
-        workflow = DownloadWorkflow(self)
+        workflow = DownloadWorkflow(self.signals)
         workflow.execute()
 
-def download_stockfish(target: Path | None = None):
-    """
-    Main entry point to run the Stockfish downloader app.
-    Accepts optional `target` Path (e.g. Path('/usr/bin/stockfish')).
-    """
-    root = tk.Tk()
-    app = StockfishDownloaderApp(root)
-    root.mainloop()
-    return str(target) if target else None
-
 # ------------------------ Main ------------------------
+def download_stockfish(target_path=None):
+    """
+    Main entry point for downloading Stockfish.
+    Creates a QApplication and shows the downloader UI.
+    
+    Args:
+        target_path: Optional path where to install Stockfish (currently unused, 
+                    the downloader determines the path automatically)
+    
+    Returns:
+        True if download/install succeeded, False otherwise
+    """
+    app = QApplication(sys.argv)
+    downloader = StockfishDownloaderApp()
+    downloader.show()
+    app.exec()
+    
+    # Check if stockfish was successfully installed
+    if target_path:
+        return Path(target_path).exists()
+    
+    # Check default locations
+    if detect_os() == "windows":
+        if getattr(sys, 'frozen', False):
+            default_path = Path(sys.executable).parent / "stockfish.exe"
+        else:
+            default_path = Path.cwd() / "stockfish.exe"
+    else:
+        if getattr(sys, 'frozen', False):
+            default_path = Path(sys.executable).parent / "stockfish"
+        else:
+            default_path = Path.cwd() / "stockfish"
+    
+    return default_path.exists()
+
+
 if __name__ == "__main__":
-    download_stockfish()
+    success = download_stockfish()
+    sys.exit(0 if success else 1)

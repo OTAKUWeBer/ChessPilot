@@ -3,7 +3,8 @@ import os
 import time
 import random
 import pyautogui
-from tkinter import messagebox
+from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import QTimer
 from .is_wayland import is_wayland
 from wayland_capture.wayland import WaylandInput
 
@@ -53,8 +54,10 @@ def drag_piece(start_pos, end_pos, humanize=True, offset_range=(-16, 16), root=N
     except Exception as e:
         logger.error(f"Failed to drag piece: {e}")
         if root and auto_mode_var:
-            root.after(0, lambda err=e: messagebox.showerror("Error", f"Failed to drag piece: {str(err)}"))
-            auto_mode_var.set(False)
+            QTimer.singleShot(0, lambda err=e: QMessageBox.critical(root, "Error", f"Failed to drag piece: {str(err)}"))
+            if callable(auto_mode_var):
+                root.auto_mode_var = False
+                root.auto_mode_check.setChecked(False)
 
 
 def click_piece(start_pos, end_pos, humanize=True, offset_range=(-16, 16), root=None, auto_mode_var=None):
@@ -95,5 +98,7 @@ def click_piece(start_pos, end_pos, humanize=True, offset_range=(-16, 16), root=
     except Exception as e:
         logger.error(f"Failed to click piece: {e}")
         if root and auto_mode_var:
-            root.after(0, lambda err=e: messagebox.showerror("Error", f"Failed to click piece: {str(err)}"))
-            auto_mode_var.set(False)
+            QTimer.singleShot(0, lambda err=e: QMessageBox.critical(root, "Error", f"Failed to click piece: {str(err)}"))
+            if callable(auto_mode_var):
+                root.auto_mode_var = False
+                root.auto_mode_check.setChecked(False)

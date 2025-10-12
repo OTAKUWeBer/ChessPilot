@@ -10,5 +10,5 @@ class AppConfig:
     DEFAULT_MOVE_MODE = "drag"
 
     WINDOW_TITLE = "ChessPilot"
-    WINDOW_WIDTH = 350
-    WINDOW_HEIGHT = 380
+    WINDOW_WIDTH = 380
+    WINDOW_HEIGHT = 480
