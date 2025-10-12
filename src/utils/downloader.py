@@ -137,8 +137,18 @@ def _detect_windows_cpu_info():
     flags = set()
     
     try:
-        # Use WMIC to get CPU info
-        out = subprocess.check_output(["wmic", "cpu", "get", "name"], 
+        # Use full path to WMIC to prevent DLL hijacking/PATH manipulation
+        wmic_path = os.path.join(os.environ.get('SYSTEMROOT', 'C:\\Windows'), 'System32', 'wbem', 'wmic.exe')
+        
+        # Verify the path exists before using it
+        if not os.path.exists(wmic_path):
+            logger.warning(f"WMIC not found at expected path: {wmic_path}")
+            # Fall back to safe defaults
+            flags.update(["sse4_1", "sse4_2", "popcnt"])
+            return vendor, flags
+        
+        # Use absolute path for security
+        out = subprocess.check_output([wmic_path, "cpu", "get", "name"], 
                                      text=True, timeout=10).strip()
         out_lower = out.lower()
         
@@ -255,59 +265,115 @@ def _calculate_cpu_score(name, vendor, flags):
     """Calculate a score for how well this binary matches the CPU"""
     score = 0
     
-    # Check for CPU feature flags in the binary name
-    # Higher scores for more advanced instruction sets
+    # Define instruction set configurations with their requirements and scoring
+    instruction_sets = [
+        {
+            "keyword": "avx512",
+            "required_flags": lambda f: any(flag.startswith("avx512") for flag in f),
+            "match_score": 100,
+            "mismatch_penalty": -100
+        },
+        {
+            "keyword": "bmi2",
+            "required_flags": lambda f: "bmi2" in f,
+            "match_score": 80,
+            "mismatch_penalty": -50
+        },
+        {
+            "keyword": "avx2",
+            "required_flags": lambda f: "avx2" in f or "avx" in f,
+            "match_score": 60,
+            "mismatch_penalty": -30
+        },
+        {
+            "keywords": ["popcnt", "sse41", "sse4"],
+            "required_flags": lambda f: any(x in f for x in ["sse4_1", "sse4_2", "popcnt", "sse4.1", "sse4.2"]),
+            "match_score": 50,
+            "mismatch_penalty": 0
+        }
+    ]
     
-    if "avx512" in name:
-        # AVX-512 is the most advanced
-        if any(f.startswith("avx512") for f in flags):
-            score += 100
-        else:
-            score -= 100  # Strong penalty if we don't have it
+    # Check instruction set matches
+    score += _check_instruction_sets(name, flags, instruction_sets)
     
-    elif "bmi2" in name:
-        # BMI2 is common on modern Intel (Haswell+) and AMD (Zen+)
-        if "bmi2" in flags:
-            score += 80
-            # Bonus for matching vendor
-            if vendor == "amd" and "amd" in name:
-                score += 10
-            elif vendor == "intel" and "intel" in name:
-                score += 10
-        else:
-            score -= 50  # Penalty if we don't have it
+    # Add vendor bonus if applicable
+    score += _calculate_vendor_bonus(name, vendor, flags)
     
-    elif "avx2" in name:
-        # AVX2 is widely supported
-        if "avx2" in flags or "avx" in flags:
-            score += 60
-        else:
-            score -= 30
+    # Add fallback scores
+    score += _calculate_fallback_score(name)
     
-    elif "popcnt" in name or "sse41" in name or "sse4" in name:
-        # SSE4.1 + POPCNT is baseline modern
-        if any(x in flags for x in ["sse4_1", "sse4_2", "popcnt", "sse4.1", "sse4.2"]):
-            score += 50  # Higher score for compatibility
+    # Add format bonus
+    score += _calculate_format_bonus(name)
     
-    elif "modern" in name:
-        # Generic modern build - safe fallback
-        score += 40
-    
-    elif "x86-64" in name or "x86_64" in name:
-        # Basic x86-64 fallback - most compatible
-        score += 35
-    
-    # Prefer compressed archives
-    if name.endswith((".tar.gz", ".tgz", ".zip", ".tar")):
-        score += 5
-    
-    # Small penalty for non-matching vendor specifics
-    if "amd" in name and vendor not in ["amd", "generic", "unknown"]:
-        score -= 5
-    if "intel" in name and vendor not in ["intel", "generic", "unknown"]:
-        score -= 5
+    # Apply vendor mismatch penalty
+    score += _calculate_vendor_penalty(name, vendor)
     
     return score
+
+
+def _check_instruction_sets(name, flags, instruction_sets):
+    """Check if binary name matches CPU instruction sets"""
+    for config in instruction_sets:
+        keywords = config.get("keywords", [config.get("keyword")])
+        
+        if any(kw in name for kw in keywords):
+            has_required = config["required_flags"](flags)
+            if has_required:
+                return config["match_score"]
+            else:
+                return config["mismatch_penalty"]
+    
+    return 0
+
+
+def _calculate_vendor_bonus(name, vendor, flags):
+    """Calculate bonus score for vendor-specific optimizations"""
+    if "bmi2" not in name or "bmi2" not in flags:
+        return 0
+    
+    vendor_map = {
+        "amd": "amd",
+        "intel": "intel"
+    }
+    
+    if vendor in vendor_map and vendor_map[vendor] in name:
+        return 10
+    
+    return 0
+
+
+def _calculate_fallback_score(name):
+    """Calculate score for fallback builds"""
+    fallback_scores = {
+        "modern": 40,
+        "x86-64": 35,
+        "x86_64": 35
+    }
+    
+    for keyword, score in fallback_scores.items():
+        if keyword in name:
+            return score
+    
+    return 0
+
+
+def _calculate_format_bonus(name):
+    """Add bonus for compressed archive formats"""
+    compression_formats = (".tar.gz", ".tgz", ".zip", ".tar")
+    return 5 if name.endswith(compression_formats) else 0
+
+
+def _calculate_vendor_penalty(name, vendor):
+    """Apply penalty for vendor-specific mismatches"""
+    penalty = 0
+    
+    if "amd" in name and vendor not in ["amd", "generic", "unknown"]:
+        penalty -= 5
+    
+    if "intel" in name and vendor not in ["intel", "generic", "unknown"]:
+        penalty -= 5
+    
+    return penalty
 
 # ------------------------ Download & extraction ------------------------
 def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeout=60):
