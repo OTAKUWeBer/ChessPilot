@@ -92,7 +92,11 @@ def execute_normal_move(
 
         logger.debug(f"Dragging from {start_idx} to {end_idx}")
         move_piece(color_indicator, move, board_positions, auto_mode_var, root, btn_play, move_mode)
-        time.sleep(0.1)
+        
+        if move_mode == "click":
+            time.sleep(0.4)  # Longer delay for click mode
+        else:
+            time.sleep(0.1)  # Standard delay for drag mode
 
         img = capture_screenshot_in_memory()
         if not img:
