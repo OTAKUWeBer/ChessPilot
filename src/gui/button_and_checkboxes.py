@@ -57,6 +57,33 @@ def action_button(app, parent, text, command):
     btn.clicked.connect(command)
     return btn
 
+def shortcuts_button(app, parent, command):
+    """Create a small button to show keyboard shortcuts"""
+    btn = QPushButton("❗ Keys", parent)
+    btn.setFixedWidth(70)
+    btn.setFixedHeight(30)
+    btn.setStyleSheet(f"""
+        QPushButton {{
+            background-color: #4a4a4a;
+            color: {app.text_color};
+            border: 1px solid #5a5a5a;
+            border-radius: 4px;
+            font-family: 'Segoe UI';
+            font-size: 9pt;
+            font-weight: normal;
+            padding: 5px 10px;
+        }}
+        QPushButton:hover {{
+            background-color: #525252;
+            border-color: {app.accent_color};
+        }}
+        QPushButton:pressed {{
+            background-color: #3a3a3a;
+        }}
+    """)
+    btn.clicked.connect(command)
+    return btn
+
 def castling_checkboxes(app):
     logger.debug("Creating castling checkboxes")
 

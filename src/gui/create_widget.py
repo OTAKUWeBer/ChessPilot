@@ -3,6 +3,7 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QSlider, QDoubleSpinBox,
 from PyQt6.QtCore import Qt
 import logging
 from gui.update_depth_label import update_depth_label
+from gui.shortcuts_dialog import show_shortcuts_dialog
 
 logger = logging.getLogger(__name__)
 
@@ -17,6 +18,11 @@ def create_widgets(app):
     color_layout = QVBoxLayout(app.color_frame)
     color_layout.setContentsMargins(15, 15, 15, 15)
 
+    header_container = QWidget()
+    header_layout = QHBoxLayout(header_container)
+    header_layout.setContentsMargins(0, 0, 0, 0)
+    header_layout.setSpacing(10)
+    
     header = QLabel("ChessPilot")
     header.setStyleSheet(f"""
         color: {app.accent_color};
@@ -25,7 +31,16 @@ def create_widgets(app):
         font-weight: bold;
     """)
     header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    color_layout.addWidget(header)
+    
+    # Add shortcuts button
+    app.shortcuts_btn = app.create_shortcuts_button(header_container, lambda: show_shortcuts_dialog(app))
+    
+    header_layout.addStretch()
+    header_layout.addWidget(header)
+    header_layout.addStretch()
+    header_layout.addWidget(app.shortcuts_btn)
+    
+    color_layout.addWidget(header_container)
     color_layout.addSpacing(15)
 
     color_panel = QWidget()

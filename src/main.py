@@ -46,6 +46,7 @@ from gui.button_and_checkboxes import (
     action_button,
     castling_checkboxes,
     move_mode,
+    shortcuts_button,
 )
 
 class ChessPilot(QMainWindow):
@@ -112,6 +113,9 @@ class ChessPilot(QMainWindow):
 
     def create_castling_checkboxes(self):
         castling_checkboxes(self)
+
+    def create_shortcuts_button(self, parent, command):
+        return shortcuts_button(self, parent, command)
 
     def set_color(self, color):
         logger.info(f"Color selected: {'White' if color == 'w' else 'Black'}")
