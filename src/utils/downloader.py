@@ -13,6 +13,8 @@ from pathlib import Path
 import logging
 import sys
 import time
+import struct
+import cpuinfo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -137,38 +139,94 @@ def _detect_windows_cpu_info():
     flags = set()
     
     try:
-        # Use full path to WMIC to prevent DLL hijacking/PATH manipulation
-        wmic_path = os.path.join(os.environ.get('SYSTEMROOT', 'C:\\Windows'), 'System32', 'wbem', 'wmic.exe')
+        # Try platform module first (most reliable)
+        try:
+            info = cpuinfo.get_cpu_info()
+            brand = info.get('brand_raw', '').lower()
+            
+            if 'amd' in brand or 'ryzen' in brand:
+                vendor = "amd"
+            elif 'intel' in brand:
+                vendor = "intel"
+            
+            # Get CPU flags from cpuinfo
+            cpu_flags = info.get('flags', [])
+            if cpu_flags:
+                flags.update(cpu_flags)
+                logger.info(f"CPU info from cpuinfo module: vendor={vendor}, flags count={len(flags)}")
+                return vendor, flags
+        except ImportError:
+            logger.debug("cpuinfo module not available, trying alternative methods")
+        except Exception as e:
+            logger.debug(f"cpuinfo module failed: {e}")
         
-        # Verify the path exists before using it
-        if not os.path.exists(wmic_path):
-            logger.warning(f"WMIC not found at expected path: {wmic_path}")
-            # Fall back to safe defaults
-            flags.update(["sse4_1", "sse4_2", "popcnt"])
-            return vendor, flags
+        # Try platform.processor() as fallback
+        try:
+            processor_name = platform.processor().lower()
+            if processor_name:
+                if 'amd' in processor_name or 'ryzen' in processor_name:
+                    vendor = "amd"
+                elif 'intel' in processor_name:
+                    vendor = "intel"
+                logger.info(f"CPU vendor from platform.processor(): {vendor}")
+        except Exception as e:
+            logger.debug(f"platform.processor() failed: {e}")
         
-        # Use absolute path for security
-        out = subprocess.check_output([wmic_path, "cpu", "get", "name"], 
-                                     text=True, timeout=10).strip()
-        out_lower = out.lower()
+        # Try WMIC as last resort (with security improvements)
+        if vendor == "unknown":
+            try:
+                # Use full path to WMIC to prevent DLL hijacking/PATH manipulation
+                wmic_path = os.path.join(os.environ.get('SYSTEMROOT', 'C:\\Windows'), 'System32', 'wbem', 'wmic.exe')
+                
+                # Verify the path exists before using it
+                if os.path.exists(wmic_path):
+                    # Use absolute path for security
+                    out = subprocess.check_output(
+                        [wmic_path, "cpu", "get", "name"], 
+                        text=True, 
+                        timeout=10,
+                        creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+                    ).strip()
+                    out_lower = out.lower()
+                    
+                    if "amd" in out_lower or "ryzen" in out_lower:
+                        vendor = "amd"
+                    elif "intel" in out_lower:
+                        vendor = "intel"
+                    logger.info(f"CPU vendor from WMIC: {vendor}")
+                else:
+                    logger.warning(f"WMIC not found at expected path: {wmic_path}")
+            except subprocess.TimeoutExpired:
+                logger.warning("WMIC command timed out")
+            except Exception as e:
+                logger.warning(f"WMIC detection failed: {e}")
         
-        if "amd" in out_lower or "ryzen" in out_lower:
-            vendor = "amd"
-        elif "intel" in out_lower:
-            vendor = "intel"
+        # Assume modern CPU features for Windows (most Windows systems are modern)
+        # This is a safe assumption for systems running Windows 10/11
+        flags.update(["sse4_1", "sse4_2", "popcnt", "sse4.1", "sse4.2"])
         
-        # Windows doesn't easily expose CPU flags, so we assume modern features
-        flags.update(["sse4_1", "sse4_2", "popcnt"])
+        # Try to detect AVX support via platform
+        try:
+            # Most modern Windows CPUs support AVX/AVX2
+            if struct.calcsize("P") * 8 == 64:  # 64-bit system
+                flags.add("avx")
+                flags.add("avx2")
+                logger.debug("Assumed AVX/AVX2 support on 64-bit Windows")
+        except Exception:
+            pass
         
-        # Try to detect AVX support via platform module
-        if hasattr(platform, '_syscmd_ver'):
-            flags.add("avx")
-            flags.add("avx2")  # Most modern CPUs
+        # If still unknown, default to generic modern CPU
+        if vendor == "unknown":
+            vendor = "generic"
+            logger.info("Could not determine CPU vendor, using 'generic'")
+        
+        logger.info(f"Windows CPU detection complete: vendor={vendor}, flags={sorted(list(flags))[:10]}")
             
     except Exception as e:
         logger.warning(f"Could not detect CPU on Windows: {e}")
         # Fallback: assume basic modern CPU
-        flags.update(["sse4_1", "sse4_2"])
+        vendor = "generic"
+        flags.update(["sse4_1", "sse4_2", "popcnt"])
     
     return vendor, flags
 

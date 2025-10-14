@@ -153,16 +153,22 @@ def get_best_move(depth_var, fen, root=None, auto_mode_var=None):
     try:
         logger.info("Getting best move from Stockfish")
         
+        if root and hasattr(root, 'update_status'):
+            root.update_status("Processing... Stockfish is thinking...")
+        
         stockfish = _setup_stockfish_engine()
         if stockfish is None:
             return _handle_stockfish_failure("Failed to initialize Stockfish", root, auto_mode_var)
         
-        best_move, mate_flag = _get_move_from_engine(stockfish, depth_var, fen)
+        best_move, mate_flag = _get_move_from_engine(stockfish, depth_var, fen, root)
         if best_move is None:
             return _handle_stockfish_failure(
                 "Stockfish did not respond. Please download the correct version according to your CPU architecture.",
                 root, auto_mode_var
             )
+        
+        if root and hasattr(root, 'update_status'):
+            root.update_status(f"Best move found: {best_move}")
         
         updated_fen = _get_updated_fen(stockfish, fen, best_move)
         return best_move, updated_fen, mate_flag
@@ -187,7 +193,7 @@ def _setup_stockfish_engine():
     return stockfish
 
 
-def _get_move_from_engine(stockfish, depth_var, fen):
+def _get_move_from_engine(stockfish, depth_var, fen, root=None):
     """
     Send position and depth to engine, parse response for best move and mate detection.
     """
@@ -197,6 +203,7 @@ def _get_move_from_engine(stockfish, depth_var, fen):
     
     best_move = None
     mate_flag = False
+    last_depth = 0
     
     while True:
         line = stockfish.stdout.readline()
@@ -204,6 +211,16 @@ def _get_move_from_engine(stockfish, depth_var, fen):
             break
             
         logger.debug(f"Engine output: {line.strip()}")
+        
+        if "info depth" in line and root and hasattr(root, 'update_status'):
+            try:
+                depth_part = line.split("info depth")[1].split()[0]
+                current_depth = int(depth_part)
+                if current_depth > last_depth:
+                    last_depth = current_depth
+                    root.update_status(f"Processing... Depth {current_depth}/{depth_var}")
+            except (IndexError, ValueError):
+                pass
         
         mate_flag = _check_for_mate(line, mate_flag)
         best_move = _extract_best_move(line)
@@ -297,7 +314,7 @@ def _show_error_dialog(root, message):
         QTimer.singleShot(0, lambda: QMessageBox.critical(root, "Error", message))
 
 
-def _disable_auto_mode(auto_mode_var):
+def _disable_auto_mode(auto_mode_var, root):
     """
     Disable auto mode if the variable is available.
     """

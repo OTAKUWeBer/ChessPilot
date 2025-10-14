@@ -13,6 +13,7 @@ from executor.verify_move import verify_move
 from executor.move_piece import move_piece
 from executor.is_two_square_king_move import is_two_square_king_move
 from executor.processing_sync import processing_event
+from core.config import AppConfig
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -84,39 +85,55 @@ def _initialize_move_processing(root, btn_play, update_status):
 
 def _extract_board_position(root, auto_mode_var, color_indicator, update_status):
     """
-    Capture screenshot and extract board position data.
+    Capture screenshot and extract board position data with retry logic.
     Returns board data dict or None if failed.
     """
-    logger.info("Capturing screenshot")
-    screenshot_image = capture_screenshot_in_memory(root, auto_mode_var)
+    max_retries = AppConfig.MAX_FEN_EXTRACTION_RETRIES
     
-    if not screenshot_image:
-        logger.warning("Screenshot capture failed.")
-        return None
+    for attempt in range(max_retries):
+        logger.info(f"Capturing screenshot (attempt {attempt + 1}/{max_retries})")
+        screenshot_image = capture_screenshot_in_memory(root, auto_mode_var)
+        
+        if not screenshot_image:
+            logger.warning(f"Screenshot capture failed on attempt {attempt + 1}")
+            if attempt < max_retries - 1:
+                time.sleep(AppConfig.FEN_RETRY_DELAY)
+                continue
+            return None
+        
+        boxes = get_positions(screenshot_image)
+        if not boxes:
+            logger.error(f"No chessboard found in screenshot (attempt {attempt + 1})")
+            if attempt < max_retries - 1:
+                QTimer.singleShot(0, lambda: update_status(f"\nRetrying board detection ({attempt + 2}/{max_retries})…"))
+                time.sleep(AppConfig.FEN_RETRY_DELAY)
+                continue
+            
+            QTimer.singleShot(0, lambda: update_status("\nNo board detected after retries"))
+            if callable(auto_mode_var):
+                root.auto_mode_var = False
+                root.auto_mode_check.setChecked(False)
+            return None
+        
+        fen_data = _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mode_var, attempt, max_retries)
+        if fen_data:
+            return {
+                'boxes': boxes,
+                'chessboard_x': fen_data['chessboard_x'],
+                'chessboard_y': fen_data['chessboard_y'],
+                'square_size': fen_data['square_size'],
+                'fen': fen_data['fen']
+            }
+        
+        # If FEN extraction failed and we have retries left
+        if attempt < max_retries - 1:
+            logger.warning(f"FEN extraction failed, retrying in {AppConfig.FEN_RETRY_DELAY}s…")
+            time.sleep(AppConfig.FEN_RETRY_DELAY)
     
-    boxes = get_positions(screenshot_image)
-    if not boxes:
-        logger.error("No chessboard found in screenshot.")
-        QTimer.singleShot(0, lambda: update_status("\nNo board detected"))
-        if callable(auto_mode_var):
-            root.auto_mode_var = False
-            root.auto_mode_check.setChecked(False)
-        return None
-    
-    fen_data = _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mode_var)
-    if not fen_data:
-        return None
-    
-    return {
-        'boxes': boxes,
-        'chessboard_x': fen_data['chessboard_x'],
-        'chessboard_y': fen_data['chessboard_y'],
-        'square_size': fen_data['square_size'],
-        'fen': fen_data['fen']
-    }
+    logger.error(f"Failed to extract board position after {max_retries} attempts")
+    return None
 
-
-def _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mode_var):
+def _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mode_var, attempt, max_retries):
     """
     Extract FEN from detected board boxes with proper error handling.
     """
@@ -124,15 +141,18 @@ def _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mo
         result = get_fen_from_position(color_indicator, boxes)
         
         if result is None:
-            logger.error("FEN extraction failed: get_fen_from_position returned None")
-            QTimer.singleShot(0, lambda: update_status("Error: Could not detect board/FEN"))
-            if callable(auto_mode_var):
-                root.auto_mode_var = False
-                root.auto_mode_check.setChecked(False)
+            logger.error(f"FEN extraction failed: get_fen_from_position returned None (attempt {attempt + 1})")
+            if attempt < max_retries - 1:
+                QTimer.singleShot(0, lambda: update_status(f"Retrying FEN extraction ({attempt + 2}/{max_retries})…"))
+            else:
+                QTimer.singleShot(0, lambda: update_status("Error: Could not detect board/FEN"))
+                if callable(auto_mode_var):
+                    root.auto_mode_var = False
+                    root.auto_mode_check.setChecked(False)
             return None
         
         chessboard_x, chessboard_y, square_size, fen = result
-        logger.debug(f"FEN extracted: {fen}")
+        logger.debug(f"FEN extracted successfully: {fen}")
         
         return {
             'chessboard_x': chessboard_x,
@@ -141,20 +161,30 @@ def _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mo
             'fen': fen
         }
         
-    except IndexError:
-        logger.error("FEN extraction failed: encountered unexpected box format (IndexError)")
-        QTimer.singleShot(0, lambda: update_status("Error: Bad screenshot"))
-        if callable(auto_mode_var):
-            root.auto_mode_var = False
-            root.auto_mode_check.setChecked(False)
+    except IndexError as e:
+        logger.error(f"FEN extraction failed: unexpected box format (attempt {attempt + 1}): {e}")
+        if attempt >= max_retries - 1:
+            QTimer.singleShot(0, lambda: update_status("Error: Bad screenshot"))
+            if callable(auto_mode_var):
+                root.auto_mode_var = False
+                root.auto_mode_check.setChecked(False)
         return None
         
     except ValueError as e:
-        logger.error(f"FEN extraction failed: {e}")
-        QTimer.singleShot(0, lambda err=e: update_status(f"Error: {str(err)}"))
-        if callable(auto_mode_var):
-            root.auto_mode_var = False
-            root.auto_mode_check.setChecked(False)
+        logger.error(f"FEN extraction failed (attempt {attempt + 1}): {e}")
+        if attempt >= max_retries - 1:
+            QTimer.singleShot(0, lambda err=e: update_status(f"Error: {str(err)}"))
+            if callable(auto_mode_var):
+                root.auto_mode_var = False
+                root.auto_mode_check.setChecked(False)
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error during FEN extraction (attempt {attempt + 1}): {e}", exc_info=True)
+        if attempt >= max_retries - 1:
+            QTimer.singleShot(0, lambda err=e: update_status(f"Error: {str(err)}"))
+            if callable(auto_mode_var):
+                root.auto_mode_var = False
+                root.auto_mode_check.setChecked(False)
         return None
 
 

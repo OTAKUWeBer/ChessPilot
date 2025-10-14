@@ -7,12 +7,22 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 def get_fen_from_position(color, boxes):
+    logger.debug(f"Processing {len(boxes)} detected boxes")
+    
     # Find the chessboard (class_id 12.0)
     chessboard_boxes = [box for box in boxes if box[5] == 12.0]
+    
+    detected_classes = set([box[5] for box in boxes])
+    logger.debug(f"Detected class IDs: {detected_classes}")
+    
     if not chessboard_boxes:
-        logger.warning("Error: Bad Screenshot")
+        logger.warning("Error: No chessboard detected (class_id 12.0 not found)")
+        logger.debug(f"Available boxes: {boxes[:5]}...")  # Log first 5 boxes
         return None
+        
     chessboard_box = chessboard_boxes[0]
+    logger.debug(f"Chessboard found at: x={chessboard_box[0]}, y={chessboard_box[1]}, size={chessboard_box[2]}")
+    
     chessboard_x = chessboard_box[0]
     chessboard_y = chessboard_box[1]
     square_size = chessboard_box[2] / 8.0  # Calculate square size based on chessboard width

@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt
 
 from utils.logging_setup import setup_console_logging
 from utils.chess_resources_manager import setup_resources
+from utils.system_info import log_system_info, log_dependency_status
 
 setup_console_logging()
 logger = logging.getLogger("main")
@@ -18,6 +19,11 @@ project_dir = script_dir.parent
 os.chdir(script_dir)
 
 logger.info("ChessPilot starting...")
+logger.info(f"Version: 2.0.0")
+
+log_system_info()
+log_dependency_status()
+
 if not setup_resources(script_dir, project_dir):
     logger.error("Resource setup failed")
     # Show error dialog before exiting

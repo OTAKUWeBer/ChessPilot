@@ -24,7 +24,7 @@ session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
 input_name = session.get_inputs()[0].name
 output_name = session.get_outputs()[0].name
 
-conf = 0.7
+conf = 0.5  # Lowered from 0.7 to detect boards more reliably
 
 def letterbox_resize(image, target_size):
     """
@@ -83,7 +83,9 @@ def predict(image):
     for r in output:
         if r[4] > conf:
             scaled = scale_bbox(r, x_offset, y_offset, scale)
-            detections.append(scaled.tolist())  # Convert to list for compatibility
+            detections.append(scaled.tolist())
+    
+    logger.debug(f"Detected {len(detections)} objects with confidence > {conf}")
     
     return detections
 

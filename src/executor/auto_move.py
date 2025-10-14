@@ -6,10 +6,14 @@ from board_detection import get_positions, get_fen_from_position
 from executor.capture_screenshot_in_memory import capture_screenshot_in_memory
 from executor.process_move import process_move
 from executor.processing_sync import processing_event
+from core.config import AppConfig
 
 # Logger setup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+_consecutive_failures = 0
+_max_failures = AppConfig.MAX_CONSECUTIVE_FAILURES
 
 
 def _get_var_value(var):
@@ -147,6 +151,9 @@ def auto_move_loop(
     Main auto move loop - coordinates the overall flow.
     Complexity reduced by delegating to specialized functions.
     """
+    global _consecutive_failures
+    _consecutive_failures = 0
+    
     logger.info("Auto move loop started")
     opp_color = 'b' if color_indicator == 'w' else 'w'
     logger.info(f"Player color: {color_indicator}, Opponent color: {opp_color}")
@@ -224,8 +231,16 @@ def _run_move_detection_loop(
     """
     Main loop that continuously checks for moves and processes them.
     """
+    global _consecutive_failures
+    
     while _get_var_value(auto_mode_var):
         logger.debug("Loop tick")
+        
+        if _consecutive_failures >= _max_failures:
+            logger.error(f"Exceeded maximum consecutive failures ({_max_failures}). Stopping auto mode.")
+            _stop_auto_mode(root, auto_mode_var, btn_play, update_status_callback, 
+                          f"Auto mode stopped: {_consecutive_failures} consecutive failures")
+            break
         
         if not _should_continue_processing(board_positions):
             continue
@@ -233,8 +248,18 @@ def _run_move_detection_loop(
         try:
             current_position = _capture_current_position(root, auto_mode_var, color_indicator)
             if not current_position:
+                _consecutive_failures += 1
+                logger.warning(f"Board capture failed (failure {_consecutive_failures}/{_max_failures})")
+                
+                if _consecutive_failures >= _max_failures:
+                    logger.error("Max failures reached during board capture")
+                    _stop_auto_mode(root, auto_mode_var, btn_play, update_status_callback,
+                                  "Auto mode stopped: Board detection failed repeatedly")
+                    break
                 continue
                 
+            _consecutive_failures = 0
+            
             placement, active = current_position
             
             if active == opp_color:
@@ -254,8 +279,47 @@ def _run_move_detection_loop(
                     )
                     
         except Exception as e:
-            _handle_loop_error(e, root, update_status_callback, auto_mode_var)
-            break
+            _consecutive_failures += 1
+            logger.error(f"Exception in auto_move_loop (failure {_consecutive_failures}/{_max_failures}): {e}", exc_info=True)
+            
+            if _consecutive_failures >= _max_failures:
+                _stop_auto_mode(root, auto_mode_var, btn_play, update_status_callback,
+                              f"Auto mode stopped: Error - {str(e)}")
+                break
+            else:
+                # Continue loop but log the error
+                logger.warning(f"Continuing after error ({_consecutive_failures}/{_max_failures} failures)")
+                time.sleep(1.0)  # Wait a bit before retrying
+
+
+def _stop_auto_mode(root, auto_mode_var, btn_play, update_status_callback, message):
+    """
+    Stop auto mode and update UI with error message.
+    """
+    logger.info(f"Stopping auto mode: {message}")
+    
+    try:
+        # Disable auto mode variable
+        if hasattr(root, "auto_mode_var"):
+            root.auto_mode_var = False
+        _set_var_value(auto_mode_var, False)
+        
+        # Uncheck the checkbox
+        if hasattr(root, "auto_mode_check"):
+            root.auto_mode_check.setChecked(False)
+            logger.info("Unchecked auto_mode_check")
+        
+        # Re-enable the play button
+        if hasattr(root, "btn_play"):
+            root.btn_play.setEnabled(True)
+            logger.info("Re-enabled play button")
+        
+        # Update status with error message
+        if update_status_callback:
+            root.after(0, lambda: update_status_callback(f"\n{message}"))
+            
+    except Exception as e:
+        logger.error(f"Error stopping auto mode: {e}", exc_info=True)
 
 
 def _should_continue_processing(board_positions):
@@ -263,12 +327,12 @@ def _should_continue_processing(board_positions):
     Check if we should continue with the current loop iteration.
     """
     if processing_event.is_set():
-        logger.debug("Currently processing a move; sleeping 0.1s…")
-        time.sleep(0.1)
+        logger.debug("Currently processing a move; sleeping…")
+        time.sleep(AppConfig.AUTO_MODE_POLL_INTERVAL)
         return False
         
     if not board_positions:
-        logger.warning("Board positions not yet initialized; sleeping 0.5s…")
+        logger.warning("Board positions not yet initialized; sleeping…")
         time.sleep(0.5)
         return False
         
@@ -277,43 +341,62 @@ def _should_continue_processing(board_positions):
 
 def _capture_current_position(root, auto_mode_var, color_indicator):
     """
-    Capture screenshot and extract current board position.
+    Capture screenshot and extract current board position with retry logic.
     Returns tuple of (placement, active_color) or None if failed.
     """
-    logger.debug("Capturing screenshot for auto-move…")
-    screenshot = capture_screenshot_in_memory(root, auto_mode_var)
+    max_retries = AppConfig.MAX_FEN_EXTRACTION_RETRIES
     
-    if not screenshot:
-        logger.warning("Screenshot returned None; retrying in 0.02s…")
-        time.sleep(0.02)
-        return None
+    for attempt in range(max_retries):
+        logger.debug(f"Capturing screenshot for auto-move (attempt {attempt + 1}/{max_retries})…")
+        screenshot = capture_screenshot_in_memory(root, auto_mode_var)
         
-    boxes = get_positions(screenshot)
-    if not boxes:
-        logger.warning("Board detection failed; retrying in 0.2s…")
-        time.sleep(0.2)
-        return None
+        if not screenshot:
+            logger.warning(f"Screenshot returned None on attempt {attempt + 1}; retrying…")
+            time.sleep(AppConfig.FEN_RETRY_DELAY)
+            continue
+            
+        boxes = get_positions(screenshot)
+        if not boxes:
+            logger.warning(f"Board detection failed on attempt {attempt + 1}; retrying…")
+            time.sleep(AppConfig.FEN_RETRY_DELAY)
+            continue
+            
+        result = _parse_fen_position(color_indicator, boxes)
+        if result:
+            return result
         
-    return _parse_fen_position(color_indicator, boxes)
-
+        # If parsing failed, retry
+        if attempt < max_retries - 1:
+            logger.warning(f"FEN parsing failed on attempt {attempt + 1}; retrying…")
+            time.sleep(AppConfig.FEN_RETRY_DELAY)
+    
+    logger.error(f"Failed to capture position after {max_retries} attempts")
+    return None
 
 def _parse_fen_position(color_indicator, boxes):
     """
     Parse FEN from board positions and return placement and active color.
     """
-    _, _, _, current_fen = get_fen_from_position(color_indicator, boxes)
-    logger.info(f"FEN extracted: {current_fen}")
-    
-    parts = current_fen.split()
-    if len(parts) < 2:
-        logger.warning("Malformed FEN; retrying in 0.2s…")
-        time.sleep(0.2)
-        return None
+    try:
+        result = get_fen_from_position(color_indicator, boxes)
+        if not result:
+            logger.warning("get_fen_from_position returned None")
+            return None
+            
+        _, _, _, current_fen = result
+        logger.info(f"FEN extracted: {current_fen}")
         
-    placement, active = parts[0], parts[1]
-    logger.debug(f"Placement: {placement}, Active side: {active}")
-    return placement, active
-
+        parts = current_fen.split()
+        if len(parts) < 2:
+            logger.warning("Malformed FEN (insufficient parts)")
+            return None
+            
+        placement, active = parts[0], parts[1]
+        logger.debug(f"Placement: {placement}, Active side: {active}")
+        return placement, active
+    except Exception as e:
+        logger.error(f"Exception parsing FEN: {e}", exc_info=True)
+        return None
 
 def _handle_opponent_turn(opp_color, placement, last_fen_by_color):
     """
@@ -325,8 +408,7 @@ def _handle_opponent_turn(opp_color, placement, last_fen_by_color):
         last_fen_by_color[opp_color] = placement
     else:
         logger.debug("Opponent placement unchanged.")
-    time.sleep(0.02)
-
+    time.sleep(AppConfig.AUTO_MODE_POLL_INTERVAL)
 
 def _handle_player_turn(opp_color, placement, last_fen_by_color):
     """
@@ -334,20 +416,19 @@ def _handle_player_turn(opp_color, placement, last_fen_by_color):
     Returns True if a genuine opponent move was detected.
     """
     if opp_color not in last_fen_by_color:
-        logger.debug("Our turn detected but no previous opponent-FEN known; sleeping 0.02s…")
-        time.sleep(0.02)
+        logger.debug("Our turn detected but no previous opponent-FEN known; sleeping…")
+        time.sleep(AppConfig.AUTO_MODE_POLL_INTERVAL)
         return False
         
     if placement == last_fen_by_color[opp_color]:
-        logger.debug("It's our turn but opponent didn't move; sleeping 0.02s…")
-        time.sleep(0.02)
+        logger.debug("It's our turn but opponent didn't move; sleeping…")
+        time.sleep(AppConfig.AUTO_MODE_POLL_INTERVAL)
         return False
         
     # Genuine move detected
     last_fen_by_color[opp_color] = placement
     logger.info("Detected genuine opponent move; launching our move.")
     return True
-
 
 def _process_detected_move(
     root, color_indicator, auto_mode_var, btn_play, move_mode, board_positions,
@@ -357,8 +438,26 @@ def _process_detected_move(
     """
     Process a detected opponent move by calculating and executing our response.
     """
+    settle_delay = AppConfig.OPPONENT_MOVE_SETTLE_DELAY
+    logger.info(f"Opponent move detected. Waiting {settle_delay}s for move to settle…")
+    time.sleep(settle_delay)
+    
+    # Verify the position is stable by capturing again
+    logger.debug("Verifying position stability after settle delay…")
+    verification_position = _capture_current_position(root, auto_mode_var, color_indicator)
+    
+    if verification_position:
+        placement, active = verification_position
+        # Update with verified position
+        if active == color_indicator:
+            last_fen_by_color[color_indicator] = placement
+            logger.info("Position verified and stable, proceeding with move calculation")
+        else:
+            logger.warning("Position changed during verification, opponent may still be moving")
+            time.sleep(AppConfig.OPPONENT_MOVE_SETTLE_DELAY)
+    
     delay = _get_var_value(screenshot_delay_var)
-    logger.debug(f"Sleeping for {delay}s before calculating move…")
+    logger.debug(f"Additional delay of {delay}s before calculating move…")
     time.sleep(delay)
     
     process_move_thread(
@@ -367,36 +466,5 @@ def _process_detected_move(
         update_last_fen_for_color, last_fen_by_color, screenshot_delay_var
     )
     
-    logger.debug(f"Sleeping again for {delay}s after launching move…")
-    time.sleep(delay)
-
-
-def _handle_loop_error(error, root, update_status_callback, auto_mode_var):
-    """
-    Handle errors that occur in the main processing loop.
-    """
-    logger.error(f"Exception in auto_move_loop: {error}", exc_info=True)
-    
-    try:
-        if root is not None:
-            # Set the variable
-            if hasattr(root, "auto_mode_var"):
-                root.auto_mode_var = False
-            
-            # Uncheck the checkbox
-            if hasattr(root, "auto_mode_check"):
-                root.auto_mode_check.setChecked(False)
-                logger.info("Unchecked auto_mode_check due to error")
-            
-            # Re-enable the play button
-            if hasattr(root, "btn_play"):
-                root.btn_play.setEnabled(True)
-                logger.info("Re-enabled play button due to error")
-            
-            # Update status
-            root.after(0, lambda err=error: update_status_callback(f"Error: {str(err)}\nAuto mode disabled"))
-    except Exception as e:
-        logger.error(f"Error in error handler: {e}", exc_info=True)
-    
-    # Also try the _set_var_value helper
-    _set_var_value(auto_mode_var, False)
+    logger.debug(f"Sleeping for {AppConfig.MIN_MOVE_INTERVAL}s after launching move…")
+    time.sleep(AppConfig.MIN_MOVE_INTERVAL)

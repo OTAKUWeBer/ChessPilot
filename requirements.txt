@@ -7,3 +7,4 @@ colorama
 requests
 pywin32; platform_system == "Windows"
 PyQt6
+py-cpuinfo
