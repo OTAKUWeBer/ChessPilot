@@ -68,7 +68,6 @@ class ShortcutsDialog(QDialog):
             ("W / B", "Choose White or Black"),
             ("← / →", "Decrease / Increase Stockfish depth"),
             ("↓ / ↑", "Decrease / Increase screenshot delay"),
-            ("Esc", "Return to color selection screen"),
         ]
         
         selection_table = self._create_shortcuts_table(selection_shortcuts, frame_color, text_color)
