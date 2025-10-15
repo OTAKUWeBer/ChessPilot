@@ -410,7 +410,7 @@ def _execute_castling_pieces(
     move_piece(color_indicator, rook_move, board_positions, auto_mode_var, root, btn_play, move_mode)
     
     # Wait for move animation to complete
-    delay = 0.6 if move_mode == "click" else 0.3
+    delay = 0.4 if move_mode == "click" else 0.1
     time.sleep(delay)
 
 

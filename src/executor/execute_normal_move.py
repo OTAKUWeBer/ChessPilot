@@ -184,7 +184,7 @@ def _execute_physical_move(
     )
     
     # Wait for move animation to complete
-    delay = 0.6 if move_mode == "click" else 0.3
+    delay = 0.4 if move_mode == "click" else 0.1
     time.sleep(delay)
 
 
