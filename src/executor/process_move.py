@@ -14,6 +14,7 @@ from executor.move_piece import move_piece
 from executor.is_two_square_king_move import is_two_square_king_move
 from executor.processing_sync import processing_event
 from core.config import AppConfig
+from executor.did_castling_move import did_castling_move 
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -334,29 +335,70 @@ def _perform_castling_move(
     board_positions, auto_mode_var, root, btn_play, move_mode, update_status, last_fen_by_color
 ):
     """
-    Perform the actual castling move and verify it.
+    Perform the actual castling move with retry logic and verification.
+    """
+    logger.info(f"Attempting castling move: {best_move} for {color_indicator}")
+    max_retries = 3
+
+    for attempt in range(1, max_retries + 1):
+        logger.debug(f"[Castling Attempt {attempt}/{max_retries}] Starting move sequence")
+        
+        # Get board state before move
+        original_fen = get_current_fen(color_indicator)
+        if not original_fen:
+            logger.warning("Could not fetch original FEN, retrying...")
+            time.sleep(0.2)
+            continue
+        
+        # Execute the castling move (king + rook)
+        _execute_castling_pieces(
+            best_move, color_indicator, board_positions,
+            auto_mode_var, root, btn_play, move_mode
+        )
+        
+        # Verify the move was successful
+        verification_result = _verify_castling_execution(
+            color_indicator, original_fen, best_move
+        )
+        
+        if verification_result['verified']:
+            _handle_successful_castling(
+                best_move, mate_flag, verification_result['current_fen'],
+                update_status, auto_mode_var, root, last_fen_by_color, color_indicator
+            )
+            return True
+        
+        # Handle unverified move with skip flag
+        if AppConfig.SKIP_VERIFICATION_ON_FAILURE:
+            _handle_unverified_castling(
+                best_move, mate_flag, update_status, auto_mode_var, root
+            )
+            return True
+        
+        if attempt < max_retries:
+            logger.warning(f"Castling verification failed, retrying move execution...")
+
+    # All attempts failed
+    _handle_castling_failure(best_move, max_retries, update_status, auto_mode_var, root)
+    return False
+
+
+def _execute_castling_pieces(
+    best_move, color_indicator, board_positions,
+    auto_mode_var, root, btn_play, move_mode
+):
+    """
+    Execute both king and rook moves for castling.
     """
     # Determine castling side from the king's move
-    from_file, from_rank, to_file, to_rank = best_move[0], best_move[1], best_move[2], best_move[3]
-    
-    # Determine if kingside or queenside based on king's destination
+    from_file, to_file = best_move[0], best_move[2]
     is_kingside = ord(to_file) > ord(from_file)
     
     # Calculate rook move based on castling side and color
     if color_indicator == "w":
-        if is_kingside:
-            # White kingside: rook h1 -> f1
-            rook_move = "h1f1"
-        else:
-            # White queenside: rook a1 -> d1
-            rook_move = "a1d1"
+        rook_move = "h1f1" if is_kingside else "a1d1"
     else:  # black
-        if is_kingside:
-            # Black kingside: rook h8 -> f8
-            rook_move = "h8f8"
-        else:
-            # Black queenside: rook a8 -> d8
-            rook_move = "a8d8"
+        rook_move = "h8f8" if is_kingside else "a8d8"
     
     logger.info(f"Executing castling: King move {best_move}, Rook move {rook_move}")
     
@@ -367,36 +409,151 @@ def _perform_castling_move(
     # Move the rook
     move_piece(color_indicator, rook_move, board_positions, auto_mode_var, root, btn_play, move_mode)
     
-    status_msg = f"\nBest Move: {best_move}\nCastling move executed: {best_move}"
+    # Wait for move animation to complete
+    delay = 0.6 if move_mode == "click" else 0.3
+    time.sleep(delay)
+
+
+def _verify_castling_execution(color_indicator, original_fen, king_move):
+    """
+    Verify that the castling move was successfully executed.
+    """
+    max_verify_attempts = 2
+    
+    from_file, to_file = king_move[0], king_move[2]
+    is_kingside = ord(to_file) > ord(from_file)
+    
+    if color_indicator == "w":
+        rook_move = "h1f1" if is_kingside else "a1d1"
+    else:  # black
+        rook_move = "h8f8" if is_kingside else "a8d8"
+    
+    for verify_attempt in range(max_verify_attempts):
+        time.sleep(0.2)  # Delay before verification
+        
+        current_fen = _capture_and_extract_fen(color_indicator, verify_attempt)
+        if not current_fen:
+            continue
+        
+        logger.debug(f"Checking if castling move registered: King {king_move}, Rook {rook_move}")
+        if did_castling_move(color_indicator, original_fen, current_fen, king_move, rook_move):
+            logger.info(f"Castling move executed successfully: King {king_move}, Rook {rook_move}")
+            return {'verified': True, 'current_fen': current_fen}
+        
+        logger.debug(f"Castling move not yet registered on attempt {verify_attempt + 1}")
+    
+    return {'verified': False, 'current_fen': None}
+
+
+def _capture_and_extract_fen(color_indicator, verify_attempt):
+    """
+    Capture screenshot and extract FEN from current board state.
+    Used by both normal moves and castling moves.
+    """
+    img = capture_screenshot_in_memory()
+    if not img:
+        logger.warning(f"Screenshot failed on verification attempt {verify_attempt + 1}")
+        return None
+    
+    boxes = get_positions(img)
+    if not boxes:
+        logger.warning(f"Board detection failed on verification attempt {verify_attempt + 1}")
+        return None
+    
+    if not any(box[5] == 12.0 for box in boxes):
+        logger.warning(f"No chessboard detected on verification attempt {verify_attempt + 1}")
+        return None
+    
+    try:
+        result = get_fen_from_position(color_indicator, boxes)
+        if result is None:
+            logger.warning(f"FEN extraction returned None on verification attempt {verify_attempt + 1}")
+            return None
+        
+        _, _, _, current_fen = result
+        return current_fen
+    except (ValueError, TypeError) as e:
+        logger.warning(f"FEN extraction error on verification attempt {verify_attempt + 1}: {e}")
+        return None
+
+
+def _handle_successful_castling(move, mate_flag, current_fen, update_status, auto_mode_var, root, last_fen_by_color, color_indicator):
+    """
+    Handle a successfully verified castling move.
+    """
+    status = f"Best Move: {move}\nMove Played: {move}"
+    
     if mate_flag:
-        status_msg += "\n𝘾𝙝𝙚𝙘𝙠𝙢𝙖𝙩𝙚"
-        if callable(auto_mode_var):
-            root.auto_mode_var = False
-            root.auto_mode_check.setChecked(False)
-
-    QTimer.singleShot(0, lambda: update_status(status_msg))
-    time.sleep(0.3)
+        status += "\n𝘾𝙝𝙚𝙘𝙠𝙢𝙖𝙩𝙚"
+        _disable_auto_mode(auto_mode_var, root)
+        logger.info("Checkmate detected. Auto mode disabled.")
     
-    _verify_castling_move(best_move, updated_fen, color_indicator, root, update_status, last_fen_by_color)
-
-
-def _verify_castling_move(best_move, updated_fen, color_indicator, root, update_status, last_fen_by_color):
-    """
-    Verify that the castling move was executed correctly.
-    """
-    success, _ = verify_move(color_indicator, best_move, updated_fen)
+    # Update last FEN
+    if current_fen:
+        last_fen_by_color[color_indicator] = current_fen.split()[0]
     
-    if not success:
-        logger.error("Move verification failed after castling.")
-        QTimer.singleShot(0, lambda: update_status(
-            f"Move verification failed on castling move\nBest Move: {best_move}"
-        ))
-    else:
-        fen_after = get_current_fen(color_indicator)
-        if fen_after:
-            last_fen_by_color[color_indicator] = fen_after.split()[0]
-        logger.info("Castling move verified and updated.")
+    update_status(status)
+    logger.info("Castling move verified and updated.")
 
+
+def _handle_unverified_castling(move, mate_flag, update_status, auto_mode_var, root):
+    """
+    Handle castling when verification fails but skip flag is enabled.
+    """
+    logger.warning(f"Castling verification failed but SKIP_VERIFICATION_ON_FAILURE is enabled")
+    logger.info(f"Assuming castling move {move} was executed successfully")
+    
+    status = f"Best Move: {move}\nMove Played: {move} (unverified)"
+    
+    if mate_flag:
+        status += "\n𝘾𝙝𝙚𝙘𝙠𝙢𝙖𝙩𝙚"
+    
+    update_status(status)
+    _disable_auto_mode(auto_mode_var, root)
+    logger.info("Auto mode disabled due to unverified castling move")
+
+
+def _handle_castling_failure(move, max_retries, update_status, auto_mode_var, root):
+    """
+    Handle complete castling failure after all retries.
+    """
+    logger.error(f"Castling move {move} failed after {max_retries} attempts")
+    update_status(
+        f"Move failed to register after {max_retries} attempts\n"
+        f"Check board detection settings"
+    )
+    _disable_auto_mode(auto_mode_var, root)
+    logger.info("Auto mode disabled due to castling failure")
+
+
+def _disable_auto_mode(auto_mode_var, root):
+    """
+    Disable auto mode by setting the variable and unchecking the checkbox.
+    Matches the pattern used in execute_normal_move.py
+    """
+    try:
+        if root is not None:
+            # Set the variable
+            if hasattr(root, "auto_mode_var"):
+                root.auto_mode_var = False
+                logger.info("Set auto_mode_var to False")
+            
+            # Uncheck the checkbox
+            if hasattr(root, "auto_mode_check"):
+                root.auto_mode_check.setChecked(False)
+                logger.info("Unchecked auto_mode_check checkbox")
+            
+            # Re-enable the play button
+            if hasattr(root, "btn_play"):
+                root.btn_play.setEnabled(True)
+                logger.info("Re-enabled play button")
+        
+        # Also try to set via the auto_mode_var parameter if it has a set method
+        if hasattr(auto_mode_var, "set") and callable(auto_mode_var.set):
+            auto_mode_var.set(False)
+            
+    except Exception as e:
+        logger.error(f"Error disabling auto mode: {e}", exc_info=True)
 
 def _handle_processing_error(error, root, update_status, auto_mode_var):
     """
