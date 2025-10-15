@@ -306,7 +306,7 @@ def _execute_castling_move(
     if is_castling_possible(fen, color_indicator, side):
         _perform_castling_move(
             best_move, updated_fen, mate_flag, color_indicator,
-            board_positions, auto_mode_var, root, btn_play, update_status, last_fen_by_color, move_mode,
+            board_positions, auto_mode_var, root, btn_play, move_mode, update_status, last_fen_by_color
         )
     else:
         logger.warning("Castling not possible according to board state.")
@@ -331,12 +331,41 @@ def _auto_enable_castling_checkbox(side, kingside_var, queenside_var, root, upda
 
 def _perform_castling_move(
     best_move, updated_fen, mate_flag, color_indicator,
-    board_positions, auto_mode_var, root, btn_play,move_mode, update_status, last_fen_by_color
+    board_positions, auto_mode_var, root, btn_play, move_mode, update_status, last_fen_by_color
 ):
     """
     Perform the actual castling move and verify it.
     """
+    # Determine castling side from the king's move
+    from_file, from_rank, to_file, to_rank = best_move[0], best_move[1], best_move[2], best_move[3]
+    
+    # Determine if kingside or queenside based on king's destination
+    is_kingside = ord(to_file) > ord(from_file)
+    
+    # Calculate rook move based on castling side and color
+    if color_indicator == "w":
+        if is_kingside:
+            # White kingside: rook h1 -> f1
+            rook_move = "h1f1"
+        else:
+            # White queenside: rook a1 -> d1
+            rook_move = "a1d1"
+    else:  # black
+        if is_kingside:
+            # Black kingside: rook h8 -> f8
+            rook_move = "h8f8"
+        else:
+            # Black queenside: rook a8 -> d8
+            rook_move = "a8d8"
+    
+    logger.info(f"Executing castling: King move {best_move}, Rook move {rook_move}")
+    
+    # Move the king first
     move_piece(color_indicator, best_move, board_positions, auto_mode_var, root, btn_play, move_mode)
+    time.sleep(0.2)  # Small delay between king and rook moves
+    
+    # Move the rook
+    move_piece(color_indicator, rook_move, board_positions, auto_mode_var, root, btn_play, move_mode)
     
     status_msg = f"\nBest Move: {best_move}\nCastling move executed: {best_move}"
     if mate_flag:
