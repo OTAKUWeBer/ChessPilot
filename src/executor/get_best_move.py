@@ -124,7 +124,8 @@ def cleanup_stockfish():
             _stockfish_process.stdin.write("quit\n")
             _stockfish_process.stdin.flush()
             _stockfish_process.wait(timeout=5)
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error terminating Stockfish process: {e}")
             _stockfish_process.terminate()
         finally:
             _stockfish_process = None

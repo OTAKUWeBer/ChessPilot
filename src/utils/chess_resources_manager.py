@@ -142,7 +142,8 @@ def _handle_path_result(res, final_path):
             except Exception as e:
                 logger.warning("Could not move downloaded binary into place: %s", e)
         return ok
-    except Exception:
+    except Exception as e:
+        logger.error(f"Error processing downloader return value: {e}")
         return False
 
 

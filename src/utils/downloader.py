@@ -288,7 +288,8 @@ def _is_64bit_system():
     """Check if the system is 64-bit."""
     try:
         return struct.calcsize("P") * 8 == 64
-    except Exception:
+    except Exception as e:
+        logger.error(f"Could not determine system architecture: {e}")
         return False
 
 def detect_arch_flags():
