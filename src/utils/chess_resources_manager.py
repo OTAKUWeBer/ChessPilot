@@ -7,13 +7,8 @@ from pathlib import Path
 
 from .downloader import download_stockfish
 
-# Logger setup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-if not logger.handlers:
-    ch = logging.StreamHandler()
-    ch.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
-    logger.addHandler(ch)
 
 README_STOCKFISH_URL = "https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
 README_ONNX_URL = "https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
