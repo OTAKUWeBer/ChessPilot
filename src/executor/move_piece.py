@@ -28,4 +28,4 @@ def move_piece(color_indicator, move, board_positions, auto_mode_var, root, btn_
 
     auto_val = auto_mode_var() if callable(auto_mode_var) else auto_mode_var
     if not auto_val:
-        QTimer.singleShot(0, lambda: move_cursor_to_button(root, auto_mode_var, btn_play))
+        move_cursor_to_button(root, auto_mode_var, btn_play)
