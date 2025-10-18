@@ -3,6 +3,12 @@ import sys
 import logging
 from pathlib import Path
 import os
+import multiprocessing
+
+# Must be at the very top for PyInstaller on Windows
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PyQt6.QtCore import Qt
 

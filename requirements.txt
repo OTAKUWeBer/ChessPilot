@@ -1,10 +1,10 @@
+pywin32; platform_system == "Windows"
+onnxruntime==1.20.0
 mss
 pyautogui
 Pillow
-onnxruntime
 numpy
 colorama
 requests
-pywin32; platform_system == "Windows"
 PyQt6
 py-cpuinfo
