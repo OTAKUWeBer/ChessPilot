@@ -17,7 +17,6 @@ build/
 dist/
 *.egg-info/
 *.egg
-*.spec
 
 # Logs and debug files
 *.log
