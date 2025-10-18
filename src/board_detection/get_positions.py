@@ -99,7 +99,7 @@ def get_positions(image_input):
         else:
             image = image_input
     except Exception as e:
-        print(f"Error loading image: {e}")
+        logger.warning(f"Error loading image: {e}")
         return []
 
     predictions = predict(image)

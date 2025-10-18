@@ -108,12 +108,12 @@ if __name__ == "__main__":
     
     # Ensure valid input
     while color not in ['w', 'b']:
-        print("Invalid input. Please enter 'w' for white or 'b' for black.")
+        logger.warning("Invalid input. Please enter 'w' for white or 'b' for black.")
         color = input("Enter the color you are playing as (w or b): ").strip().lower()
 
     # Get FEN for the board and print it
     try:
         fen = get_fen_from_position(color, boxes)
-        print(fen)
+        logger.info(fen)
     except ValueError as e:
-        print(f"Error: {e}")
+        logger.error(f"Error: {e}")
