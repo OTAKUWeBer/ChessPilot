@@ -47,11 +47,11 @@ def bind_shortcuts(app):
     )
 
     QShortcut(QKeySequence(Qt.Key.Key_Right), app).activated.connect(
-        lambda: adjust_depth_up(app) if app.color_indicator is None else None
+        lambda: adjust_depth_up(app)
     )
 
     QShortcut(QKeySequence(Qt.Key.Key_Left), app).activated.connect(
-        lambda: adjust_depth_down(app) if app.color_indicator is None else None
+        lambda: adjust_depth_down(app)
     )
 
 def adjust_delay_up(app):
@@ -71,7 +71,6 @@ def adjust_depth_up(app):
     new_val = min(30, current + 1)
     app.depth_var = new_val
     app.depth_slider.setValue(new_val)
-    app.update_status(f"Depth: {new_val}")
 
 def adjust_depth_down(app):
     current = app.depth_var

@@ -106,7 +106,6 @@ def create_widgets(app):
             background: {app.hover_color};
         }}
     """)
-    app.depth_slider.valueChanged.connect(lambda val: update_depth_label(app, val))
     depth_layout.addWidget(app.depth_slider)
     depth_layout.addSpacing(8)
 
@@ -286,6 +285,7 @@ def create_widgets(app):
     control_layout.addWidget(app.btn_play)
     control_layout.addSpacing(10)
 
+
     app.castling_frame = QWidget()
     app.castling_frame.setStyleSheet(f"background-color: {app.frame_color};")
     castling_layout = QVBoxLayout(app.castling_frame)
@@ -351,6 +351,75 @@ def create_widgets(app):
 
     app.color_frame.show()
     app.main_frame.hide()
+    
+    control_layout.addSpacing(10)
+    
+    # Add depth slider to main frame
+    depth_panel_main = QWidget()
+    depth_panel_main.setStyleSheet(f"background-color: {app.frame_color};")
+    depth_layout_main = QVBoxLayout(depth_panel_main)
+    depth_layout_main.setContentsMargins(0, 0, 0, 0)
 
+    depth_title_main = QLabel("Stockfish Depth:")
+    depth_title_main.setStyleSheet(f"""
+        color: {app.text_color};
+        font-family: 'Segoe UI';
+        font-size: 11pt;
+        font-weight: 500;
+    """)
+    depth_layout_main.addWidget(depth_title_main)
+    depth_layout_main.addSpacing(5)
+
+    app.depth_slider_main = QSlider(Qt.Orientation.Horizontal)
+    app.depth_slider_main.setMinimum(10)
+    app.depth_slider_main.setMaximum(30)
+    app.depth_slider_main.setValue(app.depth_var)
+    app.depth_slider_main.setStyleSheet(f"""
+        QSlider::groove:horizontal {{
+            background: #4a4a4a;
+            height: 6px;
+            border-radius: 3px;
+        }}
+        QSlider::handle:horizontal {{
+            background: {app.accent_color};
+            width: 20px;
+            height: 20px;
+            margin: -7px 0;
+            border-radius: 10px;
+        }}
+        QSlider::handle:horizontal:hover {{
+            background: {app.hover_color};
+        }}
+    """)
+    depth_layout_main.addWidget(app.depth_slider_main)
+    depth_layout_main.addSpacing(8)
+
+    app.depth_label_main = QLabel(f"Depth: {app.depth_var}")
+    app.depth_label_main.setStyleSheet(f"""
+        color: {app.text_color};
+        font-family: 'Segoe UI';
+        font-size: 10pt;
+    """)
+    app.depth_label_main.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    depth_layout_main.addWidget(app.depth_label_main)
+
+    control_layout.addWidget(depth_panel_main)
+    control_layout.addSpacing(10)
+
+    # Synchronize both depth sliders
+    def sync_depth_sliders(value):
+        # Update both sliders and labels
+        app.depth_slider.blockSignals(True)
+        app.depth_slider_main.blockSignals(True)
+        app.depth_slider.setValue(value)
+        app.depth_slider_main.setValue(value)
+        app.depth_slider.blockSignals(False)
+        app.depth_slider_main.blockSignals(False)
+        # Update labels and depth_var
+        update_depth_label(app, value)
+        app.depth_label_main.setText(f"Depth: {value}")
+    
+    app.depth_slider.valueChanged.connect(sync_depth_sliders)
+    app.depth_slider_main.valueChanged.connect(sync_depth_sliders)
     app.btn_play.setEnabled(False)
     logger.debug("Widgets created successfully")
