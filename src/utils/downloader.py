@@ -18,9 +18,6 @@ import cpuinfo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
-_ch = logging.StreamHandler(sys.stdout)
-_ch.setFormatter(logging.Formatter("[%(levelname)s] %(message)s"))
-logger.addHandler(_ch)
 
 class ProgressSignals(QObject):
     """Signals for thread-safe UI updates"""
