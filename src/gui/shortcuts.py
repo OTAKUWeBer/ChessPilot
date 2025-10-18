@@ -77,4 +77,3 @@ def adjust_depth_down(app):
     new_val = max(10, current - 1)
     app.depth_var = new_val
     app.depth_slider.setValue(new_val)
-    app.update_status(f"Depth: {new_val}")
