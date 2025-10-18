@@ -1,8 +1,8 @@
 import os
 import logging
 from typing import Optional, Tuple
-from PyQt5.QtCore import QTimer, QRect, QPoint
-from PyQt5.QtWidgets import QMessageBox, QPushButton
+from PyQt6.QtCore import QTimer, QRect, QPoint
+from PyQt6.QtWidgets import QMessageBox, QPushButton
 import pyautogui
 
 logger = logging.getLogger(__name__)
