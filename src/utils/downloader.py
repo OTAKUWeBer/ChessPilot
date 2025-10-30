@@ -19,6 +19,8 @@ import cpuinfo
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+SILENT_MODE = False
+
 class ProgressSignals(QObject):
     """Signals for thread-safe UI updates"""
     progress_update = pyqtSignal(int)  # percentage
@@ -91,7 +93,8 @@ def _detect_linux_cpu_info():
         logger.warning(f"Could not read /proc/cpuinfo: {e}")
         # Fallback to lscpu
         try:
-            out = subprocess.check_output(["/usr/bin/lscpu"], text=True, timeout=10)
+            creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            out = subprocess.check_output(["/usr/bin/lscpu"], text=True, timeout=10, creationflags=creation_flags)
             for line in out.splitlines():
                 if "vendor id" in line.lower():
                     if "amd" in line.lower():
@@ -110,9 +113,10 @@ def _detect_mac_cpu_info():
     flags = set()
     
     try:
+        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         # Check for Apple Silicon
         out = subprocess.check_output(["/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string"], 
-                                     text=True, timeout=5).strip()
+                                     text=True, timeout=5, creationflags=creation_flags).strip()
         if "apple" in out.lower():
             vendor = "apple"
         elif "intel" in out.lower():
@@ -121,7 +125,7 @@ def _detect_mac_cpu_info():
             vendor = "amd"
             
         # Get CPU features
-        out = subprocess.check_output(["/usr/sbin/sysctl", "-a"], text=True, timeout=10)
+        out = subprocess.check_output(["/usr/sbin/sysctl", "-a"], text=True, timeout=10, creationflags=creation_flags)
         for line in out.splitlines():
             key = line.split(":")[0].strip().lower()
             if "machdep.cpu.features" in key or "machdep.cpu.leaf7_features" in key:
@@ -222,13 +226,14 @@ def _get_wmic_path():
 
 def _run_wmic_command(wmic_path):
     """Execute WMIC command to get CPU name."""
-    creation_flags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+    creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
     
     output = subprocess.check_output(
         [wmic_path, "cpu", "get", "name"],
         text=True,
         timeout=10,
-        creationflags=creation_flags
+        creationflags=creation_flags,
+        stderr=subprocess.DEVNULL  # Suppress stderr to prevent any output
     ).strip()
     
     return output
@@ -848,6 +853,9 @@ class StockfishDownloaderApp(QWidget):
         self.setWindowTitle("Stockfish Downloader")
         self.setFixedSize(420, 180)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
+        
+        if SILENT_MODE:
+            self.hide()
 
         self.signals = ProgressSignals()
         self.signals.progress_update.connect(self._update_progress)
@@ -937,7 +945,10 @@ class StockfishDownloaderApp(QWidget):
 
     def _close_after(self, ms):
         logger.debug("Window will close in %d ms", ms)
-        QTimer.singleShot(ms, self.close)
+        if SILENT_MODE:
+            QTimer.singleShot(100, self.close)
+        else:
+            QTimer.singleShot(ms, self.close)
 
     def _retry_download(self):
         self.retry_button.hide()
@@ -952,7 +963,7 @@ class StockfishDownloaderApp(QWidget):
 def download_stockfish(target_path=None):
     """
     Main entry point for downloading Stockfish.
-    Creates a QApplication and shows the downloader UI.
+    Creates a QApplication and shows the downloader UI (unless SILENT_MODE is True).
     
     Args:
         target_path: Optional path where to install Stockfish (currently unused, 
@@ -961,9 +972,16 @@ def download_stockfish(target_path=None):
     Returns:
         True if download/install succeeded, False otherwise
     """
-    app = QApplication(sys.argv)
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+        app_created = True
+    else:
+        app_created = False
+    
     downloader = StockfishDownloaderApp()
-    downloader.show()
+    if not SILENT_MODE:
+        downloader.show()
     app.exec()
     
     # Check if stockfish was successfully installed
@@ -983,7 +1001,6 @@ def download_stockfish(target_path=None):
             default_path = Path.cwd() / "stockfish"
     
     return default_path.exists()
-
 
 if __name__ == "__main__":
     success = download_stockfish()
