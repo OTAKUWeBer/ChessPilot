@@ -17,7 +17,7 @@ from utils.chess_resources_manager import setup_resources
 from utils.system_info import log_system_info, log_dependency_status
 
 setup_console_logging()
-logger = logging.getLogger("main")
+logger = logging.getLogger(__name__)
 
 script_dir = Path(__file__).resolve().parent
 project_dir = script_dir.parent

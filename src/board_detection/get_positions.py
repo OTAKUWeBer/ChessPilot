@@ -7,7 +7,7 @@ import os
 import logging
 
 # Logger setup
-logger = logging.getLogger("getpositions")
+logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
 # Use the helper function to get the correct model path
