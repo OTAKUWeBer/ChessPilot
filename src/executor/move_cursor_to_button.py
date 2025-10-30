@@ -85,7 +85,7 @@ def move_cursor_platform_specific(x: int, y: int) -> None:
     
     elif is_wayland():
         try:
-            from wayland_input import WaylandInput
+            from wayland_capture import WaylandInput
             client = WaylandInput()
             client.click(int(x), int(y))
             logger.debug("Cursor moved using Wayland")
