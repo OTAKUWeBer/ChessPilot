@@ -22,7 +22,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ChessPilot-v2.0.0-windows',
+    name='ChessPilot-v2.0.1-windows',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
