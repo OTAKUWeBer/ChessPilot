@@ -34,6 +34,29 @@ Highlights:
 
 ---
 
+## 🚀 What's new in v2.1.0 — Stability, Precision & Performance (minimal, refined)
+
+This update delivers targeted refinements that enhance reliability across all supported platforms while preserving the exact workflow introduced in v2.0.0. No features, behaviors, or UI flows have been altered — only improved.
+
+### Highlights (v2.1.0)
+
+* **Enhanced Promotion Handling**
+  Improved dialog detection and click-precision logic ensure more consistent promotion piece selection, especially under fast animation or low-contrast board themes.
+
+* **Stronger ONNX Fail-Safes**
+  Added secondary validation layers and cleaner fallback behavior when a detection frame fails or returns partial results, resulting in higher FEN extraction stability.
+
+* **Refined Input Injection**
+  Smoother and more consistent click/drag execution on both Windows and Wayland, with reduced micro-latency jitter during rapid move sequences.
+
+* **Internal Cleanup & Micro-Optimizations**
+  Updated internal helper modules, removed redundant debug traces, and optimized a few tight loops for slightly faster frame processing.
+
+* **Zero Breaking Changes**
+  All previous functionality, UI controls, shortcuts, and behavior remain exactly the same. This is a pure reliability and polish release.
+
+---
+
 ## 🚀 Features
 
 * **Automatic Stockfish Download**: Detects your CPU and downloads the best Stockfish build automatically.

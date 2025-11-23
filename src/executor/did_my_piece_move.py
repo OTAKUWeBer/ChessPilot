@@ -44,7 +44,16 @@ def did_my_piece_move(color_indicator, before_fen: str, after_fen: str, move: st
 
     moved_from = (piece_char in my_pieces) and (after_list[start_i] == ' ')
     after_char = after_list[end_i]
-    moved_to = (after_char == piece_char)
+    
+    is_promotion = len(move) == 5 and piece_char in ('P', 'p')
+    if is_promotion:
+        promotion_piece = move[4].upper()  # The piece we're promoting to (Q, R, B, N)
+        promotion_piece_color = promotion_piece if color_indicator == 'w' else promotion_piece.lower()
+        moved_to = (after_char == promotion_piece_color)
+        logger.debug(f"Promotion move detected: {piece_char} → {promotion_piece_color}")
+    else:
+        moved_to = (after_char == piece_char)
+    
     logger.debug(f"After piece at end square: '{after_char}'")
 
     unchanged_elsewhere = all(

@@ -7,6 +7,7 @@ from executor.chess_notation_to_index import chess_notation_to_index
 from executor.move_piece import move_piece
 from executor.did_my_piece_move import did_my_piece_move
 from core.config import AppConfig
+from executor.pawn_promotion import handle_pawn_promotion, is_pawn_promotion_move
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -131,6 +132,34 @@ def _attempt_single_move(
         auto_mode_var, root, btn_play, move_mode
     )
     
+    if is_pawn_promotion_move(move):
+        logger.info(f"Detected pawn promotion move: {move}")
+        # Capture current board state to pass to promotion handler
+        try:
+            img = capture_screenshot_in_memory()
+            boxes = get_positions(img) if img else None
+            if boxes:
+                chessboard_boxes = [box for box in boxes if box[5] == 12.0]
+                if chessboard_boxes:
+                    result = get_fen_from_position(color_indicator, boxes)
+                    if result:
+                        chessboard_x, chessboard_y, square_size, fen = result
+                        chessboard_data = {
+                            'chessboard_x': chessboard_x,
+                            'chessboard_y': chessboard_y,
+                            'square_size': square_size,
+                            'fen': fen
+                        }
+                        # Handle promotion piece selection
+                        promotion_success = handle_pawn_promotion(
+                            color_indicator, move, board_positions, chessboard_data,
+                            auto_mode_var, root, move_mode, humanize=True, max_retries=2
+                        )
+                        if not promotion_success:
+                            logger.warning("Pawn promotion handling may have failed")
+        except Exception as e:
+            logger.warning(f"Error in promotion handling: {e}")
+    
     # Verify the move was successful
     verification_result = _verify_move_execution(
         color_indicator, original_fen, move
@@ -197,10 +226,12 @@ class VerificationResult:
 
 def _verify_move_execution(color_indicator, original_fen, move):
     """Verify that the move was successfully executed."""
-    max_verify_attempts = 2
+    is_promotion = is_pawn_promotion_move(move)
+    max_verify_attempts = 4 if is_promotion else 2
+    extra_delay = 0.3 if is_promotion else 0.2
     
     for verify_attempt in range(max_verify_attempts):
-        time.sleep(0.2)  # Delay before verification
+        time.sleep(extra_delay)  # Extra delay for promotion moves
         
         current_fen = _capture_and_extract_fen(color_indicator, verify_attempt)
         if not current_fen:
