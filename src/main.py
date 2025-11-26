@@ -25,7 +25,7 @@ project_dir = script_dir.parent
 os.chdir(script_dir)
 
 logger.info("ChessPilot starting...")
-logger.info(f"Version: 2.0.0")
+logger.info(f"Version: 2.1.0")
 
 log_system_info()
 log_dependency_status()
