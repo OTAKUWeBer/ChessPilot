@@ -78,34 +78,32 @@ def log_system_info():
 
 def check_dependencies():
     """
-    Check if all required dependencies are installed.
-    
-    Returns:
-        dict: Dictionary of dependency names and their availability
+    Reliable dependency checker with correct module paths.
     """
-    dependencies = {
-        'PyQt6': False,
-        'PIL': False,
-        'numpy': False,
-        'onnxruntime': False,
-        'mss': False,
-        'pyautogui': False,
-        'requests': False,
-        'cpuinfo': False,
-    }
-    
-    for dep in dependencies.keys():
-        try:
-            if dep == 'PIL':
-                __import__('PIL')
-            else:
-                __import__(dep.lower())
-            dependencies[dep] = True
-        except ImportError:
-            dependencies[dep] = False
-    
-    return dependencies
 
+    # Mapping: DisplayName → module_to_import
+    dependency_map = {
+        "PyQt6": "PyQt6",
+        "PIL": "PIL",
+        "numpy": "numpy",
+        "onnxruntime": "onnxruntime",
+        "mss": "mss",
+        "pyautogui": "pyautogui",
+        "requests": "requests",
+        "cpuinfo": "cpuinfo",
+    }
+
+    results = {}
+
+    for display_name, module_name in dependency_map.items():
+        try:
+            __import__(module_name)
+            results[display_name] = True
+        except Exception as e:
+            logger.debug(f"Dependency {display_name} failed: {e}")
+            results[display_name] = False
+
+    return results
 
 def log_dependency_status():
     """
