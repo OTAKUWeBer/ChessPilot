@@ -47,18 +47,18 @@ This update delivers targeted refinements that enhance reliability across all su
 
 ## 🚀 Features
 
-* **Automatic Stockfish Download**: Detects your CPU and downloads the best Stockfish build automatically.
-* **FEN Extraction**: Local ONNX model ([Zai-Kun’s 2D Chess Detection](https://github.com/Zai-Kun/2d-chess-pieces-detection)).
-* **Stockfish Analysis**: Integrates Stockfish for optimal move suggestions.
-* **Auto-Move Execution**: Plays the chosen move on your screen automatically.
-* **Manual Play**: Click **“Play Next Move”** when you want to proceed manually.
-* **Board Flipping**: Play as Black by flipping the board.
-* **Castling Rights**: Toggle Kingside/Queenside castling.
-* **Depth Control**: Slider to adjust analysis depth (default: 15).
-* **Retry Logic**: Retries failed moves up to three times.
-* **ESC Shortcut**: Press **ESC** to reselect playing color at any time.
-* **Cross-Platform GUI**: Built with **PyQt6** for a modern desktop UI.
-* **100% Offline**: No external API calls — all processing stays local.
+* ⚡ **Automatic Stockfish Download** – Detects your CPU and fetches the optimal Stockfish build automatically.
+* 🏗️ **FEN Extraction** – Local ONNX model ([Zai-Kun’s 2D Chess Detection](https://github.com/Zai-Kun/2d-chess-pieces-detection)) reads the board instantly.
+* 🧠 **Stockfish Analysis** – Get the best move suggestions in real-time.
+* 🎯 **Auto-Move Execution** – Plays the selected move on your board automatically.
+* 🖱️ **Manual Play** – Click **“Play Next Move”** whenever you want to take control.
+* ⚪⚫ **Color Selection** – Choose to play as White or Black.
+* ♟️ **Auto Promotion** – Pawns promote automatically to any piece Stockfish chooses.
+* 👑 **Castling Rights** – Toggle Kingside or Queenside castling with ease.
+* 🎚️ **Depth Control** – Adjust analysis depth with a simple slider (default: 15).
+* 🔁 **Retry Logic** – Automatically retries failed moves up to three times.
+* 💻 **Cross-Platform GUI** – Modern, smooth interface built with **PyQt6**.
+* 🔒 **100% Offline** – All processing happens locally; zero internet required.
 
 ---
 
