@@ -36,15 +36,6 @@ ACCENT_COLOR = "#4CAF50"
 TEXT_COLOR = "#FFFFFF"
 HOVER_COLOR = "#45a049"
 
-def get_subprocess_flags():
-    """
-    Returns appropriate subprocess creation flags for the current OS.
-    On Windows, prevents console window from popping up.
-    """
-    if os.name == 'nt':  # Windows
-        return subprocess.CREATE_NO_WINDOW
-    return 0
-
 # ------------------------ Helpers ------------------------
 def detect_os():
     p = platform.system().lower()
