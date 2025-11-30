@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtCore import QTimer
 import logging
 from utils.get_binary_path import get_binary_path
+import os
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -17,7 +18,8 @@ def capture_screenshot_in_memory(root=None, auto_mode_var=None):
     try:
         if is_wayland():
             logger.info("Capturing screenshot using grim (Wayland)...")
-            result = subprocess.run([grim_path, "-"], stdout=subprocess.PIPE, check=True)
+            creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
+            result = subprocess.run([grim_path, "-"], stdout=subprocess.PIPE, check=True, creationflags=creation_flags)
             image = Image.open(io.BytesIO(result.stdout))
         else:
             logger.info("Capturing screenshot using mss (non-Wayland)...")
