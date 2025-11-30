@@ -7,6 +7,13 @@ import multiprocessing
 
 # Must be at the very top for PyInstaller on Windows
 if __name__ == "__main__":
+    # Hide console window on Windows when frozen
+    if sys.platform == 'win32' and getattr(sys, 'frozen', False):
+        import ctypes
+        ctypes.windll.user32.ShowWindow(
+            ctypes.windll.kernel32.GetConsoleWindow(), 
+            0  # SW_HIDE
+        )
     multiprocessing.freeze_support()
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
