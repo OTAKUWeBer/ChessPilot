@@ -26,7 +26,8 @@
 # 🎥 Demo Video
 
 <p align="center">
-  <video src="assets/demo.mp4" width="600" controls></video>
+  <video src="https://raw.githubusercontent.com/OTAKUWeBer/ChessPilot/main/assets/demo.mp4
+  " width="600" controls></video>
 </p>
 
 ---
