@@ -23,6 +23,14 @@
 
 ---
 
+# 🎥 Demo Video
+
+<p align="center">
+  <video src="assets/demo.mp4" width="600" controls></video>
+</p>
+
+---
+
 ## 🎉 Highlights (What's New)
 
 ### **v2.1.0 — Stability, Precision & Performance**
