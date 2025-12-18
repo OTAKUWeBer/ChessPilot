@@ -1,7 +1,6 @@
 import logging
 from .get_positions import get_positions
 
-# Setup Logger
 # Logger setup
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
