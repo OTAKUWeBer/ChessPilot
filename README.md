@@ -18,7 +18,7 @@
 <a href="https://img.shields.io/badge/Made_For-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"><img src="https://img.shields.io/badge/Made_For-Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"></a>
 
 <p align="center">
-  A lightweight, privacy-first tool that reads a real chess board from a screenshot/webcam, evaluates the position locally with Stockfish, and (optionally) plays the best move automatically.
+  A lightweight, privacy-first tool that reads a **2D on-screen chess board** (Chess.com, Lichess, WorldChess, etc.), evaluates the position locally with Stockfish, and (optionally) plays the best move automatically.
 </p>
 
 ---
