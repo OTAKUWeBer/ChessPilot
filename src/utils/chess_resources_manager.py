@@ -5,12 +5,12 @@ from shutil import which
 import sys
 from pathlib import Path
 
-from .downloader import download_stockfish
+from .downloader import download_maia, download_lc0
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-README_STOCKFISH_URL = "https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
+README_ENGINE_URL = "https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
 README_ONNX_URL = "https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
 
 def find_file_with_keyword(keyword, extension=None, search_path=None):
@@ -37,154 +37,11 @@ def find_file_with_keyword(keyword, extension=None, search_path=None):
     return None
 
 
-def _get_stockfish_binary_name():
-    """Returns the appropriate binary name for the current OS."""
-    return "stockfish.exe" if os.name == "nt" else "stockfish"
-
-
-def _check_bundled_stockfish():
-    """Check if Stockfish is bundled with PyInstaller."""
-    if not getattr(sys, 'frozen', False):
-        return None
-    
-    bundled_name = _get_stockfish_binary_name()
-    bundled_path = Path(sys._MEIPASS) / bundled_name
-    
-    if bundled_path.exists():
-        logger.info(f"Using bundled Stockfish at {bundled_path}.")
-        return bundled_path
-    return None
-
-
 def _get_working_directory():
     """Determine the appropriate working directory."""
     if getattr(sys, "frozen", False):
         return Path(sys.executable).parent
     return Path.cwd()
-
-
-def _check_system_stockfish():
-    """Check if Stockfish is installed system-wide."""
-    bundled_name = _get_stockfish_binary_name()
-    system_path = which(bundled_name)
-    
-    if system_path:
-        logger.info(f"Found system-installed Stockfish at {system_path}. Skipping download/extract.")
-        return system_path
-    return None
-
-
-def _check_existing_stockfish(final_path):
-    """Check if Stockfish already exists at the target location."""
-    if final_path.exists():
-        logger.info(f"Stockfish binary already exists at {final_path}. Skipping download.")
-        return True
-    return False
-
-
-def _download_and_handle_stockfish(final_path):
-    """Download Stockfish and handle different return value conventions."""
-    logger.info(f"Stockfish not found. Attempting to download to {final_path} ...")
-    
-    try:
-        # Try calling downloader with target path if signature accepts it
-        try:
-            res = download_stockfish(final_path)
-        except TypeError:
-            # Fallback: call without args
-            logger.debug("download_stockfish() didn't accept a target path; calling without args.")
-            res = download_stockfish()
-        
-        return _process_download_result(res, final_path)
-    
-    except Exception as e:
-        logger.exception("Error while attempting to download Stockfish: %s", e)
-        return False
-
-
-def _process_download_result(res, final_path):
-    """Process the result from download_stockfish() with different return conventions."""
-    bundled_name = _get_stockfish_binary_name()
-    
-    if isinstance(res, bool):
-        ok = res
-    elif res is None:
-        # assume downloader performed its own placement; check final_path
-        ok = final_path.exists() or which(bundled_name) is not None
-    else:
-        ok = _handle_path_result(res, final_path)
-    
-    if ok:
-        _set_executable_permissions(final_path)
-        logger.info(f"Stockfish ready at {final_path}")
-        return True
-    else:
-        logger.error(f"Downloader reported failure or binary not found at {final_path}. See README: {README_STOCKFISH_URL}")
-        return False
-
-
-def _handle_path_result(res, final_path):
-    """Handle when downloader returns a path-like object."""
-    try:
-        returned = Path(res)
-        ok = returned.exists()
-        
-        # if it's not at final_path, try moving it into place
-        if ok and returned.resolve() != final_path.resolve():
-            try:
-                shutil.move(str(returned), str(final_path))
-                ok = final_path.exists()
-            except Exception as e:
-                logger.warning("Could not move downloaded binary into place: %s", e)
-        return ok
-    except Exception as e:
-        logger.error(f"Error processing downloader return value: {e}")
-        return False
-
-
-def _set_executable_permissions(final_path):
-    """Set executable permissions on non-Windows systems."""
-    if os.name != "nt":
-        try:
-            st = final_path.stat().st_mode
-            final_path.chmod(st | 0o111)
-        except Exception as e:
-            logger.warning("Failed to set executable bit: %s", e)
-
-
-def extract_stockfish():
-    """
-    Ensures a Stockfish binary exists at ./stockfish or ./stockfish.exe in cwd.
-    If missing, attempts to download via downloader.download_stockfish().
-    Returns True on success (binary available), False otherwise.
-    """
-    logger.info("Checking for Stockfish binary...")
-    
-    # Check if bundled by PyInstaller
-    bundled_stockfish = _check_bundled_stockfish()
-    if bundled_stockfish:
-        logger.info("Using bundled Stockfish")
-        return True
-    
-    # Determine target path
-    cwd = _get_working_directory()
-    bundled_name = _get_stockfish_binary_name()
-    final_path = cwd / bundled_name
-    
-    # Check if system installed
-    system_stockfish = _check_system_stockfish()
-    if system_stockfish:
-        logger.info(f"Using system Stockfish: {system_stockfish}")
-        return True
-    
-    # Check if already present in target location
-    if _check_existing_stockfish(final_path):
-        logger.info(f"Stockfish found at: {final_path}")
-        return True
-    
-    # Download and handle result
-    logger.info("Stockfish not found locally. Starting download...")
-    return _download_and_handle_stockfish(final_path)
 
 
 def _check_bundled_onnx():
@@ -277,42 +134,122 @@ def _move_resource_from_project_root(project_dir, script_dir, filename, resource
             logger.warning(f"Could not move {resource_type} from project root to src: %s", e)
 
 
+def _get_engine_binary_names():
+    """Returns the appropriate binary names for both Lc0 and Maia."""
+    if os.name == "nt":
+        return {"lc0": "lc0.exe", "maia": "maia.exe"}
+    else:
+        return {"lc0": "lc0", "maia": "maia"}
+
+
+def _check_bundled_engines():
+    """Check if Lc0 or Maia is bundled with PyInstaller."""
+    if not getattr(sys, 'frozen', False):
+        return None
+    
+    engine_names = _get_engine_binary_names()
+    for engine_type, binary_name in engine_names.items():
+        bundled_path = Path(sys._MEIPASS) / binary_name
+        if bundled_path.exists():
+            logger.info(f"Using bundled {engine_type.upper()} at {bundled_path}.")
+            return bundled_path
+    return None
+
+
+def _check_system_engines():
+    """Check if Lc0 or Maia is installed system-wide."""
+    engine_names = _get_engine_binary_names()
+    for engine_type, binary_name in engine_names.items():
+        system_path = which(binary_name)
+        if system_path:
+            logger.info(f"Found system-installed {engine_type.upper()} at {system_path}.")
+            return system_path
+    return None
+
+
+def _check_existing_engines(final_dir):
+    """Check if Lc0 or Maia already exists in the target directory."""
+    engine_names = _get_engine_binary_names()
+    for engine_type, binary_name in engine_names.items():
+        engine_path = final_dir / binary_name
+        if engine_path.exists():
+            logger.info(f"{engine_type.upper()} binary already exists at {engine_path}.")
+            return engine_path
+    return None
+
+
+def extract_engines():
+    """
+    Ensures Lc0 or Maia binary exists. If missing, attempts auto-download.
+    For Linux, skips Lc0 (requires building from source) and goes straight to Maia.
+    Returns True on success (engine available), False otherwise.
+    """
+    logger.info("Checking for Lc0 or Maia engine binary...")
+    
+    # Check if bundled by PyInstaller
+    bundled_engine = _check_bundled_engines()
+    if bundled_engine:
+        logger.info("Using bundled engine")
+        return True
+    
+    # Determine target path
+    cwd = _get_working_directory()
+    
+    # Check if system installed
+    system_engine = _check_system_engines()
+    if system_engine:
+        logger.info(f"Using system engine: {system_engine}")
+        return True
+    
+    # Check if already present in target location
+    existing_engine = _check_existing_engines(cwd)
+    if existing_engine:
+        logger.info(f"Engine found at: {existing_engine}")
+        return True
+    
+    logger.info("Engine not found. Attempting auto-download...")
+    
+    import platform
+    os_type = platform.system().lower()
+    
+    if os_type != "linux":
+        # Try downloading Lc0 first on non-Linux systems
+        logger.info("Attempting to download Lc0...")
+        if download_lc0():
+            logger.info("Lc0 downloaded successfully")
+            return True
+    else:
+        logger.info("Linux detected - Lc0 requires building from source, skipping auto-download")
+        logger.warning("Lc0 on Linux: https://github.com/LeelaChessZero/lc0/releases (requires building from source)")
+    
+    # Try downloading Maia (works on all platforms)
+    logger.info("Attempting to download Maia...")
+    if download_maia():
+        logger.info("Maia downloaded successfully")
+        return True
+    
+    # If both fail, log instructions
+    logger.error("Auto-download failed. Please manually download:")
+    if os_type != "linux":
+        logger.warning("  Lc0: https://github.com/LeelaChessZero/lc0/releases")
+    else:
+        logger.warning("  Lc0 (Linux): https://github.com/LeelaChessZero/lc0/releases (requires building from source)")
+    logger.warning("  Maia: https://github.com/CSSLab/maia-chess/releases")
+    return False
+
+
 def setup_resources(script_dir: Path, project_dir: Path) -> bool:
     """
-    Setup all required resources (Stockfish and ONNX model).
+    Setup all required resources (Lc0/Maia engine and ONNX model).
     Returns True if all resources are ready, False otherwise.
     """
     logger.info("Setting up ChessPilot resources...")
     
-    if os.name != "nt":
-        logger.info("Non-Windows system detected, skipping resource moves")
-        # Still need to check for resources
-        if not extract_stockfish():
-            logger.error("Stockfish setup failed")
-            return False
-        if not rename_onnx_model():
-            logger.error("ONNX model setup failed")
-            return False
-        return True
-    
-    # Move Stockfish binary from project root if present
-    _move_resource_from_project_root(
-        project_dir, script_dir, "stockfish.exe", "Stockfish binary"
-    )
-    
-    # Ensure stockfish is present (download if missing)
-    if not extract_stockfish():
-        logger.error("Stockfish setup failed. Please check your internet connection.")
+    if not extract_engines():
+        logger.error("Engine setup failed")
         return False
-    
-    # Move ONNX model from project root if present
-    _move_resource_from_project_root(
-        project_dir, script_dir, "chess_detection.onnx", "ONNX model"
-    )
-    
-    # Ensure ONNX model is present
     if not rename_onnx_model():
-        logger.error("ONNX model setup failed. Please download it manually.")
+        logger.error("ONNX model setup failed")
         return False
     
     logger.info("All resources ready!")
@@ -320,13 +257,13 @@ def setup_resources(script_dir: Path, project_dir: Path) -> bool:
 
 
 if __name__ == "__main__":
-    logger.info("Starting Stockfish download check and ONNX model rename process...")
+    logger.info("Starting engine setup check...")
     # Default behavior: run from cwd (expected to be script_dir)
     script_dir = Path.cwd()
     project_dir = script_dir.parent
-    stockfish_ok = extract_stockfish()
+    engine_ok = extract_engines()
     onnx_ok = rename_onnx_model()
-    if stockfish_ok and onnx_ok:
+    if engine_ok and onnx_ok:
         logger.info("Setup complete.")
     else:
         logger.info("Setup incomplete—check errors.")

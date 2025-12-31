@@ -11,7 +11,7 @@ from .process_move import process_move
 from .store_board_positions import store_board_positions
 from .verify_move import verify_move
 from .auto_move import auto_move_loop
-from .get_best_move import get_best_move, cleanup_stockfish, initialize_stockfish_at_startup
+from .get_best_move import get_best_move, cleanup_engine, initialize_engine_at_startup
 from .get_current_fen import get_current_fen
 from .is_two_square_king_move import is_two_square_king_move
 
@@ -32,6 +32,6 @@ __all__ = [
     "get_best_move",
     "get_current_fen",
     "is_two_square_king_move",
-    "cleanup_stockfish",
-    "initialize_stockfish_at_startup",
+    "cleanup_engine",
+    "initialize_engine_at_startup",
 ]

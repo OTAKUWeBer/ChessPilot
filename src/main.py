@@ -44,7 +44,7 @@ if not setup_resources(script_dir, project_dir):
     QMessageBox.critical(
         None,
         "Setup Failed",
-        "Failed to setup required resources (Stockfish or ONNX model).\n\n"
+        "Failed to setup required resources (Lc0/Maia engine or ONNX model).\n\n"
         "Please check:\n"
         "1. Your internet connection\n"
         "2. That you have write permissions\n"
@@ -112,11 +112,11 @@ class ChessPilot(QMainWindow):
         logger.debug(f"Initial window size: {self.width()}x{self.height()}")
 
         if not self.engine_service.initialize():
-            logger.error("Stockfish initialization failed at startup")
+            logger.error("Engine initialization failed at startup")
             QMessageBox.warning(
                 self,
                 "Engine Warning",
-                "Stockfish engine failed to initialize.\n\n"
+                "Chess engine (Lc0 or Maia) failed to initialize.\n\n"
                 "The app will continue, but move analysis won't work.\n"
                 "Please restart the application or check the logs."
             )
@@ -269,7 +269,7 @@ class ChessPilot(QMainWindow):
         )
 
     def closeEvent(self, event):
-        logger.info("Application closing - cleaning up Stockfish process")
+        logger.info("Application closing - cleaning up engine process")
         self.engine_service.cleanup()
         event.accept()
 

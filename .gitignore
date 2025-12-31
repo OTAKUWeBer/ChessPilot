@@ -70,6 +70,9 @@ chess_detection.onnx
 *.zip
 wayland-info
 grim
+*.pb.gz
+*.pb
+*.gz
 
 # AUR / AppImage packaging
 .SRCINFO

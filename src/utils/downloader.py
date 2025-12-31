@@ -1,7 +1,6 @@
 import os
 import platform
 import subprocess
-import tarfile
 import zipfile
 import shutil
 import tempfile
@@ -13,8 +12,6 @@ from pathlib import Path
 import logging
 import sys
 import time
-import struct
-import cpuinfo
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -29,7 +26,7 @@ class ProgressSignals(QObject):
     show_retry = pyqtSignal()
     close_window = pyqtSignal(int)  # delay in ms
 
-# ------------------------ Visual style (match ChessPilot) ------------------------
+# ------------------------ Visual style ------------------------
 BG_COLOR = "#2D2D2D"
 FRAME_COLOR = "#373737"
 ACCENT_COLOR = "#4CAF50"
@@ -47,257 +44,84 @@ def detect_os():
         return "mac"
     return p
 
-def detect_cpu_info():
-    """Detect CPU vendor and features"""
-    arch = platform.machine().lower()
-    os_name = detect_os()
+def detect_gpu_capabilities():
+    """Detect GPU capabilities for neural network engines"""
+    capabilities = set()
     
-    vendor = "unknown"
-    flags = set()
+    # Check for NVIDIA GPU
+    if _has_nvidia_gpu():
+        capabilities.add("cuda")
+        if _has_cudnn():
+            capabilities.add("cudnn")
+    
+    # Check for DirectX 12 (Windows 10+)
+    if detect_os() == "windows" and _has_dx12():
+        capabilities.add("dx12")
+    
+    # Check for OpenCL
+    if _has_opencl():
+        capabilities.add("opencl")
+    
+    return capabilities
+
+def _has_nvidia_gpu():
+    """Check for NVIDIA GPU"""
+    try:
+        if detect_os() == "windows":
+            subprocess.run(["nvidia-smi"], capture_output=True, check=True, timeout=5)
+            return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
+        pass
     
     try:
-        if os_name == "linux":
-            vendor, flags = _detect_linux_cpu_info()
-        elif os_name == "mac":
-            vendor, flags = _detect_mac_cpu_info()
-        elif os_name == "windows":
-            vendor, flags = _detect_windows_cpu_info()
-    except Exception as e:
-        logger.warning(f"CPU detection failed, using defaults: {e}")
-        # Fallback to safe defaults
-        vendor = "generic"
-        flags = {"sse4_1", "sse4_2", "popcnt"}
+        if detect_os() == "windows":
+            nvidia_files = [
+                Path(os.environ.get("SYSTEMROOT", "C:\\Windows")) / "System32" / "nvapi64.dll",
+                Path(os.environ.get("SYSTEMROOT", "C:\\Windows")) / "System32" / "nvcuda.dll"
+            ]
+            return any(f.exists() for f in nvidia_files)
+    except Exception:
+        pass
     
-    logger.info(f"CPU Vendor: {vendor}, Flags: {sorted(flags)[:10]}...")
-    return arch, vendor, flags
+    return False
 
-def _detect_linux_cpu_info():
-    vendor = "unknown"
-    flags = set()
-    
+def _has_cudnn():
+    """Check for cuDNN availability"""
     try:
-        # Get CPU info
-        with open("/proc/cpuinfo", "r") as f:
-            for line in f:
-                line_lower = line.lower()
-                if "vendor_id" in line_lower:
-                    if "amd" in line_lower:
-                        vendor = "amd"
-                    elif "intel" in line_lower:
-                        vendor = "intel"
-                elif "flags" in line_lower:
-                    parts = line.split(":", 1)
-                    if len(parts) > 1:
-                        flags.update(parts[1].strip().split())
-    except Exception as e:
-        logger.warning(f"Could not read /proc/cpuinfo: {e}")
-        # Fallback to lscpu
-        try:
-            creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-            out = subprocess.check_output(["/usr/bin/lscpu"], text=True, timeout=10, creationflags=creation_flags)
-            for line in out.splitlines():
-                if "vendor id" in line.lower():
-                    if "amd" in line.lower():
-                        vendor = "amd"
-                    elif "intel" in line.lower():
-                        vendor = "intel"
-                elif "flags" in line.lower():
-                    flags.update(line.split(":")[1].strip().split())
-        except Exception as e2:
-            logger.warning(f"Could not detect CPU with lscpu: {e2}")
-    
-    return vendor, flags
+        if detect_os() == "windows":
+            cudnn_files = [
+                Path(os.environ.get("SYSTEMROOT", "C:\\Windows")) / "System32" / "cudnn64_8.dll",
+                Path(os.environ.get("SYSTEMROOT", "C:\\Windows")) / "System32" / "cudnn_cnn_infer64_8.dll"
+            ]
+            return any(f.exists() for f in cudnn_files)
+    except Exception:
+        pass
+    return False
 
-def _detect_mac_cpu_info():
-    vendor = "apple"  # Modern Macs are Apple Silicon or Intel
-    flags = set()
-    
+def _has_dx12():
+    """Check for DirectX 12 support (Windows 10+)"""
     try:
-        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-        # Check for Apple Silicon
-        out = subprocess.check_output(["/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string"], 
-                                     text=True, timeout=5, creationflags=creation_flags).strip()
-        if "apple" in out.lower():
-            vendor = "apple"
-        elif "intel" in out.lower():
-            vendor = "intel"
-        elif "amd" in out.lower():
-            vendor = "amd"
-            
-        # Get CPU features
-        out = subprocess.check_output(["/usr/sbin/sysctl", "-a"], text=True, timeout=10, creationflags=creation_flags)
-        for line in out.splitlines():
-            key = line.split(":")[0].strip().lower()
-            if "machdep.cpu.features" in key or "machdep.cpu.leaf7_features" in key:
-                flags.update(line.split(":")[1].strip().split())
-    except Exception as e:
-        logger.warning(f"Could not detect CPU on macOS: {e}")
-    
-    return vendor, flags
+        if detect_os() == "windows":
+            import winreg
+            with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, 
+                              r"SOFTWARE\Microsoft\Windows NT\CurrentVersion") as key:
+                build = winreg.QueryValueEx(key, "CurrentBuild")[0]
+                return int(build) >= 10240
+    except Exception:
+        pass
+    return False
 
-def _detect_windows_cpu_info():
-    """
-    Detect CPU vendor and flags on Windows.
-    Returns: tuple of (vendor: str, flags: set)
-    """
-    vendor = _get_cpu_vendor()
-    flags = _get_cpu_flags()
-    
-    logger.info(f"Windows CPU detection complete: vendor={vendor}, flags={sorted(list(flags))[:10]}")
-    return vendor, flags
-
-
-def _get_cpu_vendor():
-    """Try multiple methods to detect CPU vendor, returning the first successful result."""
-    vendor = _try_cpuinfo_vendor() or _try_platform_vendor() or _try_wmic_vendor()
-    
-    if not vendor or vendor == "unknown":
-        vendor = "generic"
-        logger.info("Could not determine CPU vendor, using 'generic'")
-    
-    return vendor
-
-
-def _try_cpuinfo_vendor():
-    """Attempt to get CPU vendor from cpuinfo module."""
+def _has_opencl():
+    """Check for OpenCL support"""
     try:
-        info = cpuinfo.get_cpu_info()
-        brand = info.get('brand_raw', '').lower()
-        
-        vendor = _parse_vendor_from_string(brand)
-        if vendor != "unknown":
-            logger.info(f"CPU vendor from cpuinfo module: {vendor}")
-            return vendor
-    except ImportError:
-        logger.debug("cpuinfo module not available")
-    except Exception as e:
-        logger.debug(f"cpuinfo module failed: {e}")
-    
-    return None
-
-
-def _try_platform_vendor():
-    """Attempt to get CPU vendor from platform module."""
-    try:
-        processor_name = platform.processor().lower()
-        if processor_name:
-            vendor = _parse_vendor_from_string(processor_name)
-            if vendor != "unknown":
-                logger.info(f"CPU vendor from platform.processor(): {vendor}")
-                return vendor
-    except Exception as e:
-        logger.debug(f"platform.processor() failed: {e}")
-    
-    return None
-
-
-def _try_wmic_vendor():
-    """Attempt to get CPU vendor from WMIC command."""
-    try:
-        wmic_path = _get_wmic_path()
-        if not wmic_path:
-            return None
-        
-        output = _run_wmic_command(wmic_path)
-        if output:
-            vendor = _parse_vendor_from_string(output.lower())
-            if vendor != "unknown":
-                logger.info(f"CPU vendor from WMIC: {vendor}")
-                return vendor
-    except subprocess.TimeoutExpired:
-        logger.warning("WMIC command timed out")
-    except Exception as e:
-        logger.warning(f"WMIC detection failed: {e}")
-    
-    return None
-
-
-def _get_wmic_path():
-    """Get the full path to WMIC executable for security."""
-    system_root = os.environ.get('SYSTEMROOT', 'C:\\Windows')
-    wmic_path = os.path.join(system_root, 'System32', 'wbem', 'wmic.exe')
-    
-    if os.path.exists(wmic_path):
-        return wmic_path
-    
-    logger.warning(f"WMIC not found at expected path: {wmic_path}")
-    return None
-
-
-def _run_wmic_command(wmic_path):
-    """Execute WMIC command to get CPU name."""
-    creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-    
-    output = subprocess.check_output(
-        [wmic_path, "cpu", "get", "name"],
-        text=True,
-        timeout=10,
-        creationflags=creation_flags,
-        stderr=subprocess.DEVNULL  # Suppress stderr to prevent any output
-    ).strip()
-    
-    return output
-
-
-def _parse_vendor_from_string(text):
-    """Parse CPU vendor from a text string."""
-    if 'amd' in text or 'ryzen' in text:
-        return "amd"
-    elif 'intel' in text:
-        return "intel"
-    return "unknown"
-
-
-def _get_cpu_flags():
-    """Get CPU flags from cpuinfo module or use reasonable defaults."""
-    flags = _try_cpuinfo_flags()
-    
-    if not flags:
-        flags = _get_default_windows_flags()
-    
-    return flags
-
-
-def _try_cpuinfo_flags():
-    """Attempt to get CPU flags from cpuinfo module."""
-    try:
-        info = cpuinfo.get_cpu_info()
-        cpu_flags = info.get('flags', [])
-        if cpu_flags:
-            flags = set(cpu_flags)
-            logger.info(f"CPU flags from cpuinfo module: count={len(flags)}")
-            return flags
-    except (ImportError, Exception) as e:
-        logger.debug(f"Could not get CPU flags from cpuinfo: {e}")
-    
-    return None
-
-
-def _get_default_windows_flags():
-    """Return default CPU flags for modern Windows systems."""
-    flags = {"sse4_1", "sse4_2", "popcnt", "sse4.1", "sse4.2"}
-    
-    # Assume AVX support on 64-bit systems
-    if _is_64bit_system():
-        flags.add("avx")
-        flags.add("avx2")
-        logger.debug("Assumed AVX/AVX2 support on 64-bit Windows")
-    
-    return flags
-
-
-def _is_64bit_system():
-    """Check if the system is 64-bit."""
-    try:
-        return struct.calcsize("P") * 8 == 64
-    except Exception as e:
-        logger.error(f"Could not determine system architecture: {e}")
-        return False
-
-def detect_arch_flags():
-    """Legacy function for compatibility"""
-    arch, vendor, flags = detect_cpu_info()
-    return arch, flags
+        if detect_os() == "windows":
+            opencl_files = [
+                Path(os.environ.get("SYSTEMROOT", "C:\\Windows")) / "System32" / "OpenCL.dll"
+            ]
+            return any(f.exists() for f in opencl_files)
+    except Exception:
+        pass
+    return False
 
 def format_bytes(n):
     n = float(n or 0)
@@ -308,200 +132,42 @@ def format_bytes(n):
     return f"{n:.1f} TB"
 
 # ------------------------ Asset selection ------------------------
-def choose_best_asset(assets, os_name, arch, vendor, flags):
-    """Choose the best Stockfish binary based on OS, CPU vendor, and features"""
-    filtered = _filter_assets_by_os(assets, os_name)
-    if not filtered:
-        logger.error("No assets found for this OS")
+def choose_best_maia_asset(assets, os_name, gpu_capabilities):
+    """Choose the best Maia model file (pb.gz format)"""
+    pb_files = [a for a in assets if a["name"].endswith(".pb.gz")]
+    
+    if not pb_files:
+        logger.error("No .pb.gz model files found in Maia release")
         return None
     
-    return _select_best_by_cpu_features(filtered, vendor, flags)
+    preferred = [a for a in pb_files if "1700" in a["name"]]
+    if preferred:
+        logger.info(f"Using preferred Maia 1700 model: {preferred[0]['name']}")
+        return preferred[0]
+    
+    # Sort by model number (extracted from filename) descending
+    def get_model_number(asset_name):
+        import re
+        match = re.search(r'maia-(\d+)', asset_name)
+        return int(match.group(1)) if match else 0
+    
+    sorted_files = sorted(pb_files, key=lambda a: get_model_number(a["name"]), reverse=True)
+    logger.info(f"Selected highest-rated Maia model: {sorted_files[0]['name']}")
+    return sorted_files[0]
 
-def _filter_assets_by_os(assets, os_name):
-    filtered = []
-    
-    # First pass: Look for OS-specific prefixes
-    for a in assets:
-        n = a["name"].lower()
-        if _matches_os_prefix(n, os_name):
-            filtered.append(a)
-    
-    # Second pass: Fallback to generic OS indicators
-    if not filtered:
-        for a in assets:
-            n = a["name"].lower()
-            if _matches_os_generic(n, os_name):
-                filtered.append(a)
-    
-    return filtered
+def _filter_maia_assets_by_os(assets, os_name):
+    """Filter Maia assets by operating system - not needed for model files"""
+    return [a for a in assets if a["name"].endswith(".pb.gz")]
 
-def _matches_os_prefix(name, os_name):
-    if os_name == "linux" and name.startswith("stockfish-ubuntu"):
-        return True
-    if os_name == "mac" and name.startswith("stockfish-macos"):
-        return True
-    if os_name == "windows" and name.startswith("stockfish-windows"):
-        return True
-    return False
-
-def _matches_os_generic(name, os_name):
-    if os_name == "linux" and "linux" in name:
-        return True
-    if os_name == "mac" and ("mac" in name or "darwin" in name):
-        return True
-    if os_name == "windows" and ("win" in name or name.endswith(".zip")):
-        return True
-    return False
-
-def _select_best_by_cpu_features(filtered, vendor, flags):
-    """Select the best binary based on CPU features
-    
-    Stockfish naming conventions:
-    - x86-64-avx512 (newest, requires AVX-512)
-    - x86-64-bmi2 (modern Intel/AMD with BMI2)
-    - x86-64-avx2 (requires AVX2)
-    - x86-64-sse41-popcnt (older CPUs)
-    - x86-64-modern (generic modern)
-    - x86-64 (basic fallback)
-    """
-    score_map = {}
-    
-    for a in filtered:
-        score = _calculate_cpu_score(a["name"].lower(), vendor, flags)
-        score_map[a["name"]] = score
-        logger.debug(f"Asset: {a['name']} -> Score: {score}")
-    
-    if not score_map:
-        return filtered[0] if filtered else None
-    
-    best_name = max(score_map.items(), key=lambda kv: kv[1])[0]
-    logger.info(f"Best match: {best_name} (score: {score_map[best_name]})")
-    
-    for a in filtered:
-        if a["name"] == best_name:
-            return a
-    
-    return filtered[0]
-
-def _calculate_cpu_score(name, vendor, flags):
-    """Calculate a score for how well this binary matches the CPU"""
-    score = 0
-    
-    # Define instruction set configurations with their requirements and scoring
-    instruction_sets = [
-        {
-            "keyword": "avx512",
-            "required_flags": lambda f: any(flag.startswith("avx512") for flag in f),
-            "match_score": 100,
-            "mismatch_penalty": -100
-        },
-        {
-            "keyword": "bmi2",
-            "required_flags": lambda f: "bmi2" in f,
-            "match_score": 80,
-            "mismatch_penalty": -50
-        },
-        {
-            "keyword": "avx2",
-            "required_flags": lambda f: "avx2" in f or "avx" in f,
-            "match_score": 60,
-            "mismatch_penalty": -30
-        },
-        {
-            "keywords": ["popcnt", "sse41", "sse4"],
-            "required_flags": lambda f: any(x in f for x in ["sse4_1", "sse4_2", "popcnt", "sse4.1", "sse4.2"]),
-            "match_score": 50,
-            "mismatch_penalty": 0
-        }
-    ]
-    
-    # Check instruction set matches
-    score += _check_instruction_sets(name, flags, instruction_sets)
-    
-    # Add vendor bonus if applicable
-    score += _calculate_vendor_bonus(name, vendor, flags)
-    
-    # Add fallback scores
-    score += _calculate_fallback_score(name)
-    
-    # Add format bonus
-    score += _calculate_format_bonus(name)
-    
-    # Apply vendor mismatch penalty
-    score += _calculate_vendor_penalty(name, vendor)
-    
-    return score
-
-
-def _check_instruction_sets(name, flags, instruction_sets):
-    """Check if binary name matches CPU instruction sets"""
-    for config in instruction_sets:
-        keywords = config.get("keywords", [config.get("keyword")])
-        
-        if any(kw in name for kw in keywords):
-            has_required = config["required_flags"](flags)
-            if has_required:
-                return config["match_score"]
-            else:
-                return config["mismatch_penalty"]
-    
-    return 0
-
-
-def _calculate_vendor_bonus(name, vendor, flags):
-    """Calculate bonus score for vendor-specific optimizations"""
-    if "bmi2" not in name or "bmi2" not in flags:
-        return 0
-    
-    vendor_map = {
-        "amd": "amd",
-        "intel": "intel"
-    }
-    
-    if vendor in vendor_map and vendor_map[vendor] in name:
-        return 10
-    
-    return 0
-
-
-def _calculate_fallback_score(name):
-    """Calculate score for fallback builds"""
-    fallback_scores = {
-        "modern": 40,
-        "x86-64": 35,
-        "x86_64": 35
-    }
-    
-    for keyword, score in fallback_scores.items():
-        if keyword in name:
-            return score
-    
-    return 0
-
-
-def _calculate_format_bonus(name):
-    """Add bonus for compressed archive formats"""
-    compression_formats = (".tar.gz", ".tgz", ".zip", ".tar")
-    return 5 if name.endswith(compression_formats) else 0
-
-
-def _calculate_vendor_penalty(name, vendor):
-    """Apply penalty for vendor-specific mismatches"""
-    penalty = 0
-    
-    if "amd" in name and vendor not in ["amd", "generic", "unknown"]:
-        penalty -= 5
-    
-    if "intel" in name and vendor not in ["intel", "generic", "unknown"]:
-        penalty -= 5
-    
-    return penalty
+def _select_best_maia_by_gpu(filtered_assets, gpu_capabilities):
+    """Select the best Maia build based on GPU capabilities - not needed for model files"""
+    if not filtered_assets:
+        return None
+    return filtered_assets[0]
 
 # ------------------------ Download & extraction ------------------------
 def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeout=60):
-    """
-    Downloads a file while calling progress_callback(downloaded_bytes, total_bytes_or_None, speed_bytes_per_sec)
-    """
+    """Downloads a file with progress reporting"""
     logger.debug(f"Starting download: {url} -> {dest_path}")
     start_time = time.time()
     downloaded = 0
@@ -555,14 +221,12 @@ class BinaryExtractor:
         extracted = []
         
         try:
-            if self._is_tar_archive():
-                extracted = self._extract_tar()
-            elif self._is_zip_archive():
+            if self._is_zip_archive():
                 extracted = self._extract_zip()
             else:
                 extracted = self._copy_single_file()
                 
-        except (tarfile.TarError, zipfile.BadZipFile) as e:
+        except zipfile.BadZipFile as e:
             logger.error(f"Archive extraction failed: {e}")
             self._cleanup()
             return None
@@ -571,7 +235,10 @@ class BinaryExtractor:
             self._cleanup()
             return None
 
-        binary_path = self._find_stockfish_binary(extracted)
+        binary_path = self._find_maia_binary(extracted)
+        if not binary_path:
+            binary_path = self._find_maia_model(extracted)
+            
         if binary_path:
             self._set_binary_permissions(binary_path)
         else:
@@ -579,23 +246,8 @@ class BinaryExtractor:
         
         return binary_path
     
-    def _is_tar_archive(self):
-        return self.archive_path.endswith((".tar", ".tar.gz", ".tgz"))
-    
     def _is_zip_archive(self):
         return self.archive_path.endswith(".zip")
-    
-    def _extract_tar(self):
-        extracted = []
-        with tarfile.open(self.archive_path, "r:*") as t:
-            for member in t.getmembers():
-                if self._is_safe_path(member.name):
-                    t.extract(member, self.tmpdir)
-                    
-            for root, _, files in os.walk(self.tmpdir):
-                for f in files:
-                    extracted.append(os.path.join(root, f))
-        return extracted
     
     def _extract_zip(self):
         extracted = []
@@ -620,16 +272,34 @@ class BinaryExtractor:
             return False
         return True
     
-    def _find_stockfish_binary(self, extracted):
+    def _find_maia_binary(self, extracted):
+        """Find Maia binary executable in extracted files"""
         for f in extracted:
             name = os.path.basename(f).lower()
-            if "stockfish" in name:
+            if ("maia" in name or "lc0" in name) and (name.endswith(".exe") or not "." in name):
+                if os.path.isfile(f):
+                    return f
+        
+        # Fallback: any executable that mentions maia
+        for f in extracted:
+            name = os.path.basename(f).lower()
+            if "maia" in name and os.path.isfile(f):
                 return f
+        return None
+    
+    def _find_maia_model(self, extracted):
+        """Find Maia model file (.pb.gz) in extracted files"""
+        for f in extracted:
+            name = os.path.basename(f).lower()
+            if name.endswith(".pb.gz"):
+                if os.path.isfile(f):
+                    logger.info(f"Found Maia model file: {name}")
+                    return f
         return None
     
     def _set_binary_permissions(self, binary_path):
         try:
-            os.chmod(binary_path, 0o744)
+            os.chmod(binary_path, 0o755)
         except OSError as e:
             logger.warning(f"Could not set permissions on {binary_path}: {e}")
     
@@ -646,11 +316,11 @@ class DownloadWorkflow:
     def __init__(self, signals):
         self.signals = signals
         self.os_name = detect_os()
-        self.arch, self.vendor, self.flags = detect_cpu_info()
+        self.gpu_capabilities = detect_gpu_capabilities()
         
     def execute(self):
         try:
-            logger.info(f"Detected OS={self.os_name}, arch={self.arch}, vendor={self.vendor}")
+            logger.info(f"Detected OS={self.os_name}, GPU capabilities={self.gpu_capabilities}")
             
             if self._is_already_installed():
                 return
@@ -682,7 +352,7 @@ class DownloadWorkflow:
     def _is_already_installed(self):
         target_path = self._get_target_path()
         if target_path.exists():
-            logger.info(f"Stockfish already installed at {target_path} — exiting")
+            logger.info(f"Maia already installed at {target_path} — exiting")
             self.signals.label_update.emit("Already installed")
             self.signals.sub_label_update.emit(str(target_path))
             self.signals.progress_update.emit(100)
@@ -693,21 +363,22 @@ class DownloadWorkflow:
     def _get_target_path(self):
         if self.os_name == "windows":
             if getattr(sys, 'frozen', False):
-                return Path(sys.executable).parent / "stockfish.exe"
+                return Path(sys.executable).parent / "maia.exe"
             else:
-                return Path.cwd() / "stockfish.exe"
+                return Path.cwd() / "maia.exe"
         else:
             if getattr(sys, 'frozen', False):
-                return Path(sys.executable).parent / "stockfish"
+                return Path(sys.executable).parent / "maia"
             else:
-                return Path.cwd() / "stockfish"
+                return Path.cwd() / "maia"
     
     def _fetch_release_data(self):
-        self.signals.label_update.emit("Fetching latest release metadata...")
-        logger.info("Fetching latest Stockfish release metadata from GitHub")
+        self.signals.label_update.emit("Fetching latest Maia release...")
+        logger.info("Fetching latest Maia release metadata from GitHub")
         
         try:
-            r = requests.get("https://api.github.com/repos/official-stockfish/Stockfish/releases/latest", timeout=30)
+            # Maia engines are distributed via LeelaChessZero/lc0 releases
+            r = requests.get("https://api.github.com/repos/CSSLab/maia-chess/releases/latest", timeout=30)
             r.raise_for_status()
             rel = r.json()
             
@@ -731,17 +402,17 @@ class DownloadWorkflow:
             return None
     
     def _select_asset(self, release_data):
-        best_asset = choose_best_asset(release_data["assets"], self.os_name, 
-                                       self.arch, self.vendor, self.flags)
+        best_asset = choose_best_maia_asset(release_data["assets"], self.os_name, self.gpu_capabilities)
         if not best_asset:
-            logger.error("No matching build found for this OS/arch")
+            logger.error("No matching Maia build found for this OS/GPU")
             self.signals.label_update.emit("No matching build found")
             self.signals.sub_label_update.emit("See logs for details")
             self.signals.show_retry.emit()
             return None
             
         logger.info(f"Selected asset: {best_asset['name']} (release {release_data['tag_name']})")
-        self.signals.sub_label_update.emit(f"CPU: {self.vendor.upper()} | Selected: {best_asset['name']}")
+        gpu_info = "GPU" if self.gpu_capabilities else "CPU"
+        self.signals.sub_label_update.emit(f"Mode: {gpu_info} | Selected: {best_asset['name']}")
         return best_asset
     
     def _download_asset(self, best_asset, tag_name):
@@ -798,10 +469,10 @@ class DownloadWorkflow:
     
     def _extract_binary(self, archive_path):
         self.signals.label_update.emit("Extracting binary...")
-        logger.info("Extracting binary from archive")
+        logger.info("Extracting Maia binary from archive")
         bin_path = extract_binary(archive_path)
         if not bin_path:
-            logger.error("Could not find Stockfish binary inside the archive")
+            logger.error("Could not find Maia binary inside the archive")
             self.signals.label_update.emit("Binary not found in archive")
             self.signals.sub_label_update.emit("See logs")
             self.signals.show_retry.emit()
@@ -814,43 +485,55 @@ class DownloadWorkflow:
         self.signals.label_update.emit("Installing...")
         target_path = self._get_target_path()
         
-        if self.os_name == "windows":
-            self._install_windows(bin_path, target_path)
-        else:
-            self._install_unix(bin_path, target_path)
-    
-    def _install_windows(self, bin_path, target_path):
         try:
-            shutil.copy2(bin_path, target_path)
-            logger.info("Installed Stockfish to %s", target_path)
-            self.signals.label_update.emit(f"Installed to {target_path.name}")
+            extraction_dir = os.path.dirname(bin_path)
+            target_dir = target_path.parent
+            
+            bin_name = os.path.basename(bin_path)
+            
+            if bin_name.endswith(".pb.gz"):
+                # Maia model file - install as-is with .pb.gz extension
+                model_target = target_dir / bin_name
+                shutil.copy2(bin_path, model_target)
+                logger.info(f"Installed Maia model to {model_target}")
+                self.signals.label_update.emit(f"Installed {bin_name}")
+                self.signals.sub_label_update.emit(str(model_target))
+            else:
+                # Binary executable - copy and handle DLLs
+                shutil.copy2(bin_path, target_path)
+                
+                # Copy any DLL files if on Windows
+                if self.os_name == "windows":
+                    for file_path in Path(extraction_dir).glob("**/*.dll"):
+                        dll_target = target_dir / file_path.name
+                        if not dll_target.exists():
+                            try:
+                                shutil.copy2(file_path, dll_target)
+                                logger.info(f"Copied DLL: {file_path.name}")
+                            except Exception as e:
+                                logger.warning(f"Failed to copy DLL {file_path}: {e}")
+                
+                if self.os_name != "windows":
+                    os.chmod(target_path, 0o755)
+                    
+                logger.info("Installed binary to %s", target_path)
+                self.signals.label_update.emit(f"Installed to {target_path.name}")
+                self.signals.sub_label_update.emit(str(target_path))
+            
             self.signals.progress_update.emit(100)
             self.signals.close_window.emit(700)
+            
         except (OSError, IOError) as e:
-            logger.error(f"Failed to copy binary on Windows: {e}")
-            self.signals.label_update.emit("Install failed")
-            self.signals.sub_label_update.emit(str(e))
-            self.signals.show_retry.emit()
-    
-    def _install_unix(self, bin_path, target_path):
-        try:
-            shutil.copy2(bin_path, target_path)
-            os.chmod(target_path, 0o700)
-            logger.info("Installed Stockfish to %s", target_path)
-            self.signals.label_update.emit(f"Installed to {target_path.name}")
-            self.signals.progress_update.emit(100)
-            self.signals.close_window.emit(700)
-        except (OSError, IOError) as e:
-            logger.error(f"Failed to copy binary on Unix-like OS: {e}")
+            logger.error(f"Failed to install: {e}")
             self.signals.label_update.emit("Install failed")
             self.signals.sub_label_update.emit(str(e))
             self.signals.show_retry.emit()
 
 # ------------------------ Downloader UI ------------------------
-class StockfishDownloaderApp(QWidget):
+class MaiaDownloaderApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Stockfish Downloader")
+        self.setWindowTitle("Maia Chess Engine Downloader")
         self.setFixedSize(420, 180)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
         
@@ -959,14 +642,276 @@ class StockfishDownloaderApp(QWidget):
         workflow = DownloadWorkflow(self.signals)
         workflow.execute()
 
+# ------------------------ Lc0 Downloader UI ------------------------
+class Lc0DownloaderApp(QWidget):
+    """GUI for downloading and installing Lc0"""
+    def __init__(self):
+        super().__init__()
+        self.os_name = detect_os()
+        self.gpu_capabilities = detect_gpu_capabilities()
+        
+        self.signals = ProgressSignals()
+        self.signals.progress_update.connect(self._on_progress)
+        self.signals.label_update.connect(self._on_label)
+        self.signals.sub_label_update.connect(self._on_sublabel)
+        self.signals.show_retry.connect(self._on_show_retry)
+        self.signals.close_window.connect(self._on_close)
+        
+        self._init_ui()
+        self._start_download()
+    
+    def _init_ui(self):
+        """Initialize UI elements"""
+        self.setWindowTitle("Lc0 Chess Engine Installer")
+        self.setGeometry(100, 100, 500, 250)
+        self.setStyleSheet(f"background-color: {BG_COLOR}; color: {TEXT_COLOR};")
+        
+        layout = QVBoxLayout()
+        
+        self.label = QLabel("Checking for Lc0...")
+        self.label.setStyleSheet(f"color: {TEXT_COLOR}; font-size: 14px;")
+        layout.addWidget(self.label)
+        
+        self.sub_label = QLabel("")
+        self.sub_label.setStyleSheet(f"color: #AAA; font-size: 12px;")
+        layout.addWidget(self.sub_label)
+        
+        self.progress = QProgressBar()
+        self.progress.setStyleSheet(f"QProgressBar {{ background-color: {FRAME_COLOR}; }} QProgressBar::chunk {{ background-color: {ACCENT_COLOR}; }}")
+        layout.addWidget(self.progress)
+        
+        self.retry_btn = QPushButton("Retry")
+        self.retry_btn.setStyleSheet(f"background-color: {ACCENT_COLOR}; color: {TEXT_COLOR};")
+        self.retry_btn.clicked.connect(self._start_download)
+        self.retry_btn.hide()
+        layout.addWidget(self.retry_btn)
+        
+        self.setLayout(layout)
+    
+    def _on_progress(self, val):
+        self.progress.setValue(val)
+    
+    def _on_label(self, text):
+        self.label.setText(text)
+    
+    def _on_sublabel(self, text):
+        self.sub_label.setText(text)
+    
+    def _on_show_retry(self):
+        self.retry_btn.show()
+    
+    def _on_close(self, delay):
+        QTimer.singleShot(delay, self.close)
+    
+    def _start_download(self):
+        """Start download in background thread"""
+        self.retry_btn.hide()
+        thread = threading.Thread(target=self._download_lc0, daemon=True)
+        thread.start()
+    
+    def _download_lc0(self):
+        """Download and install Lc0"""
+        try:
+            release_data = self._fetch_release_data()
+            if not release_data:
+                return
+            
+            best_asset = self._select_asset(release_data)
+            if not best_asset:
+                return
+            
+            archive_path = self._download_asset(best_asset, release_data["tag_name"])
+            if not archive_path:
+                return
+            
+            target_path = self._get_target_path()
+            if self._is_already_installed(target_path):
+                return
+            
+            self.signals.label_update.emit(f"Extracting {best_asset['name']}...")
+            self.signals.progress_update.emit(85)
+            
+            extracted = self._extract_archive(archive_path)
+            if not extracted:
+                self.signals.label_update.emit("Extraction failed")
+                self.signals.sub_label_update.emit("Could not extract archive")
+                self.signals.show_retry.emit()
+                return
+            
+            binary = self._find_lc0_binary(extracted)
+            if not binary:
+                self.signals.label_update.emit("Binary not found")
+                self.signals.sub_label_update.emit("Could not locate lc0 executable")
+                self.signals.show_retry.emit()
+                return
+            
+            self._set_binary_permissions(binary)
+            shutil.move(binary, str(target_path))
+            
+            self.signals.label_update.emit("✓ Lc0 installed successfully")
+            self.signals.sub_label_update.emit(str(target_path))
+            self.signals.progress_update.emit(100)
+            self.signals.close_window.emit(800)
+            
+        except Exception as e:
+            logger.error(f"Lc0 download error: {e}")
+            self.signals.label_update.emit("Error during installation")
+            self.signals.sub_label_update.emit(str(e))
+            self.signals.show_retry.emit()
+    
+    def _get_target_path(self):
+        if self.os_name == "windows":
+            if getattr(sys, 'frozen', False):
+                return Path(sys.executable).parent / "lc0.exe"
+            else:
+                return Path.cwd() / "lc0.exe"
+        else:
+            if getattr(sys, 'frozen', False):
+                return Path(sys.executable).parent / "lc0"
+            else:
+                return Path.cwd() / "lc0"
+    
+    def _fetch_release_data(self):
+        self.signals.label_update.emit("Fetching latest Lc0 release...")
+        try:
+            r = requests.get("https://api.github.com/repos/LeelaChessZero/lc0/releases/latest", timeout=30)
+            r.raise_for_status()
+            rel = r.json()
+            
+            tag = rel.get("tag_name", "unknown")
+            assets = [{"name": a["name"], "url": a["browser_download_url"], "size": a.get("size", 0)} 
+                     for a in rel.get("assets", [])]
+            
+            return {"tag_name": tag, "assets": assets}
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch Lc0 release: {e}")
+            self.signals.label_update.emit("Network error")
+            self.signals.sub_label_update.emit("Could not fetch release info")
+            self.signals.show_retry.emit()
+            return None
+    
+    def _select_asset(self, release_data):
+        """Select best Lc0 build for this OS"""
+        assets = release_data["assets"]
+        filtered = []
+        
+        for asset in assets:
+            name = asset["name"].lower()
+            if self.os_name == "windows" and ("windows" in name or "win" in name):
+                filtered.append(asset)
+            elif self.os_name == "linux" and ("linux" in name or "ubuntu" in name):
+                filtered.append(asset)
+            elif self.os_name == "mac" and ("mac" in name or "macos" in name):
+                filtered.append(asset)
+        
+        if not filtered:
+            logger.error(f"No Lc0 build found for {self.os_name}")
+            if self.os_name == "linux":
+                self.signals.label_update.emit("Lc0 requires building from source on Linux")
+                self.signals.sub_label_update.emit("Please download and build from: https://github.com/LeelaChessZero/lc0/releases")
+            else:
+                self.signals.label_update.emit("No matching build found")
+            self.signals.show_retry.emit()
+            return None
+        
+        best_asset = max(filtered, key=lambda a: a.get("size", 0))
+        logger.info(f"Selected Lc0: {best_asset['name']}")
+        self.signals.sub_label_update.emit(f"Selected: {best_asset['name']}")
+        return best_asset
+    
+    def _download_asset(self, asset, tag_name):
+        self.signals.label_update.emit(f"Downloading {asset['name']}...")
+        asset_name = asset["name"]
+        archive_path = os.path.join(tempfile.gettempdir(), asset_name)
+        
+        if os.path.exists(archive_path):
+            local_size = os.path.getsize(archive_path)
+            if local_size == int(asset.get("size", 0)):
+                logger.info("Using cached download")
+                self.signals.sub_label_update.emit("Using cached download")
+                return archive_path
+        
+        try:
+            download_file(asset["url"], archive_path, progress_callback=self._create_progress_callback())
+            return archive_path
+        except Exception as e:
+            logger.error(f"Download failed: {e}")
+            self.signals.label_update.emit("Download failed")
+            self.signals.sub_label_update.emit(str(e))
+            self.signals.show_retry.emit()
+            return None
+    
+    def _create_progress_callback(self):
+        def progress_cb(d, t, speed_bytes_per_s):
+            pct = (d * 100 / t) if t else min(99, d / (1024 * 1024))
+            self.signals.progress_update.emit(int(pct))
+            speed_mb_s = speed_bytes_per_s / (1024 * 1024)
+            if t:
+                self.signals.sub_label_update.emit(f"{format_bytes(d)} / {format_bytes(t)} — {speed_mb_s:.2f} MB/s")
+        return progress_cb
+    
+    def _is_already_installed(self, target_path):
+        if target_path.exists():
+            logger.info(f"Lc0 already installed at {target_path}")
+            self.signals.label_update.emit("Already installed")
+            self.signals.sub_label_update.emit(str(target_path))
+            self.signals.progress_update.emit(100)
+            self.signals.close_window.emit(800)
+            return True
+        return False
+    
+    def _extract_archive(self, archive_path):
+        """Extract archive and return list of extracted files"""
+        try:
+            extract_dir = os.path.join(tempfile.gettempdir(), "lc0_extract")
+            os.makedirs(extract_dir, exist_ok=True)
+            
+            if archive_path.endswith(".zip"):
+                with zipfile.ZipFile(archive_path, "r") as zf:
+                    zf.extractall(extract_dir)
+            else:
+                # Handle tar.gz if needed
+                import tarfile
+                with tarfile.open(archive_path, "r:gz") as tf:
+                    tf.extractall(extract_dir)
+            
+            extracted = []
+            for root, dirs, files in os.walk(extract_dir):
+                for file in files:
+                    extracted.append(os.path.join(root, file))
+            
+            return extracted
+        except Exception as e:
+            logger.error(f"Extraction error: {e}")
+            return None
+    
+    def _find_lc0_binary(self, extracted):
+        """Find Lc0 binary in extracted files"""
+        for f in extracted:
+            name = os.path.basename(f).lower()
+            if "lc0" in name and (name.endswith(".exe") or not "." in name):
+                if os.path.isfile(f):
+                    return f
+        return None
+    
+    def _set_binary_permissions(self, binary_path):
+        """Set executable permissions on Unix systems"""
+        if self.os_name != "windows":
+            try:
+                st = Path(binary_path).stat().st_mode
+                Path(binary_path).chmod(st | 0o111)
+            except Exception as e:
+                logger.warning(f"Failed to set permissions: {e}")
+
 # ------------------------ Main ------------------------
-def download_stockfish(target_path=None):
+def download_maia(target_path=None):
     """
-    Main entry point for downloading Stockfish.
+    Main entry point for downloading Maia Chess Engine.
     Creates a QApplication and shows the downloader UI (unless SILENT_MODE is True).
     
     Args:
-        target_path: Optional path where to install Stockfish (currently unused, 
+        target_path: Optional path where to install Maia (currently unused, 
                     the downloader determines the path automatically)
     
     Returns:
@@ -979,29 +924,69 @@ def download_stockfish(target_path=None):
     else:
         app_created = False
     
-    downloader = StockfishDownloaderApp()
+    downloader = MaiaDownloaderApp()
     if not SILENT_MODE:
         downloader.show()
     app.exec()
     
-    # Check if stockfish was successfully installed
+    # Check if maia was successfully installed
     if target_path:
         return Path(target_path).exists()
     
     # Check default locations
     if detect_os() == "windows":
         if getattr(sys, 'frozen', False):
-            default_path = Path(sys.executable).parent / "stockfish.exe"
+            default_path = Path(sys.executable).parent / "maia.exe"
         else:
-            default_path = Path.cwd() / "stockfish.exe"
+            default_path = Path.cwd() / "maia.exe"
     else:
         if getattr(sys, 'frozen', False):
-            default_path = Path(sys.executable).parent / "stockfish"
+            default_path = Path(sys.executable).parent / "maia"
         else:
-            default_path = Path.cwd() / "stockfish"
+            default_path = Path.cwd() / "maia"
+    
+    return default_path.exists()
+
+def download_lc0(target_path=None):
+    """
+    Main entry point for downloading Lc0 Chess Engine.
+    
+    Args:
+        target_path: Optional path where to install Lc0
+    
+    Returns:
+        True if download/install succeeded, False otherwise
+    """
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication(sys.argv)
+        app_created = True
+    else:
+        app_created = False
+    
+    downloader = Lc0DownloaderApp()
+    if not SILENT_MODE:
+        downloader.show()
+    app.exec()
+    
+    # Check if lc0 was successfully installed
+    if target_path:
+        return Path(target_path).exists()
+    
+    # Check default locations
+    if detect_os() == "windows":
+        if getattr(sys, 'frozen', False):
+            default_path = Path(sys.executable).parent / "lc0.exe"
+        else:
+            default_path = Path.cwd() / "lc0.exe"
+    else:
+        if getattr(sys, 'frozen', False):
+            default_path = Path(sys.executable).parent / "lc0"
+        else:
+            default_path = Path.cwd() / "lc0"
     
     return default_path.exists()
 
 if __name__ == "__main__":
-    success = download_stockfish()
+    success = download_maia()
     sys.exit(0 if success else 1)

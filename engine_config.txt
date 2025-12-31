@@ -4,8 +4,11 @@
 # You can edit these values to change engine behavior.
 # Be sure to restart the app after editing this file.
 
-# Memory used in MB (64–1024+ recommended depending on your system)
-setoption name Hash value 1024
+# Engine selection: lc0 or maia
+engine = lc0
 
-# CPU threads to use (1–8 usually; match your CPU core count)
-setoption name Threads value 4
+# For Lc0: Network file to use (if applicable)
+# setoption name Network value <network_file>
+
+# For both engines: Number of playouts per move
+# setoption name Visits value 1000

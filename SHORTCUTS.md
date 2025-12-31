@@ -5,7 +5,7 @@ Use the following key combinations to control ChessPilot. Shortcuts are **mode�
 | Mode          | Shortcut      | Description                                  |
 | ------------- | ------------- | -------------------------------------------- |
 | **Selection** | **W** / **B** | Choose White or Black                        |
-|               | **←** / **→** | Decrease / increase Stockfish analysis depth |
+|               | **←** / **→** | Decrease / increase Engine analysis depth |
 |               | **↓** / **↑** | Decrease / increase screenshot delay         |
 |               | **Esc**       | (Re)open the color‑selection screen          |
 | **Play**      | **P**         | Execute the next move                        |
@@ -21,4 +21,4 @@ Use the following key combinations to control ChessPilot. Shortcuts are **mode�
 
 > 💡 _Shortcuts operate in two modes:_  
 > - **Before** selecting a color: **W**, **B**, **Esc**, **←**, **→**, **↓**, **↑**  
-> - **After** selecting a color: **P**, **A**, **K**, **Q**, **Esc**  
+> - **After** selecting a color: **P**, **A**, **K**, **Q**, **Esc**

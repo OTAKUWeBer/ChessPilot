@@ -75,7 +75,7 @@ def create_widgets(app):
     depth_layout = QVBoxLayout(depth_panel)
     depth_layout.setContentsMargins(0, 0, 0, 0)
 
-    depth_title = QLabel("Stockfish Depth:")
+    depth_title = QLabel("Engine Depth:")
     depth_title.setStyleSheet(f"""
         color: {app.text_color};
         font-family: 'Segoe UI';
@@ -360,7 +360,7 @@ def create_widgets(app):
     depth_layout_main = QVBoxLayout(depth_panel_main)
     depth_layout_main.setContentsMargins(0, 0, 0, 0)
 
-    depth_title_main = QLabel("Stockfish Depth:")
+    depth_title_main = QLabel("Engine Depth:")
     depth_title_main.setStyleSheet(f"""
         color: {app.text_color};
         font-family: 'Segoe UI';
