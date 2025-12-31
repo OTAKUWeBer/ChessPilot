@@ -6,8 +6,16 @@ import shutil
 import tempfile
 import threading
 import requests
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar, QPushButton
-from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal
+from PyQt6.QtWidgets import (
+    QApplication,
+    QWidget,
+    QVBoxLayout,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+)
+from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal, QUrl
 from pathlib import Path
 import logging
 import sys
@@ -663,7 +671,7 @@ class Lc0DownloaderApp(QWidget):
     def _init_ui(self):
         """Initialize UI elements"""
         self.setWindowTitle("Lc0 Chess Engine Installer")
-        self.setGeometry(100, 100, 500, 250)
+        self.setGeometry(100, 100, 500, 300)
         self.setStyleSheet(f"background-color: {BG_COLOR}; color: {TEXT_COLOR};")
         
         layout = QVBoxLayout()
@@ -674,11 +682,18 @@ class Lc0DownloaderApp(QWidget):
         
         self.sub_label = QLabel("")
         self.sub_label.setStyleSheet(f"color: #AAA; font-size: 12px;")
+        self.sub_label.setWordWrap(True)
         layout.addWidget(self.sub_label)
         
         self.progress = QProgressBar()
         self.progress.setStyleSheet(f"QProgressBar {{ background-color: {FRAME_COLOR}; }} QProgressBar::chunk {{ background-color: {ACCENT_COLOR}; }}")
         layout.addWidget(self.progress)
+        
+        self.link_btn = QPushButton("Open Build Instructions")
+        self.link_btn.setStyleSheet(f"background-color: {ACCENT_COLOR}; color: {TEXT_COLOR};")
+        self.link_btn.clicked.connect(lambda: QDesktopServices.openUrl(QUrl("https://github.com/LeelaChessZero/lc0/releases")))
+        self.link_btn.hide()
+        layout.addWidget(self.link_btn)
         
         self.retry_btn = QPushButton("Retry")
         self.retry_btn.setStyleSheet(f"background-color: {ACCENT_COLOR}; color: {TEXT_COLOR};")
@@ -706,6 +721,7 @@ class Lc0DownloaderApp(QWidget):
     def _start_download(self):
         """Start download in background thread"""
         self.retry_btn.hide()
+        self.link_btn.hide()
         thread = threading.Thread(target=self._download_lc0, daemon=True)
         thread.start()
     
@@ -796,26 +812,60 @@ class Lc0DownloaderApp(QWidget):
         assets = release_data["assets"]
         filtered = []
         
-        for asset in assets:
-            name = asset["name"].lower()
-            if self.os_name == "windows" and ("windows" in name or "win" in name):
-                filtered.append(asset)
-            elif self.os_name == "linux" and ("linux" in name or "ubuntu" in name):
-                filtered.append(asset)
-            elif self.os_name == "mac" and ("mac" in name or "macos" in name):
-                filtered.append(asset)
-        
-        if not filtered:
-            logger.error(f"No Lc0 build found for {self.os_name}")
-            if self.os_name == "linux":
-                self.signals.label_update.emit("Lc0 requires building from source on Linux")
-                self.signals.sub_label_update.emit("Please download and build from: https://github.com/LeelaChessZero/lc0/releases")
-            else:
-                self.signals.label_update.emit("No matching build found")
+        if self.os_name == "windows":
+            # Filter Windows binaries - prefer CPU builds for compatibility
+            for asset in assets:
+                name = asset["name"].lower()
+                if "windows" in name and ".zip" in name:
+                    filtered.append(asset)
+            
+            if not filtered:
+                logger.error("No Windows build found for Lc0")
+                self.signals.label_update.emit("No Windows build available")
+                self.signals.sub_label_update.emit("Could not find compatible Lc0 build")
+                self.signals.show_retry.emit()
+                return None
+            
+            # Sort by size and prefer dnnl/openblas (smaller, universal)
+            def sort_key(asset):
+                name = asset["name"].lower()
+                if "dnnl" in name or "openblas" in name:
+                    return (0, asset.get("size", 0))
+                return (1, asset.get("size", 0))
+            
+            best_asset = min(filtered, key=sort_key)
+            
+        elif self.os_name == "linux":
+            # Linux: No pre-built binaries, show build instructions
+            self.signals.label_update.emit("Lc0 requires building from source on Linux")
+            self.signals.sub_label_update.emit(
+                "Lc0 does not provide pre-built Linux binaries.\n\n"
+                "To build Lc0 from source, visit the releases page and follow the build instructions.\n\n"
+                "Alternatively, you can use Maia chess engine which will be downloaded automatically."
+            )
+            self.link_btn.show()
+            return None
+            
+        elif self.os_name == "mac":
+            for asset in assets:
+                name = asset["name"].lower()
+                if "mac" in name or "macos" in name:
+                    filtered.append(asset)
+            
+            if not filtered:
+                logger.error("No macOS build found for Lc0")
+                self.signals.label_update.emit("No macOS build available")
+                self.signals.sub_label_update.emit("Could not find compatible Lc0 build")
+                self.signals.show_retry.emit()
+                return None
+            
+            best_asset = max(filtered, key=lambda a: a.get("size", 0))
+        else:
+            logger.error(f"Unknown OS: {self.os_name}")
+            self.signals.label_update.emit("Unsupported platform")
             self.signals.show_retry.emit()
             return None
         
-        best_asset = max(filtered, key=lambda a: a.get("size", 0))
         logger.info(f"Selected Lc0: {best_asset['name']}")
         self.signals.sub_label_update.emit(f"Selected: {best_asset['name']}")
         return best_asset
