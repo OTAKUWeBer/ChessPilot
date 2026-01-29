@@ -248,9 +248,6 @@ def _verify_move_execution(color_indicator, original_fen, move):
     return VerificationResult(verified=False)
 
 
-from .board_utils import capture_and_extract_fen
-
-
 def _handle_successful_move(move, mate_flag, current_fen, update_status, auto_mode_var, root):
     """Handle a successfully verified move."""
     status = f"Best Move: {move}\nMove Played: {move}"
