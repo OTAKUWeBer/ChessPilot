@@ -3,6 +3,7 @@ from PyQt6.QtCore import QTimer
 import time
 from board_detection import get_positions, get_fen_from_position
 from executor.capture_screenshot_in_memory import capture_screenshot_in_memory
+from executor.board_utils import capture_and_extract_fen
 from executor.get_best_move import get_best_move
 from executor.is_castling_possible import is_castling_possible
 from executor.update_fen_castling_rights import update_fen_castling_rights
@@ -431,7 +432,7 @@ def _verify_castling_execution(color_indicator, original_fen, king_move):
     for verify_attempt in range(max_verify_attempts):
         time.sleep(0.2)  # Delay before verification
         
-        current_fen = _capture_and_extract_fen(color_indicator, verify_attempt)
+        current_fen = capture_and_extract_fen(color_indicator, verify_attempt)
         if not current_fen:
             continue
         
@@ -445,36 +446,7 @@ def _verify_castling_execution(color_indicator, original_fen, king_move):
     return {'verified': False, 'current_fen': None}
 
 
-def _capture_and_extract_fen(color_indicator, verify_attempt):
-    """
-    Capture screenshot and extract FEN from current board state.
-    Used by both normal moves and castling moves.
-    """
-    img = capture_screenshot_in_memory()
-    if not img:
-        logger.warning(f"Screenshot failed on verification attempt {verify_attempt + 1}")
-        return None
-    
-    boxes = get_positions(img)
-    if not boxes:
-        logger.warning(f"Board detection failed on verification attempt {verify_attempt + 1}")
-        return None
-    
-    if not any(box[5] == 12.0 for box in boxes):
-        logger.warning(f"No chessboard detected on verification attempt {verify_attempt + 1}")
-        return None
-    
-    try:
-        result = get_fen_from_position(color_indicator, boxes)
-        if result is None:
-            logger.warning(f"FEN extraction returned None on verification attempt {verify_attempt + 1}")
-            return None
-        
-        _, _, _, current_fen = result
-        return current_fen
-    except (ValueError, TypeError) as e:
-        logger.warning(f"FEN extraction error on verification attempt {verify_attempt + 1}: {e}")
-        return None
+
 
 
 def _handle_successful_castling(move, mate_flag, current_fen, update_status, auto_mode_var, root, last_fen_by_color, color_indicator):

@@ -116,9 +116,22 @@ PyQt6 is required for the UI.
 Install system dependencies:
 
 ```bash
-sudo apt install python3-pyqt6        # Ubuntu / Debian
-sudo pacman -S python-pyqt6           # Arch Linux
-sudo dnf install python3-qt6          # Fedora
+# Ubuntu / Debian
+sudo apt install python3-pyqt6        
+
+# Arch Linux
+sudo pacman -S python-pyqt6
+
+# Fedora
+sudo dnf install python3-qt6
+```
+
+**Wayland Users (Arch Linux only)**
+
+If you are running Wayland instead of X11, install the following:
+
+```bash
+sudo pacman -S wayland-utils
 ```
 
 Install Python dependencies:

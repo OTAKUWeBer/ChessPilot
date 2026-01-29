@@ -1,4 +1,5 @@
 import logging
+from .board_utils import expand_row, fen_to_list, algebraic_to_index
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -11,29 +12,8 @@ def did_my_piece_move(color_indicator, before_fen: str, after_fen: str, move: st
     """
     logger.debug(f"Checking move: {move} for color: {color_indicator}")
     
-    def expand_row(row):
-        out = []
-        for ch in row:
-            if ch.isdigit():
-                out += [' '] * int(ch)
-            else:
-                out.append(ch)
-        return out
-
-    def fen_to_list(fen):
-        rows = fen.split()[0].split('/')
-        flat = []
-        for r in rows:
-            flat += expand_row(r)
-        return flat  # len=64
-
     before_list = fen_to_list(before_fen)
     after_list = fen_to_list(after_fen)
-
-    def algebraic_to_index(sq):
-        file = ord(sq[0]) - ord('a')         # 0..7
-        rank = 8 - int(sq[1])               # '1'→7 down to '8'→0
-        return rank * 8 + file
 
     start_i = algebraic_to_index(move[0:2])
     end_i = algebraic_to_index(move[2:4])

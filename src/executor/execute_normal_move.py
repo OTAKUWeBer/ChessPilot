@@ -6,6 +6,7 @@ from executor.get_current_fen import get_current_fen
 from executor.chess_notation_to_index import chess_notation_to_index
 from executor.move_piece import move_piece
 from executor.did_my_piece_move import did_my_piece_move
+from executor.board_utils import capture_and_extract_fen
 from core.config import AppConfig
 from executor.pawn_promotion import handle_pawn_promotion, is_pawn_promotion_move
 
@@ -233,7 +234,7 @@ def _verify_move_execution(color_indicator, original_fen, move):
     for verify_attempt in range(max_verify_attempts):
         time.sleep(extra_delay)  # Extra delay for promotion moves
         
-        current_fen = _capture_and_extract_fen(color_indicator, verify_attempt)
+        current_fen = capture_and_extract_fen(color_indicator, verify_attempt)
         if not current_fen:
             continue
         
@@ -247,33 +248,7 @@ def _verify_move_execution(color_indicator, original_fen, move):
     return VerificationResult(verified=False)
 
 
-def _capture_and_extract_fen(color_indicator, verify_attempt):
-    """Capture screenshot and extract FEN from current board state."""
-    img = capture_screenshot_in_memory()
-    if not img:
-        logger.warning(f"Screenshot failed on verification attempt {verify_attempt + 1}")
-        return None
-    
-    boxes = get_positions(img)
-    if not boxes:
-        logger.warning(f"Board detection failed on verification attempt {verify_attempt + 1}")
-        return None
-    
-    if not any(box[5] == 12.0 for box in boxes):
-        logger.warning(f"No chessboard detected on verification attempt {verify_attempt + 1}")
-        return None
-    
-    try:
-        result = get_fen_from_position(color_indicator, boxes)
-        if result is None:
-            logger.warning(f"FEN extraction returned None on verification attempt {verify_attempt + 1}")
-            return None
-        
-        _, _, _, current_fen = result
-        return current_fen
-    except (ValueError, TypeError) as e:
-        logger.warning(f"FEN extraction error on verification attempt {verify_attempt + 1}: {e}")
-        return None
+from .board_utils import capture_and_extract_fen
 
 
 def _handle_successful_move(move, mate_flag, current_fen, update_status, auto_mode_var, root):
