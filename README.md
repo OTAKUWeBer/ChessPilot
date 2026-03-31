@@ -33,6 +33,13 @@
 
 ## 🎉 Highlights (What's New)
 
+### **v2.2.0 — The Architecture & Aesthetics Update**
+
+* **Massive Structural Refactor** — The monolithic executor module has been split into clean `core`, `game`, and `utils` domains, improving performance and maintainability.
+* **Bulletproof Engine Stability** — Prevented Stockfish from hanging infinitely (the "stuck analyzing" bug) by adding precise timeouts, and added safe `Ctrl+C` interrupt handlers to end the process cleanly without core dumping.
+* **Gorgeous UI Modernization** — Replaced mismatched styles with a cohesive "Emerald and Slate" dark theme managed through a centralized Styles class.
+* **Linux Patches** — Fixed Wayland cursor tracking and pawn promotion screenshot captures.
+
 ### **v2.1.0 — Stability, Precision & Performance**
 
 * Full pawn promotion support — handled automatically and reliably.
