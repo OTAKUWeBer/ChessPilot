@@ -128,8 +128,8 @@ def _cleanup_stockfish():
             logger.error(f"Error terminating Stockfish process: {e}")
             try:
                 _stockfish_process.terminate()
-            except Exception:
-                pass
+            except Exception as term_e:
+                logger.debug(f"Ignored error during terminate(): {term_e}")
         finally:
             # Explicitly close pipes to prevent "Exception ignored" during GC
             for pipe in ('stdin', 'stdout', 'stderr'):
@@ -137,8 +137,8 @@ def _cleanup_stockfish():
                 if p:
                     try:
                         p.close()
-                    except Exception:
-                        pass
+                    except Exception as close_e:
+                        logger.debug(f"Ignored error closing {pipe}: {close_e}")
             _stockfish_process = None
             logger.info("Stockfish process cleaned up")
 
