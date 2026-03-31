@@ -1,7 +1,6 @@
 import logging
-
-from executor.capture_screenshot_in_memory import capture_screenshot_in_memory
 from board_detection import get_positions, get_fen_from_position
+from utils.system_interaction import capture_screenshot_in_memory
 
 logger = logging.getLogger(__name__)
 
@@ -60,3 +59,14 @@ def algebraic_to_index(sq):
     file = ord(sq[0]) - ord('a')         # 0..7
     rank = 8 - int(sq[1])               # '1'→7 down to '8'→0
     return rank * 8 + file
+
+def store_board_positions(board_positions, x, y, size):
+    chessboard_x = x
+    chessboard_y = y
+    square_size = size
+    board_positions.clear()
+    for row in range(8):
+        for col in range(8):
+            pos_x = x + col * size + (size // 2)
+            pos_y = y + row * size + (size // 2)
+            board_positions[(col, row)] = (pos_x, pos_y)

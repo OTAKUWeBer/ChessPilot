@@ -1,10 +1,7 @@
 import logging
 from board_detection import get_positions, get_fen_from_position
-from executor.capture_screenshot_in_memory import capture_screenshot_in_memory
-from executor.expend_fen_row import expend_fen_row
-from executor.is_castling_possible import is_castling_possible
-from executor.update_fen_castling_rights import update_fen_castling_rights
-from executor.get_current_fen import get_current_fen
+from utils.system_interaction import capture_screenshot_in_memory
+from core.fen_utils import expand_fen_row, is_castling_possible, update_fen_castling_rights, get_current_fen
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +45,7 @@ class BoardAnalyzer:
     @staticmethod
     def expand_fen_row(row: str):
         logger.debug(f"Expanding FEN row: {row}")
-        return expend_fen_row(row)
+        return expand_fen_row(row)
 
     @staticmethod
     def check_castling_possible(fen: str, color_indicator: str):

@@ -52,9 +52,9 @@ if not setup_resources(script_dir, project_dir):
     )
     sys.exit(1)
 
-from executor import process_move, execute_normal_move
 from core import GameState, AppConfig
 from game import MoveExecutor, BoardAnalyzer, MoveValidator, AutoPlayController
+from game.move_processor import process_move
 from services import EngineService
 
 from gui.set_window_icon import set_window_icon
@@ -237,7 +237,7 @@ class ChessPilot(QMainWindow):
 
     def play_normal_move(self, move: str, mate_flag: bool, expected_fen: str):
         logger.debug(f"Playing normal move via wrapper: {move}")
-        return execute_normal_move(
+        return self.move_executor.execute_normal_move(
             self.board_positions,
             self.color_indicator,
             move,
@@ -259,7 +259,7 @@ class ChessPilot(QMainWindow):
         return self.board_analyzer.read_current_fen(self.color_indicator)
 
     def store_positions(self, x: int, y: int, size: int):
-        from executor.store_board_positions import store_board_positions
+        from core.board_utils import store_board_positions
         logger.debug(f"Storing board positions: x={x}, y={y}, size={size}")
         store_board_positions(self.board_positions, x, y, size)
 
@@ -279,18 +279,28 @@ class ChessPilot(QMainWindow):
         self.last_fen_by_color[active_color] = placement
         logger.debug(f"Updated last FEN for {active_color}: {placement}")
 
+import signal
+from PyQt6.QtCore import QTimer
+
 if __name__ == "__main__":
     logger.info("Starting ChessPilot main loop")
     app = QApplication(sys.argv)
+    
+    # Allow Python to catch Ctrl+C by letting the interpreter run every 100ms
+    timer = QTimer()
+    timer.timeout.connect(lambda: None)
+    timer.start(100)
+    
+    def sigint_handler(signum, frame):
+        logger.info("Ctrl+C detected! Shutting down gracefully...")
+        QApplication.quit()
+        
+    signal.signal(signal.SIGINT, sigint_handler)
     
     try:
         window = ChessPilot()
         window.show()
         sys.exit(app.exec())
-    except KeyboardInterrupt:
-        logger.info("Exiting APP")
-        if 'window' in locals() and hasattr(window, 'engine_service'):
-            window.engine_service.cleanup()
     except Exception as e:
         logger.exception("Fatal error in main loop")
         QMessageBox.critical(
@@ -300,4 +310,6 @@ if __name__ == "__main__":
         )
         sys.exit(1)
     finally:
+        if 'window' in locals() and hasattr(window, 'engine_service'):
+            window.engine_service.cleanup()
         logger.info("ChessPilot application closed")

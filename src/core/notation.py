@@ -1,6 +1,6 @@
+import logging
 from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtCore import QTimer
-import logging
 
 # Logger setup
 logger = logging.getLogger(__name__)
