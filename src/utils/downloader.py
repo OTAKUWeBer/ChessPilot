@@ -309,7 +309,7 @@ def format_bytes(n):
 
 # ------------------------ Asset selection ------------------------
 def choose_best_asset(assets, os_name, arch, vendor, flags):
-    """Choose the best Stockfish binary based on OS, CPU vendor, and features"""
+    """Choose the best Lc0 binary based on OS, CPU vendor, and features"""
     filtered = _filter_assets_by_os(assets, os_name)
     if not filtered:
         logger.error("No assets found for this OS")
@@ -336,11 +336,11 @@ def _filter_assets_by_os(assets, os_name):
     return filtered
 
 def _matches_os_prefix(name, os_name):
-    if os_name == "linux" and name.startswith("stockfish-ubuntu"):
+    if os_name == "linux" and name.startswith("lc0-ubuntu"):
         return True
-    if os_name == "mac" and name.startswith("stockfish-macos"):
+    if os_name == "mac" and name.startswith("lc0-macos"):
         return True
-    if os_name == "windows" and name.startswith("stockfish-windows"):
+    if os_name == "windows" and name.startswith("lc0-windows"):
         return True
     return False
 
@@ -356,7 +356,7 @@ def _matches_os_generic(name, os_name):
 def _select_best_by_cpu_features(filtered, vendor, flags):
     """Select the best binary based on CPU features
     
-    Stockfish naming conventions:
+    Lc0 naming conventions:
     - x86-64-avx512 (newest, requires AVX-512)
     - x86-64-bmi2 (modern Intel/AMD with BMI2)
     - x86-64-avx2 (requires AVX2)
@@ -571,7 +571,7 @@ class BinaryExtractor:
             self._cleanup()
             return None
 
-        binary_path = self._find_stockfish_binary(extracted)
+        binary_path = self._find_lc0_binary(extracted)
         if binary_path:
             self._set_binary_permissions(binary_path)
         else:
@@ -620,10 +620,10 @@ class BinaryExtractor:
             return False
         return True
     
-    def _find_stockfish_binary(self, extracted):
+    def _find_lc0_binary(self, extracted):
         for f in extracted:
             name = os.path.basename(f).lower()
-            if "stockfish" in name:
+            if "lc0" in name:
                 return f
         return None
     
@@ -682,7 +682,7 @@ class DownloadWorkflow:
     def _is_already_installed(self):
         target_path = self._get_target_path()
         if target_path.exists():
-            logger.info(f"Stockfish already installed at {target_path} — exiting")
+            logger.info(f"Lc0 already installed at {target_path} — exiting")
             self.signals.label_update.emit("Already installed")
             self.signals.sub_label_update.emit(str(target_path))
             self.signals.progress_update.emit(100)
@@ -693,21 +693,21 @@ class DownloadWorkflow:
     def _get_target_path(self):
         if self.os_name == "windows":
             if getattr(sys, 'frozen', False):
-                return Path(sys.executable).parent / "stockfish.exe"
+                return Path(sys.executable).parent / "lc0.exe"
             else:
-                return Path.cwd() / "stockfish.exe"
+                return Path.cwd() / "lc0.exe"
         else:
             if getattr(sys, 'frozen', False):
-                return Path(sys.executable).parent / "stockfish"
+                return Path(sys.executable).parent / "lc0"
             else:
-                return Path.cwd() / "stockfish"
+                return Path.cwd() / "lc0"
     
     def _fetch_release_data(self):
         self.signals.label_update.emit("Fetching latest release metadata...")
-        logger.info("Fetching latest Stockfish release metadata from GitHub")
+        logger.info("Fetching latest Lc0 release metadata from GitHub")
         
         try:
-            r = requests.get("https://api.github.com/repos/official-stockfish/Stockfish/releases/latest", timeout=30)
+            r = requests.get("https://api.github.com/repos/LeelaChessZero/lc0/releases/latest", timeout=30)
             r.raise_for_status()
             rel = r.json()
             
@@ -801,7 +801,7 @@ class DownloadWorkflow:
         logger.info("Extracting binary from archive")
         bin_path = extract_binary(archive_path)
         if not bin_path:
-            logger.error("Could not find Stockfish binary inside the archive")
+            logger.error("Could not find Lc0 binary inside the archive")
             self.signals.label_update.emit("Binary not found in archive")
             self.signals.sub_label_update.emit("See logs")
             self.signals.show_retry.emit()
@@ -822,7 +822,7 @@ class DownloadWorkflow:
     def _install_windows(self, bin_path, target_path):
         try:
             shutil.copy2(bin_path, target_path)
-            logger.info("Installed Stockfish to %s", target_path)
+            logger.info("Installed Lc0 to %s", target_path)
             self.signals.label_update.emit(f"Installed to {target_path.name}")
             self.signals.progress_update.emit(100)
             self.signals.close_window.emit(700)
@@ -836,7 +836,7 @@ class DownloadWorkflow:
         try:
             shutil.copy2(bin_path, target_path)
             os.chmod(target_path, 0o700)
-            logger.info("Installed Stockfish to %s", target_path)
+            logger.info("Installed Lc0 to %s", target_path)
             self.signals.label_update.emit(f"Installed to {target_path.name}")
             self.signals.progress_update.emit(100)
             self.signals.close_window.emit(700)
@@ -847,10 +847,10 @@ class DownloadWorkflow:
             self.signals.show_retry.emit()
 
 # ------------------------ Downloader UI ------------------------
-class StockfishDownloaderApp(QWidget):
+class Lc0DownloaderApp(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Stockfish Downloader")
+        self.setWindowTitle("Lc0 Downloader")
         self.setFixedSize(420, 180)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
         
@@ -960,13 +960,13 @@ class StockfishDownloaderApp(QWidget):
         workflow.execute()
 
 # ------------------------ Main ------------------------
-def download_stockfish(target_path=None):
+def download_lc0(target_path=None):
     """
-    Main entry point for downloading Stockfish.
+    Main entry point for downloading Lc0.
     Creates a QApplication and shows the downloader UI (unless SILENT_MODE is True).
     
     Args:
-        target_path: Optional path where to install Stockfish (currently unused, 
+        target_path: Optional path where to install Lc0 (currently unused, 
                     the downloader determines the path automatically)
     
     Returns:
@@ -979,29 +979,51 @@ def download_stockfish(target_path=None):
     else:
         app_created = False
     
-    downloader = StockfishDownloaderApp()
+    downloader = Lc0DownloaderApp()
     if not SILENT_MODE:
         downloader.show()
     app.exec()
     
-    # Check if stockfish was successfully installed
+    # Check if lc0 was successfully installed
     if target_path:
         return Path(target_path).exists()
     
     # Check default locations
     if detect_os() == "windows":
         if getattr(sys, 'frozen', False):
-            default_path = Path(sys.executable).parent / "stockfish.exe"
+            default_path = Path(sys.executable).parent / "lc0.exe"
         else:
-            default_path = Path.cwd() / "stockfish.exe"
+            default_path = Path.cwd() / "lc0.exe"
     else:
         if getattr(sys, 'frozen', False):
-            default_path = Path(sys.executable).parent / "stockfish"
+            default_path = Path(sys.executable).parent / "lc0"
         else:
-            default_path = Path.cwd() / "stockfish"
+            default_path = Path.cwd() / "lc0"
     
     return default_path.exists()
 
 if __name__ == "__main__":
-    success = download_stockfish()
+    success = download_lc0()
     sys.exit(0 if success else 1)
+
+
+def download_maia_weights():
+    import tempfile
+    from pathlib import Path
+    import os
+    
+    url = "https://github.com/CSSLab/maia-chess/releases/download/v1.0/maia-1500.pb.gz"
+    if getattr(sys, 'frozen', False):
+        target = Path(sys.executable).parent / "maia-1500.pb.gz"
+    else:
+        target = Path.cwd() / "maia-1500.pb.gz"
+        
+    if target.exists():
+        return True
+        
+    try:
+        download_file(url, str(target), progress_callback=None)
+        return True
+    except Exception as e:
+        logger.error(f"Failed to download maia weights: {e}")
+        return False

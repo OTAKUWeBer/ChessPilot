@@ -5,12 +5,12 @@ from shutil import which
 import sys
 from pathlib import Path
 
-from .downloader import download_stockfish
+from .downloader import download_lc0, download_maia_weights
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-README_STOCKFISH_URL = "https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
+README_LC0_URL = "https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
 README_ONNX_URL = "https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
 
 def find_file_with_keyword(keyword, extension=None, search_path=None):
@@ -37,21 +37,21 @@ def find_file_with_keyword(keyword, extension=None, search_path=None):
     return None
 
 
-def _get_stockfish_binary_name():
+def _get_lc0_binary_name():
     """Returns the appropriate binary name for the current OS."""
-    return "stockfish.exe" if os.name == "nt" else "stockfish"
+    return "lc0.exe" if os.name == "nt" else "lc0"
 
 
-def _check_bundled_stockfish():
-    """Check if Stockfish is bundled with PyInstaller."""
+def _check_bundled_lc0():
+    """Check if Lc0 is bundled with PyInstaller."""
     if not getattr(sys, 'frozen', False):
         return None
     
-    bundled_name = _get_stockfish_binary_name()
+    bundled_name = _get_lc0_binary_name()
     bundled_path = Path(sys._MEIPASS) / bundled_name
     
     if bundled_path.exists():
-        logger.info(f"Using bundled Stockfish at {bundled_path}.")
+        logger.info(f"Using bundled Lc0 at {bundled_path}.")
         return bundled_path
     return None
 
@@ -63,48 +63,48 @@ def _get_working_directory():
     return Path.cwd()
 
 
-def _check_system_stockfish():
-    """Check if Stockfish is installed system-wide."""
-    bundled_name = _get_stockfish_binary_name()
+def _check_system_lc0():
+    """Check if Lc0 is installed system-wide."""
+    bundled_name = _get_lc0_binary_name()
     system_path = which(bundled_name)
     
     if system_path:
-        logger.info(f"Found system-installed Stockfish at {system_path}. Skipping download/extract.")
+        logger.info(f"Found system-installed Lc0 at {system_path}. Skipping download/extract.")
         return system_path
     return None
 
 
-def _check_existing_stockfish(final_path):
-    """Check if Stockfish already exists at the target location."""
+def _check_existing_lc0(final_path):
+    """Check if Lc0 already exists at the target location."""
     if final_path.exists():
-        logger.info(f"Stockfish binary already exists at {final_path}. Skipping download.")
+        logger.info(f"Lc0 binary already exists at {final_path}. Skipping download.")
         return True
     return False
 
 
-def _download_and_handle_stockfish(final_path):
-    """Download Stockfish and handle different return value conventions."""
-    logger.info(f"Stockfish not found. Attempting to download to {final_path} ...")
+def _download_and_handle_lc0(final_path):
+    """Download Lc0 and handle different return value conventions."""
+    logger.info(f"Lc0 not found. Attempting to download to {final_path} ...")
     
     try:
         # Try calling downloader with target path if signature accepts it
         try:
-            res = download_stockfish(final_path)
+            res = download_lc0(final_path)
         except TypeError:
             # Fallback: call without args
-            logger.debug("download_stockfish() didn't accept a target path; calling without args.")
-            res = download_stockfish()
+            logger.debug("download_lc0() didn't accept a target path; calling without args.")
+            res = download_lc0()
         
         return _process_download_result(res, final_path)
     
     except Exception as e:
-        logger.exception("Error while attempting to download Stockfish: %s", e)
+        logger.exception("Error while attempting to download Lc0: %s", e)
         return False
 
 
 def _process_download_result(res, final_path):
-    """Process the result from download_stockfish() with different return conventions."""
-    bundled_name = _get_stockfish_binary_name()
+    """Process the result from download_lc0() with different return conventions."""
+    bundled_name = _get_lc0_binary_name()
     
     if isinstance(res, bool):
         ok = res
@@ -116,10 +116,10 @@ def _process_download_result(res, final_path):
     
     if ok:
         _set_executable_permissions(final_path)
-        logger.info(f"Stockfish ready at {final_path}")
+        logger.info(f"Lc0 ready at {final_path}")
         return True
     else:
-        logger.error(f"Downloader reported failure or binary not found at {final_path}. See README: {README_STOCKFISH_URL}")
+        logger.error(f"Downloader reported failure or binary not found at {final_path}. See README: {README_LC0_URL}")
         return False
 
 
@@ -152,39 +152,39 @@ def _set_executable_permissions(final_path):
             logger.warning("Failed to set executable bit: %s", e)
 
 
-def extract_stockfish():
+def extract_lc0():
     """
-    Ensures a Stockfish binary exists at ./stockfish or ./stockfish.exe in cwd.
-    If missing, attempts to download via downloader.download_stockfish().
+    Ensures a Lc0 binary exists at ./lc0 or ./lc0.exe in cwd.
+    If missing, attempts to download via downloader.download_lc0().
     Returns True on success (binary available), False otherwise.
     """
-    logger.info("Checking for Stockfish binary...")
+    logger.info("Checking for Lc0 binary...")
     
     # Check if bundled by PyInstaller
-    bundled_stockfish = _check_bundled_stockfish()
-    if bundled_stockfish:
-        logger.info("Using bundled Stockfish")
+    bundled_lc0 = _check_bundled_lc0()
+    if bundled_lc0:
+        logger.info("Using bundled Lc0")
         return True
     
     # Determine target path
     cwd = _get_working_directory()
-    bundled_name = _get_stockfish_binary_name()
+    bundled_name = _get_lc0_binary_name()
     final_path = cwd / bundled_name
     
     # Check if system installed
-    system_stockfish = _check_system_stockfish()
-    if system_stockfish:
-        logger.info(f"Using system Stockfish: {system_stockfish}")
+    system_lc0 = _check_system_lc0()
+    if system_lc0:
+        logger.info(f"Using system Lc0: {system_lc0}")
         return True
     
     # Check if already present in target location
-    if _check_existing_stockfish(final_path):
-        logger.info(f"Stockfish found at: {final_path}")
+    if _check_existing_lc0(final_path):
+        logger.info(f"Lc0 found at: {final_path}")
         return True
     
     # Download and handle result
-    logger.info("Stockfish not found locally. Starting download...")
-    return _download_and_handle_stockfish(final_path)
+    logger.info("Lc0 not found locally. Starting download...")
+    return _download_and_handle_lc0(final_path)
 
 
 def _check_bundled_onnx():
@@ -279,7 +279,7 @@ def _move_resource_from_project_root(project_dir, script_dir, filename, resource
 
 def setup_resources(script_dir: Path, project_dir: Path) -> bool:
     """
-    Setup all required resources (Stockfish and ONNX model).
+    Setup all required resources (Lc0 and ONNX model).
     Returns True if all resources are ready, False otherwise.
     """
     logger.info("Setting up ChessPilot resources...")
@@ -287,23 +287,28 @@ def setup_resources(script_dir: Path, project_dir: Path) -> bool:
     if os.name != "nt":
         logger.info("Non-Windows system detected, skipping resource moves")
         # Still need to check for resources
-        if not extract_stockfish():
-            logger.error("Stockfish setup failed")
+        if not extract_lc0():
+            logger.error("Lc0 setup failed")
             return False
         if not rename_onnx_model():
             logger.error("ONNX model setup failed")
             return False
         return True
     
-    # Move Stockfish binary from project root if present
+    # Move Lc0 binary from project root if present
     _move_resource_from_project_root(
-        project_dir, script_dir, "stockfish.exe", "Stockfish binary"
+        project_dir, script_dir, "lc0.exe", "Lc0 binary"
     )
     
-    # Ensure stockfish is present (download if missing)
-    if not extract_stockfish():
-        logger.error("Stockfish setup failed. Please check your internet connection.")
+    # Ensure lc0 is present (download if missing)
+    if not extract_lc0():
+        logger.error("Lc0 setup failed. Please check your internet connection.")
         return False
+        
+    if not download_maia_weights():
+        logger.error("Maia weights setup failed.")
+        return False
+
     
     # Move ONNX model from project root if present
     _move_resource_from_project_root(
@@ -320,13 +325,13 @@ def setup_resources(script_dir: Path, project_dir: Path) -> bool:
 
 
 if __name__ == "__main__":
-    logger.info("Starting Stockfish download check and ONNX model rename process...")
+    logger.info("Starting Lc0 download check and ONNX model rename process...")
     # Default behavior: run from cwd (expected to be script_dir)
     script_dir = Path.cwd()
     project_dir = script_dir.parent
-    stockfish_ok = extract_stockfish()
+    lc0_ok = extract_lc0()
     onnx_ok = rename_onnx_model()
-    if stockfish_ok and onnx_ok:
+    if lc0_ok and onnx_ok:
         logger.info("Setup complete.")
     else:
         logger.info("Setup incomplete—check errors.")
