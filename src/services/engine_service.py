@@ -13,6 +13,7 @@ logger.setLevel(logging.DEBUG)
 
 # Global Lc0 process
 _lc0_process = None
+_current_elo = 1500
 
 def get_root_dir():
     # When bundled by PyInstaller, __file__ doesn't point to the EXE location
@@ -21,57 +22,17 @@ def get_root_dir():
     else:
         return os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 
-CONFIG_FILE = os.path.join(get_root_dir(), "engine_config.txt")
-
-def create_default_config(config_path):
-    """Creates a default config file with user-friendly comments."""
-    with open(config_path, "w") as f:
-        f.write("# ================================\n")
-        f.write("# ChessPilot Engine Configuration\n")
-        f.write("# ================================\n")
-        f.write("# You can edit these values to change engine behavior.\n")
-        f.write("# Be sure to restart the app after editing this file.\n\n")
-
-        f.write("# Lc0 specific optimizations\n")
-        f.write("# Backend to use (e.g. opencl, cuda, or dnnl)\n")
-        f.write("# setoption name Backend value dnnl\n")
-    
-    logger.info(f"Created default config file at {config_path}")
-
-def load_engine_config(lc0_proc, config_path=CONFIG_FILE):
-    """Loads Lc0 engine settings from a config file. Creates default with comments if missing."""
-    if not os.path.exists(config_path):
-        create_default_config(config_path)
-
-    with open(config_path, "r") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            try:
-                logger.info(f"Applying engine option: {line}")
-                lc0_proc.stdin.write(f"{line}\n")
-            except Exception as e:
-                logger.warning(f"Failed to apply config line '{line}': {e}")
-                
-    # Add Maia weights option securely
-    weights_path = resource_path("maia-1500.pb.gz")
+def setup_lc0_options(lc0_proc):
+    """Sets up minimal Lc0 options, primarily the Maia weights."""
+    weights_path = resource_path(f"maia-{_current_elo}.pb.gz")
+    logger.info(f"Setting WeightsFile to {weights_path}")
     lc0_proc.stdin.write(f"setoption name WeightsFile value {weights_path}\n")
-
 
     lc0_proc.stdin.write("isready\n")
     lc0_proc.stdin.flush()
     while True:
         if lc0_proc.stdout.readline().strip() == "readyok":
             break
-
-def ensure_config_exists():
-    """Ensures the config file exists, creating it if necessary."""
-    if not os.path.exists(CONFIG_FILE):
-        logger.warning("Config file missing during gameplay, regenerating...")
-        create_default_config(CONFIG_FILE)
-        return True
-    return False
 
 def _initialize_lc0():
     """Initialize a persistent Lc0 process."""
@@ -104,7 +65,7 @@ def _initialize_lc0():
             creationflags=flags
         )
 
-        load_engine_config(_lc0_process)
+        setup_lc0_options(_lc0_process)
         
         logger.info("Lc0 process initialized")
         return _lc0_process
@@ -161,18 +122,11 @@ def _initialize_lc0_at_startup():
         return False
 
 def _setup_lc0_engine():
-    config_recreated = ensure_config_exists()
-    lc0 = _initialize_lc0()
-    
-    if config_recreated and lc0:
-        logger.info("Reloading config into existing Lc0 process")
-        load_engine_config(lc0)
-    
-    return lc0
+    return _initialize_lc0()
 
-def _get_move_from_engine(lc0, depth_var, fen, root=None):
+def _get_move_from_engine(lc0, fen, root=None):
     lc0.stdin.write(f"position fen {fen}\n")
-    lc0.stdin.write(f"go depth {depth_var}\n")
+    lc0.stdin.write("go nodes 1\n")
     lc0.stdin.flush()
     
     best_move = None
@@ -187,14 +141,7 @@ def _get_move_from_engine(lc0, depth_var, fen, root=None):
         logger.debug(f"Engine output: {line.strip()}")
         
         if "info depth" in line and root and hasattr(root, 'update_status'):
-            try:
-                depth_part = line.split("info depth")[1].split()[0]
-                current_depth = int(depth_part)
-                if current_depth > last_depth:
-                    last_depth = current_depth
-                    root.update_status(f"Processing... Depth {current_depth}/{depth_var}")
-            except (IndexError, ValueError):
-                pass
+            pass
         
         mate_flag = _check_for_mate(line, mate_flag)
         best_move = _extract_best_move(line)
@@ -280,10 +227,20 @@ class EngineService:
     def cleanup():
         logger.info("Cleaning up engine service")
         _cleanup_lc0()
+        
+    @staticmethod
+    def set_maia_elo(elo):
+        global _current_elo
+        _current_elo = elo
+        weights_path = resource_path(f"maia-{elo}.pb.gz")
+        logger.info(f"Dynamically setting Lc0 WeightsFile to {weights_path}")
+        if _lc0_process:
+            _lc0_process.stdin.write(f"setoption name WeightsFile value {weights_path}\n")
+            _lc0_process.stdin.flush()
 
     @staticmethod
-    def get_best_move(depth: int, fen: str, root=None, auto_mode_var=None):
-        logger.debug(f"Querying best move for FEN: {fen} at depth {depth}")
+    def get_best_move(fen: str, root=None, auto_mode_var=None):
+        logger.debug(f"Querying best move for FEN: {fen}")
         try:
             logger.info("Getting best move from Lc0")
             
@@ -294,7 +251,7 @@ class EngineService:
             if lc0 is None:
                 return _handle_lc0_failure("Failed to initialize Lc0", root, auto_mode_var)
             
-            best_move, mate_flag = _get_move_from_engine(lc0, depth, fen, root)
+            best_move, mate_flag = _get_move_from_engine(lc0, fen, root)
             if best_move is None:
                 return _handle_lc0_failure(
                     "Lc0 did not respond. Please download the correct version according to your CPU architecture.",

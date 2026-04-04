@@ -86,3 +86,6 @@ ChessPilot-*.AppImage
 *.rej
 *~
 .env
+
+# Maia weights
+maia-*.pb.gz

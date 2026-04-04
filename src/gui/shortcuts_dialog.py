@@ -66,7 +66,7 @@ class ShortcutsDialog(QDialog):
         
         selection_shortcuts = [
             ("W / B", "Choose White or Black"),
-            ("← / →", "Decrease / Increase Lc0 depth"),
+
             ("↓ / ↑", "Decrease / Increase screenshot delay"),
             ("D / C", "Set move mode to Drag or Click"),
         ]

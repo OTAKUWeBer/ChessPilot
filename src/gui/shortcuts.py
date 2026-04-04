@@ -64,12 +64,12 @@ def bind_shortcuts(app):
         lambda: adjust_delay_down(app) if app.color_indicator is None else None
     )
     
-    # Depth adjustment (Right/Left) - always available
+    # Elo adjustment (Right/Left) - always available
     QShortcut(QKeySequence(Qt.Key.Key_Right), app).activated.connect(
-        lambda: adjust_depth_up(app)
+        lambda: adjust_elo_up(app)
     )
     QShortcut(QKeySequence(Qt.Key.Key_Left), app).activated.connect(
-        lambda: adjust_depth_down(app)
+        lambda: adjust_elo_down(app)
     )
 
 def adjust_delay_up(app):
@@ -86,19 +86,27 @@ def adjust_delay_down(app):
     app.delay_spinbox.setValue(new_val)
     logger.info(f"Screenshot delay decreased to {new_val}s")
 
-def adjust_depth_up(app):
-    current = app.depth_var
-    new_val = min(30, current + 1)
-    app.depth_var = new_val
-    app.depth_slider.setValue(new_val)
-    logger.info(f"Depth increased to {new_val}")
+def adjust_elo_up(app):
+    current = getattr(app, 'maia_elo_var', 1500)
+    new_val = min(1900, current + 100)
+    if new_val != current:
+        app.maia_elo_var = new_val
+        if hasattr(app, 'elo_slider'):
+            app.elo_slider.setValue(new_val // 100)
+        if hasattr(app, 'update_maia_elo'):
+            app.update_maia_elo()
+        logger.info(f"Maia Skill Level (Elo) increased to {new_val}")
 
-def adjust_depth_down(app):
-    current = app.depth_var
-    new_val = max(10, current - 1)
-    app.depth_var = new_val
-    app.depth_slider.setValue(new_val)
-    logger.info(f"Depth decreased to {new_val}")
+def adjust_elo_down(app):
+    current = getattr(app, 'maia_elo_var', 1500)
+    new_val = max(1100, current - 100)
+    if new_val != current:
+        app.maia_elo_var = new_val
+        if hasattr(app, 'elo_slider'):
+            app.elo_slider.setValue(new_val // 100)
+        if hasattr(app, 'update_maia_elo'):
+            app.update_maia_elo()
+        logger.info(f"Maia Skill Level (Elo) decreased to {new_val}")
 
 def set_mode_shortcut(app, mode):
     """Set move mode via keyboard shortcut"""

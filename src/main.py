@@ -22,6 +22,7 @@ from PyQt6.QtCore import Qt
 from utils.logging_setup import setup_console_logging
 from utils.chess_resources_manager import setup_resources
 from utils.system_info import log_system_info, log_dependency_status
+from utils.downloader import get_linux_install_cmd
 
 setup_console_logging()
 logger = logging.getLogger(__name__)
@@ -41,15 +42,19 @@ if not setup_resources(script_dir, project_dir):
     logger.error("Resource setup failed")
     # Show error dialog before exiting
     app = QApplication(sys.argv)
-    QMessageBox.critical(
-        None,
-        "Setup Failed",
-        "Failed to setup required resources (Lc0 or ONNX model).\n\n"
-        "Please check:\n"
-        "1. Your internet connection\n"
-        "2. That you have write permissions\n"
-        "3. The logs for more details"
-    )
+    msg = "Failed to setup required resources (Lc0 or ONNX model).\n\n"
+    if sys.platform != "win32":
+        cmd = get_linux_install_cmd()
+        msg += "Note: For Linux/macOS, Lc0 binaries cannot be auto-downloaded.\n"
+        msg += f"Please install Lc0 via your package manager '{cmd}'\n"
+        msg += "and ensure it is in your system PATH, or place the binary manually at: src/lc0\n"
+    else:
+        msg += "Please check:\n"
+        msg += "1. Your internet connection\n"
+        msg += "2. That you have write permissions\n"
+        msg += "3. The logs for more details"
+        
+    QMessageBox.critical(None, "Setup Failed", msg)
     sys.exit(1)
 
 from core import GameState, AppConfig
@@ -87,11 +92,12 @@ class ChessPilot(QMainWindow):
         self.color_indicator = None
         self.last_fen = ""
         self.last_fen_by_color = {'w': None, 'b': None}
-        self.depth_var = AppConfig.DEFAULT_DEPTH
+
         self.auto_mode_var = False
         self.board_positions = {}
 
         self.screenshot_delay_var = AppConfig.DEFAULT_SCREENSHOT_DELAY
+        self.maia_elo_var = 1500
         self.move_mode = AppConfig.DEFAULT_MOVE_MODE
 
         self.chessboard_x = None
@@ -152,7 +158,26 @@ class ChessPilot(QMainWindow):
     def update_status(self, message):
         logger.debug(f"Status update: {message.strip()}")
         self.status_label.setText(message)
-        self.depth_label.setText(f"Depth: {self.depth_var}")
+
+    def update_maia_elo(self):
+        elo = getattr(self, 'maia_elo_var', 1500)
+        logger.info(f"User selected new Maia ELO: {elo}")
+        self.update_status(f"Downloading/Switching to Maia {elo}...")
+        self.btn_play.setEnabled(False)
+        
+        def _bg_update():
+            from utils.downloader import download_maia_weights
+            success = download_maia_weights(elo)
+            if success:
+                self.engine_service.set_maia_elo(elo)
+                self.update_status(f"Maia engine updated to {elo} ELO")
+            else:
+                self.update_status(f"Failed to load Maia {elo}")
+            
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: self.btn_play.setEnabled(bool(self.color_indicator)))
+            
+        threading.Thread(target=_bg_update, daemon=True).start()
 
     def process_move_thread(self):
         logger.info("Play Next Move button pressed; starting process_move thread")
@@ -252,7 +277,7 @@ class ChessPilot(QMainWindow):
 
     def query_best_move(self, fen: str):
         return self.engine_service.get_best_move(
-            self.depth_var, fen, self, lambda: self.auto_mode_var
+            fen, self, lambda: self.auto_mode_var
         )
 
     def read_current_fen(self):

@@ -88,24 +88,6 @@ Windows may flag unsigned executables — this is common for small open-source p
 
 ---
 
-## 🛠️ Engine Configuration (engine_config.txt)
-
-Place this file next to the executable to customize Stockfish:
-
-```ini
-# ChessPilot Engine Configuration
-
-# Memory in MB (64–1024 recommended)
-setoption name Hash value 512
-
-# Number of CPU threads
-setoption name Threads value 2
-```
-
-Restart ChessPilot after editing.
-
----
-
 ## ⚙️ Prerequisites (From Source)
 
 PyQt6 is required for the UI.

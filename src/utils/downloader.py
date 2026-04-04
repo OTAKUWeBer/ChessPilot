@@ -37,6 +37,15 @@ TEXT_COLOR = "#FFFFFF"
 HOVER_COLOR = "#45a049"
 
 # ------------------------ Helpers ------------------------
+def get_linux_install_cmd():
+    if os.path.exists('/etc/arch-release'):
+        return "sudo pacman -S lc0"
+    elif os.path.exists('/etc/debian_version'):
+        return "sudo apt install lc0"
+    elif os.path.exists('/etc/fedora-release'):
+        return "sudo dnf install lc0"
+    return "your package manager (e.g., 'sudo apt install lc0')"
+
 def detect_os():
     p = platform.system().lower()
     if "windows" in p:
@@ -309,193 +318,49 @@ def format_bytes(n):
 
 # ------------------------ Asset selection ------------------------
 def choose_best_asset(assets, os_name, arch, vendor, flags):
-    """Choose the best Lc0 binary based on OS, CPU vendor, and features"""
-    filtered = _filter_assets_by_os(assets, os_name)
-    if not filtered:
-        logger.error("No assets found for this OS")
-        return None
-    
-    return _select_best_by_cpu_features(filtered, vendor, flags)
-
-def _filter_assets_by_os(assets, os_name):
+    """Choose the best Lc0 binary based on OS"""
     filtered = []
     
-    # First pass: Look for OS-specific prefixes
+    # First priority: Look specifically for CPU-based builds
     for a in assets:
         n = a["name"].lower()
-        if _matches_os_prefix(n, os_name):
+        if os_name == "windows" and "windows" in n and ("cpu" in n or "dnnl" in n or "openblas" in n):
             filtered.append(a)
-    
-    # Second pass: Fallback to generic OS indicators
+        elif os_name == "linux" and "linux" in n and ("cpu" in n or "dnnl" in n or "openblas" in n):
+            filtered.append(a)
+        elif os_name == "mac" and "macos" in n:
+            filtered.append(a)
+            
+    # Fallback to general OS matching if specific CPU builds aren't explicitly named
     if not filtered:
         for a in assets:
             n = a["name"].lower()
-            if _matches_os_generic(n, os_name):
+            if os_name == "windows" and "win" in n:
                 filtered.append(a)
-    
-    return filtered
+            elif os_name == "linux" and "linux" in n:
+                filtered.append(a)
+            elif os_name == "mac" and ("mac" in n or "darwin" in n):
+                filtered.append(a)
 
-def _matches_os_prefix(name, os_name):
-    if os_name == "linux" and name.startswith("lc0-ubuntu"):
-        return True
-    if os_name == "mac" and name.startswith("lc0-macos"):
-        return True
-    if os_name == "windows" and name.startswith("lc0-windows"):
-        return True
-    return False
-
-def _matches_os_generic(name, os_name):
-    if os_name == "linux" and "linux" in name:
-        return True
-    if os_name == "mac" and ("mac" in name or "darwin" in name):
-        return True
-    if os_name == "windows" and ("win" in name or name.endswith(".zip")):
-        return True
-    return False
-
-def _select_best_by_cpu_features(filtered, vendor, flags):
-    """Select the best binary based on CPU features
-    
-    Lc0 naming conventions:
-    - x86-64-avx512 (newest, requires AVX-512)
-    - x86-64-bmi2 (modern Intel/AMD with BMI2)
-    - x86-64-avx2 (requires AVX2)
-    - x86-64-sse41-popcnt (older CPUs)
-    - x86-64-modern (generic modern)
-    - x86-64 (basic fallback)
-    """
-    score_map = {}
-    
-    for a in filtered:
-        score = _calculate_cpu_score(a["name"].lower(), vendor, flags)
-        score_map[a["name"]] = score
-        logger.debug(f"Asset: {a['name']} -> Score: {score}")
-    
-    if not score_map:
-        return filtered[0] if filtered else None
-    
-    best_name = max(score_map.items(), key=lambda kv: kv[1])[0]
-    logger.info(f"Best match: {best_name} (score: {score_map[best_name]})")
-    
-    for a in filtered:
-        if a["name"] == best_name:
-            return a
-    
-    return filtered[0]
-
-def _calculate_cpu_score(name, vendor, flags):
-    """Calculate a score for how well this binary matches the CPU"""
-    score = 0
-    
-    # Define instruction set configurations with their requirements and scoring
-    instruction_sets = [
-        {
-            "keyword": "avx512",
-            "required_flags": lambda f: any(flag.startswith("avx512") for flag in f),
-            "match_score": 100,
-            "mismatch_penalty": -100
-        },
-        {
-            "keyword": "bmi2",
-            "required_flags": lambda f: "bmi2" in f,
-            "match_score": 80,
-            "mismatch_penalty": -50
-        },
-        {
-            "keyword": "avx2",
-            "required_flags": lambda f: "avx2" in f or "avx" in f,
-            "match_score": 60,
-            "mismatch_penalty": -30
-        },
-        {
-            "keywords": ["popcnt", "sse41", "sse4"],
-            "required_flags": lambda f: any(x in f for x in ["sse4_1", "sse4_2", "popcnt", "sse4.1", "sse4.2"]),
-            "match_score": 50,
-            "mismatch_penalty": 0
-        }
-    ]
-    
-    # Check instruction set matches
-    score += _check_instruction_sets(name, flags, instruction_sets)
-    
-    # Add vendor bonus if applicable
-    score += _calculate_vendor_bonus(name, vendor, flags)
-    
-    # Add fallback scores
-    score += _calculate_fallback_score(name)
-    
-    # Add format bonus
-    score += _calculate_format_bonus(name)
-    
-    # Apply vendor mismatch penalty
-    score += _calculate_vendor_penalty(name, vendor)
-    
-    return score
-
-
-def _check_instruction_sets(name, flags, instruction_sets):
-    """Check if binary name matches CPU instruction sets"""
-    for config in instruction_sets:
-        keywords = config.get("keywords", [config.get("keyword")])
+    if not filtered:
+        if os_name == "linux":
+            logger.error("Lc0 does NOT officially distribute pre-compiled Linux binaries on GitHub.")
+            cmd = get_linux_install_cmd()
+            logger.error(f"For Linux, please build from source or install via your package manager: {cmd}")
+            logger.error("Or manually place the lc0 binary at: src/lc0")
+        else:
+            logger.error("No matching build found for this OS/arch")
+        return None
         
-        if any(kw in name for kw in keywords):
-            has_required = config["required_flags"](flags)
-            if has_required:
-                return config["match_score"]
-            else:
-                return config["mismatch_penalty"]
-    
-    return 0
-
-
-def _calculate_vendor_bonus(name, vendor, flags):
-    """Calculate bonus score for vendor-specific optimizations"""
-    if "bmi2" not in name or "bmi2" not in flags:
-        return 0
-    
-    vendor_map = {
-        "amd": "amd",
-        "intel": "intel"
-    }
-    
-    if vendor in vendor_map and vendor_map[vendor] in name:
-        return 10
-    
-    return 0
-
-
-def _calculate_fallback_score(name):
-    """Calculate score for fallback builds"""
-    fallback_scores = {
-        "modern": 40,
-        "x86-64": 35,
-        "x86_64": 35
-    }
-    
-    for keyword, score in fallback_scores.items():
-        if keyword in name:
-            return score
-    
-    return 0
-
-
-def _calculate_format_bonus(name):
-    """Add bonus for compressed archive formats"""
-    compression_formats = (".tar.gz", ".tgz", ".zip", ".tar")
-    return 5 if name.endswith(compression_formats) else 0
-
-
-def _calculate_vendor_penalty(name, vendor):
-    """Apply penalty for vendor-specific mismatches"""
-    penalty = 0
-    
-    if "amd" in name and vendor not in ["amd", "generic", "unknown"]:
-        penalty -= 5
-    
-    if "intel" in name and vendor not in ["intel", "generic", "unknown"]:
-        penalty -= 5
-    
-    return penalty
+    best_asset = filtered[0]
+    # Prefer explicitly labeled CPU items if fallback array used
+    for a in filtered:
+        if "cpu" in a["name"].lower() or "dnnl" in a["name"].lower():
+            best_asset = a
+            break
+            
+    logger.info(f"Best match: {best_asset['name']}")
+    return best_asset
 
 # ------------------------ Download & extraction ------------------------
 def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeout=60):
@@ -661,6 +526,8 @@ class DownloadWorkflow:
                 
             best_asset = self._select_asset(release_data)
             if not best_asset:
+                if self.os_name == "linux":
+                    self._build_from_source()
                 return
                 
             archive_path = self._download_asset(best_asset, release_data["tag_name"])
@@ -735,9 +602,10 @@ class DownloadWorkflow:
                                        self.arch, self.vendor, self.flags)
         if not best_asset:
             logger.error("No matching build found for this OS/arch")
-            self.signals.label_update.emit("No matching build found")
-            self.signals.sub_label_update.emit("See logs for details")
-            self.signals.show_retry.emit()
+            if self.os_name != "linux":
+                self.signals.label_update.emit("No matching build found")
+                self.signals.sub_label_update.emit("See logs for details")
+                self.signals.show_retry.emit()
             return None
             
         logger.info(f"Selected asset: {best_asset['name']} (release {release_data['tag_name']})")
@@ -843,6 +711,43 @@ class DownloadWorkflow:
         except (OSError, IOError) as e:
             logger.error(f"Failed to copy binary on Unix-like OS: {e}")
             self.signals.label_update.emit("Install failed")
+            self.signals.sub_label_update.emit(str(e))
+            self.signals.show_retry.emit()
+
+    def _build_from_source(self):
+        self.signals.label_update.emit("Building from source...")
+        self.signals.sub_label_update.emit("Cloning repository... this may take some time.")
+        try:
+            cwd = Path.cwd()
+            tmp_dir = cwd / "lc0_source_tmp"
+            if tmp_dir.exists():
+                shutil.rmtree(tmp_dir)
+            
+            self.signals.progress_update.emit(10)
+            subprocess.run(["git", "clone", "https://github.com/LeelaChessZero/lc0.git", str(tmp_dir)], check=True)
+            self.signals.progress_update.emit(40)
+            
+            self.signals.label_update.emit("Compiling Lc0 natively...")
+            self.signals.sub_label_update.emit("Requires meson, ninja, and C++ compiler.")
+            subprocess.run(["./build.sh"], cwd=str(tmp_dir), check=True)
+            self.signals.progress_update.emit(90)
+            
+            build_bin = tmp_dir / "build" / "release" / "lc0"
+            if not build_bin.exists():
+                build_bin = tmp_dir / "build" / "lc0"
+                
+            if build_bin.exists():
+                target_path = self._get_target_path()
+                self._install_unix(build_bin, target_path)
+            else:
+                logger.error("Build completed but lc0 binary not found.")
+                self.signals.label_update.emit("Build failed")
+                self.signals.sub_label_update.emit("Binary not found in build dir")
+                self.signals.show_retry.emit()
+                
+        except Exception as e:
+            logger.error(f"Failed to build Lc0 from source: {e}")
+            self.signals.label_update.emit("Source build failed")
             self.signals.sub_label_update.emit(str(e))
             self.signals.show_retry.emit()
 
@@ -1007,16 +912,16 @@ if __name__ == "__main__":
     sys.exit(0 if success else 1)
 
 
-def download_maia_weights():
+def download_maia_weights(elo=1500):
     import tempfile
     from pathlib import Path
     import os
     
-    url = "https://github.com/CSSLab/maia-chess/releases/download/v1.0/maia-1500.pb.gz"
+    url = f"https://github.com/CSSLab/maia-chess/releases/download/v1.0/maia-{elo}.pb.gz"
     if getattr(sys, 'frozen', False):
-        target = Path(sys.executable).parent / "maia-1500.pb.gz"
+        target = Path(sys.executable).parent / f"maia-{elo}.pb.gz"
     else:
-        target = Path.cwd() / "maia-1500.pb.gz"
+        target = Path.cwd() / f"maia-{elo}.pb.gz"
         
     if target.exists():
         return True
@@ -1025,5 +930,5 @@ def download_maia_weights():
         download_file(url, str(target), progress_callback=None)
         return True
     except Exception as e:
-        logger.error(f"Failed to download maia weights: {e}")
+        logger.error(f"Failed to download maia weights ({elo}): {e}")
         return False

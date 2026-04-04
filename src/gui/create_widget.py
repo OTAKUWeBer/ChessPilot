@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QSlider, QDoubleSpinBox,
                              QRadioButton, QButtonGroup, QVBoxLayout, QHBoxLayout, QCheckBox)
 from PyQt6.QtCore import Qt
 import logging
-from gui.update_depth_label import update_depth_label
+
 from gui.shortcuts_dialog import show_shortcuts_dialog
 
 logger = logging.getLogger(__name__)
@@ -75,50 +75,59 @@ def create_widgets(app):
     depth_layout = QVBoxLayout(depth_panel)
     depth_layout.setContentsMargins(0, 0, 0, 0)
 
-    depth_title = QLabel("Lc0 Depth:")
-    depth_title.setStyleSheet(f"""
+    elo_panel = QWidget()
+    elo_panel.setStyleSheet(f"background-color: {app.frame_color};")
+    elo_layout = QVBoxLayout(elo_panel)
+    elo_layout.setContentsMargins(0, 0, 0, 0)
+    
+    app.elo_label = QLabel(f"Maia Skill Level (Elo): {app.maia_elo_var}")
+    app.elo_label.setStyleSheet(f"""
         color: {app.text_color};
         font-family: 'Segoe UI';
         font-size: 11pt;
         font-weight: 500;
     """)
-    depth_layout.addWidget(depth_title)
-    depth_layout.addSpacing(5)
-
-    app.depth_slider = QSlider(Qt.Orientation.Horizontal)
-    app.depth_slider.setMinimum(10)
-    app.depth_slider.setMaximum(30)
-    app.depth_slider.setValue(app.depth_var)
-    app.depth_slider.setStyleSheet(f"""
+    elo_layout.addWidget(app.elo_label)
+    elo_layout.addSpacing(5)
+    
+    app.elo_slider = QSlider(Qt.Orientation.Horizontal)
+    app.elo_slider.setMinimum(11)
+    app.elo_slider.setMaximum(19)
+    app.elo_slider.setSingleStep(1)
+    app.elo_slider.setPageStep(1)
+    app.elo_slider.setValue(app.maia_elo_var // 100)
+    
+    app.elo_slider.setStyleSheet(f"""
         QSlider::groove:horizontal {{
-            background: #4a4a4a;
+            border: 1px solid #5a5a5a;
             height: 6px;
+            background: #4a4a4a;
+            margin: 2px 0;
             border-radius: 3px;
         }}
         QSlider::handle:horizontal {{
             background: {app.accent_color};
-            width: 20px;
-            height: 20px;
-            margin: -7px 0;
-            border-radius: 10px;
+            border: 1px solid #3d3d3d;
+            width: 16px;
+            margin: -6px 0;
+            border-radius: 8px;
         }}
         QSlider::handle:horizontal:hover {{
             background: {app.hover_color};
         }}
     """)
-    depth_layout.addWidget(app.depth_slider)
-    depth_layout.addSpacing(8)
-
-    app.depth_label = QLabel(f"Depth: {app.depth_var}")
-    app.depth_label.setStyleSheet(f"""
-        color: {app.text_color};
-        font-family: 'Segoe UI';
-        font-size: 10pt;
-    """)
-    app.depth_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    depth_layout.addWidget(app.depth_label)
-    depth_layout.addSpacing(15)
-
+    
+    def on_elo_change(val):
+        real_val = val * 100
+        setattr(app, 'maia_elo_var', real_val)
+        app.elo_label.setText(f"Maia Skill Level (Elo): {real_val}")
+        
+    app.elo_slider.valueChanged.connect(on_elo_change)
+    app.elo_slider.sliderReleased.connect(app.update_maia_elo)
+    elo_layout.addWidget(app.elo_slider)
+    elo_layout.addSpacing(15)
+    
+    color_panel_layout.addWidget(elo_panel)
     delay_label = QLabel("Screenshot Delay (seconds):")
     delay_label.setStyleSheet(f"""
         color: {app.text_color};
@@ -354,72 +363,6 @@ def create_widgets(app):
     
     control_layout.addSpacing(10)
     
-    # Add depth slider to main frame
-    depth_panel_main = QWidget()
-    depth_panel_main.setStyleSheet(f"background-color: {app.frame_color};")
-    depth_layout_main = QVBoxLayout(depth_panel_main)
-    depth_layout_main.setContentsMargins(0, 0, 0, 0)
 
-    depth_title_main = QLabel("Lc0 Depth:")
-    depth_title_main.setStyleSheet(f"""
-        color: {app.text_color};
-        font-family: 'Segoe UI';
-        font-size: 11pt;
-        font-weight: 500;
-    """)
-    depth_layout_main.addWidget(depth_title_main)
-    depth_layout_main.addSpacing(5)
-
-    app.depth_slider_main = QSlider(Qt.Orientation.Horizontal)
-    app.depth_slider_main.setMinimum(10)
-    app.depth_slider_main.setMaximum(30)
-    app.depth_slider_main.setValue(app.depth_var)
-    app.depth_slider_main.setStyleSheet(f"""
-        QSlider::groove:horizontal {{
-            background: #4a4a4a;
-            height: 6px;
-            border-radius: 3px;
-        }}
-        QSlider::handle:horizontal {{
-            background: {app.accent_color};
-            width: 20px;
-            height: 20px;
-            margin: -7px 0;
-            border-radius: 10px;
-        }}
-        QSlider::handle:horizontal:hover {{
-            background: {app.hover_color};
-        }}
-    """)
-    depth_layout_main.addWidget(app.depth_slider_main)
-    depth_layout_main.addSpacing(8)
-
-    app.depth_label_main = QLabel(f"Depth: {app.depth_var}")
-    app.depth_label_main.setStyleSheet(f"""
-        color: {app.text_color};
-        font-family: 'Segoe UI';
-        font-size: 10pt;
-    """)
-    app.depth_label_main.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    depth_layout_main.addWidget(app.depth_label_main)
-
-    control_layout.addWidget(depth_panel_main)
-    control_layout.addSpacing(10)
-
-    # Synchronize both depth sliders
-    def sync_depth_sliders(value):
-        # Update both sliders and labels
-        app.depth_slider.blockSignals(True)
-        app.depth_slider_main.blockSignals(True)
-        app.depth_slider.setValue(value)
-        app.depth_slider_main.setValue(value)
-        app.depth_slider.blockSignals(False)
-        app.depth_slider_main.blockSignals(False)
-        # Update labels and depth_var
-        update_depth_label(app, value)
-        app.depth_label_main.setText(f"Depth: {value}")
-    
-    app.depth_slider.valueChanged.connect(sync_depth_sliders)
-    app.depth_slider_main.valueChanged.connect(sync_depth_sliders)
     app.btn_play.setEnabled(False)
     logger.debug("Widgets created successfully")

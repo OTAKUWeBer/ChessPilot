@@ -167,8 +167,7 @@ def _prepare_position_data(board_data, color_indicator, kingside_var, queenside_
     return fen
 
 def _calculate_best_move(root, fen, auto_mode_var, update_status):
-    depth = root.depth_var if hasattr(root, "depth_var") else 15
-    best_move, updated_fen, mate_flag = EngineService.get_best_move(depth, fen, root, auto_mode_var)
+    best_move, updated_fen, mate_flag = EngineService.get_best_move(fen, root, auto_mode_var)
     
     if not best_move:
         QTimer.singleShot(0, lambda: update_status("No valid move found!"))
