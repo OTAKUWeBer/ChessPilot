@@ -23,7 +23,6 @@ if __name__ == "__main__":
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QScreen
 
 from utils.logging_setup import setup_logging, get_log_file_path
 from utils.chess_resources_manager import setup_resources
@@ -89,22 +88,28 @@ class ChessPilot(QMainWindow):
         # displays without OS scaling (typical on Linux), the window
         # appears physically too small, so we scale it up.
         scale = 1.0
-        qapp = QApplication.instance()
-        if qapp is not None:
-            screen = qapp.primaryScreen()
-            if screen is not None:
-                ratio = screen.devicePixelRatio()
-                avail = screen.availableSize()
-                logical_h = avail.height() / ratio
-                # Reference: 1080 logical pixels (1920×1080 at 100%).
-                # Use sqrt to dampen the growth so the window doesn't
-                # become overly large on high-res screens.
-                raw = logical_h / 1080.0
-                scale = max(raw ** 0.5, 1.0)
-                logger.debug(
-                    f"Screen: {avail.width()}x{avail.height()}, "
-                    f"pixelRatio: {ratio}, scale factor: {scale:.2f}"
-                )
+        try:
+            qapp = QApplication.instance()
+            if qapp is not None:
+                screen = qapp.primaryScreen()
+                if screen is not None:
+                    ratio = screen.devicePixelRatio()
+                    if not ratio or ratio <= 0:
+                        ratio = 1.0
+                    avail = screen.availableSize()
+                    logical_h = avail.height() / ratio
+                    # Reference: 1080 logical pixels (1920×1080 at 100%).
+                    # Use sqrt to dampen the growth so the window doesn't
+                    # become overly large on high-res screens.
+                    raw = logical_h / 1080.0
+                    scale = max(raw ** 0.5, 1.0)
+                    logger.debug(
+                        f"Screen: {avail.width()}x{avail.height()}, "
+                        f"pixelRatio: {ratio}, scale factor: {scale:.2f}"
+                    )
+        except Exception as e:
+            logger.debug("Failed to calculate screen resolution scale factor: %s", e)
+            scale = 1.0
 
         self.resize(int(AppConfig.WINDOW_WIDTH * scale),
                     int(AppConfig.WINDOW_HEIGHT * scale))
