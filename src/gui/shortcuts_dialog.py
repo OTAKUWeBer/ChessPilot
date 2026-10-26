@@ -1,6 +1,16 @@
-from PyQt6.QtWidgets import QDialog, QVBoxLayout, QLabel, QPushButton, QTableWidget, QTableWidgetItem
-from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QDialog,
+    QVBoxLayout,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+)
+from PyQt6.QtCore import Qt, QUrl
+from PyQt6.QtGui import QDesktopServices
 import logging
+from utils.logging_setup import get_log_dir
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +106,30 @@ class ShortcutsDialog(QDialog):
         play_table = self._create_shortcuts_table(play_shortcuts, frame_color, text_color)
         layout.addWidget(play_table)
         
-        # Close button
+        # Action buttons
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(10)
+
+        logs_btn = QPushButton("Open Logs Folder")
+        logs_btn.setFixedHeight(40)
+        logs_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {frame_color};
+                color: {text_color};
+                border: 1px solid #555555;
+                border-radius: 5px;
+                font-family: 'Segoe UI';
+                font-size: 11pt;
+                font-weight: 500;
+                padding: 10px 20px;
+            }}
+            QPushButton:hover {{
+                background-color: #4a4a4a;
+            }}
+        """)
+        logs_btn.clicked.connect(self._open_logs_folder)
+        button_layout.addWidget(logs_btn)
+
         close_btn = QPushButton("Close")
         close_btn.setFixedHeight(40)
         close_btn.setStyleSheet(f"""
@@ -115,7 +148,14 @@ class ShortcutsDialog(QDialog):
             }}
         """)
         close_btn.clicked.connect(self.accept)
-        layout.addWidget(close_btn)
+        button_layout.addWidget(close_btn)
+
+        layout.addLayout(button_layout)
+
+    def _open_logs_folder(self):
+        log_dir = get_log_dir()
+        logger.info(f"Opening logs folder: {log_dir}")
+        QDesktopServices.openUrl(QUrl.fromLocalFile(str(log_dir)))
     
     def _create_shortcuts_table(self, shortcuts, frame_color, text_color):
         table = QTableWidget()

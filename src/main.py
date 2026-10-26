@@ -19,11 +19,11 @@ if __name__ == "__main__":
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PyQt6.QtCore import Qt
 
-from utils.logging_setup import setup_console_logging
+from utils.logging_setup import setup_logging, get_log_file_path
 from utils.chess_resources_manager import setup_resources
 from utils.system_info import log_system_info, log_dependency_status
 
-setup_console_logging()
+setup_logging()
 logger = logging.getLogger(__name__)
 
 script_dir = Path(__file__).resolve().parent
@@ -31,8 +31,11 @@ project_dir = script_dir.parent
 
 os.chdir(script_dir)
 
+logger.info("=" * 60)
 logger.info("ChessPilot starting...")
-logger.info(f"Version: 2.2.0")
+logger.info("Version: 2.2.0")
+logger.info(f"Log file: {get_log_file_path()}")
+logger.info("=" * 60)
 
 log_system_info()
 log_dependency_status()
@@ -47,8 +50,8 @@ if not setup_resources(script_dir, project_dir):
         "Failed to setup required resources (Stockfish or ONNX model).\n\n"
         "Please check:\n"
         "1. Your internet connection\n"
-        "2. That you have write permissions\n"
-        "3. The logs for more details"
+        "2. That you have write permissions\n\n"
+        f"Log file location:\n{get_log_file_path()}"
     )
     sys.exit(1)
 
@@ -117,8 +120,8 @@ class ChessPilot(QMainWindow):
                 self,
                 "Engine Warning",
                 "Stockfish engine failed to initialize.\n\n"
-                "The app will continue, but move analysis won't work.\n"
-                "Please restart the application or check the logs."
+                "The app will continue, but move analysis won't work.\n\n"
+                f"Log file location:\n{get_log_file_path()}"
             )
 
     def create_color_button(self, parent, text, color):
@@ -306,7 +309,7 @@ if __name__ == "__main__":
         QMessageBox.critical(
             None,
             "Fatal Error",
-            f"An unexpected error occurred:\n\n{str(e)}\n\nPlease check the logs."
+            f"An unexpected error occurred:\n\n{str(e)}\n\nLog file location:\n{get_log_file_path()}"
         )
         sys.exit(1)
     finally:
