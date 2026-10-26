@@ -96,8 +96,11 @@ class ChessPilot(QMainWindow):
                 ratio = screen.devicePixelRatio()
                 avail = screen.availableSize()
                 logical_h = avail.height() / ratio
-                # Reference: 1080 logical pixels (1920×1080 at 100%)
-                scale = max(logical_h / 1080.0, 1.0)
+                # Reference: 1080 logical pixels (1920×1080 at 100%).
+                # Use sqrt to dampen the growth so the window doesn't
+                # become overly large on high-res screens.
+                raw = logical_h / 1080.0
+                scale = max(raw ** 0.5, 1.0)
                 logger.debug(
                     f"Screen: {avail.width()}x{avail.height()}, "
                     f"pixelRatio: {ratio}, scale factor: {scale:.2f}"
