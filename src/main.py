@@ -11,6 +11,11 @@ if __name__ == "__main__":
     if sys.platform == 'win32':
         import ctypes
         try:
+            # -4 = DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+            ctypes.windll.user32.SetProcessDpiAwarenessContext(ctypes.c_void_p(-4))
+        except (AttributeError, OSError) as err:
+            logging.getLogger(__name__).debug("Per-monitor V2 DPI awareness could not be set: %s", err)
+        try:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('otakuweber.chesspilot.2.3.0')
         except (AttributeError, OSError) as err:
             logging.getLogger(__name__).debug("AppUserModelID could not be set: %s", err)
