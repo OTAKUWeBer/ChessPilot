@@ -12,8 +12,8 @@ if __name__ == "__main__":
         import ctypes
         try:
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('otakuweber.chesspilot.2.2.1')
-        except Exception:
-            pass
+        except (AttributeError, OSError) as err:
+            logging.getLogger(__name__).debug("AppUserModelID could not be set: %s", err)
         if getattr(sys, 'frozen', False):
             ctypes.windll.user32.ShowWindow(
                 ctypes.windll.kernel32.GetConsoleWindow(), 

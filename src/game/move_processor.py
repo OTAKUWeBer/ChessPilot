@@ -370,8 +370,8 @@ def _finalize_move_processing(root, auto_mode_var, btn_play):
     if processing_lock.locked():
         try:
             processing_lock.release()
-        except RuntimeError:
-            pass
+        except RuntimeError as err:
+            logger.debug("Processing lock already released or not owned: %s", err)
     auto_val = auto_mode_var() if callable(auto_mode_var) else auto_mode_var
     if not auto_val:
         QTimer.singleShot(0, lambda: btn_play.setEnabled(True))

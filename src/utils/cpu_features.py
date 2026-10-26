@@ -110,8 +110,8 @@ def _detect_mac_cpu_info():
         try:
             out2 = subprocess.check_output(["sysctl", "-n", "machdep.cpu.leaf7_features"], text=True, timeout=10, creationflags=creation_flags)
             flags.update(out2.lower().split())
-        except Exception:
-            pass
+        except (subprocess.SubprocessError, OSError) as err:
+            logger.debug("Optional leaf7 features not available on macOS: %s", err)
     except Exception as e:
         logger.warning(f"Could not get Mac CPU features: {e}")
         

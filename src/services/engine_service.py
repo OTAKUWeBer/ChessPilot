@@ -34,8 +34,8 @@ def get_config_file_path() -> str:
             f.write("")
         os.remove(test_file)
         return root_cfg
-    except (PermissionError, OSError):
-        pass
+    except (PermissionError, OSError) as err:
+        logger.debug("Root directory not writable, using user config fallback: %s", err)
 
     # Fallback to standard user config directory
     if sys.platform == "win32":
@@ -181,8 +181,8 @@ def _cleanup_stockfish():
                 try:
                     _stockfish_process.stdin.write("quit\n")
                     _stockfish_process.stdin.flush()
-                except (BrokenPipeError, OSError):
-                    pass
+                except (BrokenPipeError, OSError) as err:
+                    logger.debug("Engine stdin already closed during quit: %s", err)
             _stockfish_process.wait(timeout=2)
         except Exception as e:
             logger.error(f"Error terminating Stockfish process: {e}")
@@ -262,8 +262,8 @@ def _get_move_from_engine(stockfish, depth_var, fen, root=None, timeout_seconds=
                 if current_depth > last_depth:
                     last_depth = current_depth
                     root.update_status(f"Processing... Depth {current_depth}/{depth_var}")
-            except (IndexError, ValueError):
-                pass
+            except (IndexError, ValueError) as err:
+                logger.debug("Could not parse depth from engine output line: %s", err)
         
         mate_flag = _check_for_mate(line, mate_flag)
         best_move = _extract_best_move(line)

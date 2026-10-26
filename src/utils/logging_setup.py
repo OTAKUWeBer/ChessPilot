@@ -125,8 +125,8 @@ def setup_logging(level=logging.DEBUG) -> Path:
             console_fmt = "[%(asctime)s.%(msecs)03d] [%(levelname)s] %(message)s"
             console_handler.setFormatter(ColorFormatter(console_fmt, datefmt="%H:%M:%S"))
             root_logger.addHandler(console_handler)
-        except Exception:
-            pass
+        except (OSError, ValueError) as err:
+            root_logger.debug("Console logging initialization skipped: %s", err)
 
     # 3. Setup global uncaught exception hooks
     def _handle_uncaught_exception(exc_type, exc_value, exc_traceback):
