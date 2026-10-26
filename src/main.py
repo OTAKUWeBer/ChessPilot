@@ -11,7 +11,7 @@ if __name__ == "__main__":
     if sys.platform == 'win32':
         import ctypes
         try:
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('otakuweber.chesspilot.2.2.0')
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('otakuweber.chesspilot.2.2.1')
         except Exception:
             pass
         if getattr(sys, 'frozen', False):
@@ -38,7 +38,7 @@ os.chdir(script_dir)
 
 logger.info("=" * 60)
 logger.info("ChessPilot starting...")
-logger.info("Version: 2.2.0")
+logger.info("Version: 2.2.1")
 logger.info(f"Log file: {get_log_file_path()}")
 logger.info("=" * 60)
 
@@ -277,6 +277,7 @@ class ChessPilot(QMainWindow):
 
     def closeEvent(self, event):
         logger.info("Application closing - cleaning up Stockfish process")
+        self.auto_mode_var = False
         self.engine_service.cleanup()
         event.accept()
 

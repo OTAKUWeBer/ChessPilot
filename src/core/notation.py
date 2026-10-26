@@ -15,6 +15,10 @@ def chess_notation_to_index(color_indicator, root, auto_mode_var, move):
         col_map = {'a': 7, 'b': 6, 'c': 5, 'd': 4, 'e': 3, 'f': 2, 'g': 1, 'h': 0}
         row_map = {'1': 0, '2': 1, '3': 2, '4': 3, '5': 4, '6': 5, '7': 6, '8': 7}
 
+    if not move or len(move) < 4:
+        logger.warning(f"Move notation is empty or too short: {move}")
+        return None, None
+
     try:
         start_col = col_map[move[0]]
         start_row = row_map[move[1]]
@@ -23,10 +27,15 @@ def chess_notation_to_index(color_indicator, root, auto_mode_var, move):
         logger.info(f"Parsed move: {move} -> ({start_col}, {start_row}) to ({end_col}, {end_row})")
         return (start_col, start_row), (end_col, end_row)
 
-    except (KeyError, IndexError) as e:
+    except (KeyError, IndexError, TypeError) as e:
         logger.error(f"Invalid move notation: {move}, Error: {e}")
         QTimer.singleShot(0, lambda: QMessageBox.critical(root, "Error", f"Invalid move notation: {move}"))
         if callable(auto_mode_var):
-            root.auto_mode_var = False
-            root.auto_mode_check.setChecked(False)
+            def _turn_off():
+                if root:
+                    if hasattr(root, "auto_mode_var"):
+                        root.auto_mode_var = False
+                    if hasattr(root, "auto_mode_check") and root.auto_mode_check is not None:
+                        root.auto_mode_check.setChecked(False)
+            QTimer.singleShot(0, _turn_off)
         return None, None

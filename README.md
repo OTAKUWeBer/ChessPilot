@@ -33,6 +33,15 @@
 
 ## 🎉 Highlights (What's New)
 
+### **v2.2.1 — Production Stability, Automation & Performance**
+
+* **Universal Move Automation** — Added intermediate drag-and-drop movement events on Windows for seamless recognition on Chromium-based browsers (Chess.com, Lichess).
+* **Smart Auto-Castling Detection** — Automatically detects when online platforms move the rook upon king castling, preventing redundant clicks or lingering selections.
+* **Streamlined Pawn Promotion** — Eliminated redundant inference overhead during promotions; fully compatible with platform auto-queen settings.
+* **Thread-Safe UI Operations** — All background loop and move executor UI state transitions are strictly dispatched through the Qt main event loop (`QTimer.singleShot`), guaranteeing zero thread-affinity conflicts or UI freezes.
+* **Optimized CPU & Logging** — Replaced high-frequency screenshot log spam with debug-level telemetry to minimize disk I/O and CPU overhead during auto-play.
+* **Overlapping Detection Precision** — Piece recognition resolves overlapping bounding boxes using square-level confidence grids.
+
 ### **v2.2.0 — The Architecture & Aesthetics Update**
 
 * **Massive Structural Refactor** — The monolithic executor module has been split into clean `core`, `game`, and `utils` domains, improving performance and maintainability.

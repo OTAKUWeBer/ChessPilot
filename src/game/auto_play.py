@@ -215,6 +215,7 @@ def _run_move_detection_loop(
                     _stop_auto_mode(root, auto_mode_var, btn_play, update_status_callback,
                                   "Auto mode stopped: Board detection failed repeatedly")
                     break
+                time.sleep(0.2)
                 continue
                 
             _consecutive_failures = 0
@@ -256,17 +257,17 @@ def _stop_auto_mode(root, auto_mode_var, btn_play, update_status_callback, messa
             root.auto_mode_var = False
         _set_var_value(auto_mode_var, False)
         
-        if hasattr(root, "auto_mode_check"):
-            root.auto_mode_check.setChecked(False)
-            logger.info("Unchecked auto_mode_check")
-        
-        if hasattr(root, "btn_play"):
-            root.btn_play.setEnabled(True)
-            logger.info("Re-enabled play button")
-        
-        if update_status_callback:
-            QTimer.singleShot(0, lambda: update_status_callback(f"\n{message}"))
-            
+        def _update_ui():
+            if hasattr(root, "auto_mode_check") and root.auto_mode_check is not None:
+                root.auto_mode_check.setChecked(False)
+                logger.info("Unchecked auto_mode_check")
+            if hasattr(root, "btn_play") and root.btn_play is not None:
+                root.btn_play.setEnabled(True)
+                logger.info("Re-enabled play button")
+            if update_status_callback:
+                update_status_callback(f"\n{message}")
+
+        QTimer.singleShot(0, _update_ui)
     except Exception as e:
         logger.error(f"Error stopping auto mode: {e}", exc_info=True)
 

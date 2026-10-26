@@ -23,6 +23,16 @@ logger = logging.getLogger(__name__)
 
 class MoveExecutionMethods:
     @staticmethod
+    def _safe_disable_auto_mode(root, auto_mode_var):
+        if callable(auto_mode_var):
+            def _turn_off():
+                if hasattr(root, "auto_mode_var"):
+                    root.auto_mode_var = False
+                if hasattr(root, "auto_mode_check") and root.auto_mode_check is not None:
+                    root.auto_mode_check.setChecked(False)
+            QTimer.singleShot(0, _turn_off)
+
+    @staticmethod
     def drag_piece(start_pos, end_pos, humanize=True, offset_range=(-16, 16), root=None, auto_mode_var=None):
         start_x, start_y = start_pos
         end_x, end_y = end_pos
@@ -32,6 +42,10 @@ class MoveExecutionMethods:
                 min_off, max_off = offset_range
                 if min_off > max_off:
                     min_off, max_off = max_off, min_off
+                if root and hasattr(root, 'square_size') and root.square_size:
+                    max_allowed = max(2, int(root.square_size * 0.22))
+                    min_off = max(min_off, -max_allowed)
+                    max_off = min(max_off, max_allowed)
                 start_x += random.uniform(min_off, max_off)
                 start_y += random.uniform(min_off, max_off)
                 end_x += random.uniform(min_off, max_off)
@@ -43,9 +57,13 @@ class MoveExecutionMethods:
             if os.name == 'nt':
                 win32api.SetCursorPos((int(round(start_x)), int(round(start_y))))
                 win32api.mouse_event(win32con.MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0)
-                time.sleep(0.05)
+                time.sleep(0.04)
+                mid_x = (start_x + end_x) / 2
+                mid_y = (start_y + end_y) / 2
+                win32api.SetCursorPos((int(round(mid_x)), int(round(mid_y))))
+                time.sleep(0.02)
                 win32api.SetCursorPos((int(round(end_x)), int(round(end_y))))
-                time.sleep(0.05)
+                time.sleep(0.04)
                 win32api.mouse_event(win32con.MOUSEEVENTF_LEFTUP, 0, 0, 0, 0)
             elif is_wayland():
                 from wayland_capture.wayland import WaylandInput
@@ -61,9 +79,7 @@ class MoveExecutionMethods:
             logger.error(f"Failed to drag piece: {e}")
             if root and auto_mode_var:
                 QTimer.singleShot(0, lambda err=e: QMessageBox.critical(root, "Error", f"Failed to drag piece: {str(err)}"))
-                if callable(auto_mode_var):
-                    root.auto_mode_var = False
-                    root.auto_mode_check.setChecked(False)
+                MoveExecutionMethods._safe_disable_auto_mode(root, auto_mode_var)
 
     @staticmethod
     def click_piece(start_pos, end_pos, humanize=True, offset_range=(-16, 16), root=None, auto_mode_var=None):
@@ -75,6 +91,10 @@ class MoveExecutionMethods:
                 min_off, max_off = offset_range
                 if min_off > max_off:
                     min_off, max_off = max_off, min_off
+                if root and hasattr(root, 'square_size') and root.square_size:
+                    max_allowed = max(2, int(root.square_size * 0.22))
+                    min_off = max(min_off, -max_allowed)
+                    max_off = min(max_off, max_allowed)
                 start_x += random.uniform(min_off, max_off)
                 start_y += random.uniform(min_off, max_off)
                 end_x += random.uniform(min_off, max_off)
@@ -104,9 +124,7 @@ class MoveExecutionMethods:
             logger.error(f"Failed to click piece: {e}")
             if root and auto_mode_var:
                 QTimer.singleShot(0, lambda err=e: QMessageBox.critical(root, "Error", f"Failed to click piece: {str(err)}"))
-                if callable(auto_mode_var):
-                    root.auto_mode_var = False
-                    root.auto_mode_check.setChecked(False)
+                MoveExecutionMethods._safe_disable_auto_mode(root, auto_mode_var)
 
 class MoveExecutor:
     @staticmethod
@@ -208,26 +226,12 @@ class MoveExecutor:
         if is_pawn_promotion_move(move):
             logger.info(f"Detected pawn promotion move: {move}")
             try:
-                img = capture_screenshot_in_memory()
-                boxes = get_positions(img) if img else None
-                if boxes:
-                    chessboard_boxes = [box for box in boxes if box[5] == 12.0]
-                    if chessboard_boxes:
-                        result = get_fen_from_position(color_indicator, boxes)
-                        if result:
-                            chessboard_x, chessboard_y, square_size, fen = result
-                            chessboard_data = {
-                                'chessboard_x': chessboard_x,
-                                'chessboard_y': chessboard_y,
-                                'square_size': square_size,
-                                'fen': fen
-                            }
-                            promotion_success = handle_pawn_promotion(
-                                color_indicator, move, board_positions, chessboard_data,
-                                auto_mode_var, root, move_mode, humanize=True, max_retries=2
-                            )
-                            if not promotion_success:
-                                logger.warning("Pawn promotion handling may have failed")
+                promotion_success = handle_pawn_promotion(
+                    color_indicator, move, board_positions, None,
+                    auto_mode_var, root, move_mode, humanize=True, max_retries=2
+                )
+                if not promotion_success:
+                    logger.debug("Pawn promotion dialog not detected (may have auto-promoted)")
             except Exception as e:
                 logger.warning(f"Error in promotion handling: {e}")
         
@@ -303,14 +307,18 @@ class MoveExecutor:
     @staticmethod
     def _disable_auto_mode(auto_mode_var, root):
         try:
-            if root is not None:
-                if hasattr(root, "auto_mode_var"):
-                    root.auto_mode_var = False
-                if hasattr(root, "auto_mode_check"):
-                    root.auto_mode_check.setChecked(False)
-                if hasattr(root, "btn_play"):
-                    root.btn_play.setEnabled(True)
             if hasattr(auto_mode_var, "set") and callable(auto_mode_var.set):
                 auto_mode_var.set(False)
+
+            def _update_ui():
+                if root is not None:
+                    if hasattr(root, "auto_mode_var"):
+                        root.auto_mode_var = False
+                    if hasattr(root, "auto_mode_check") and root.auto_mode_check is not None:
+                        root.auto_mode_check.setChecked(False)
+                    if hasattr(root, "btn_play") and root.btn_play is not None:
+                        root.btn_play.setEnabled(True)
+
+            QTimer.singleShot(0, _update_ui)
         except Exception as e:
             logger.error(f"Error disabling auto mode: {e}", exc_info=True)

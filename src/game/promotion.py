@@ -99,12 +99,12 @@ def select_promotion_piece(piece_position, move_mode="drag", humanize=True, offs
         return False
 
 def is_pawn_promotion_move(move_notation):
-    if len(move_notation) == 5 and move_notation[4] in ['q', 'r', 'b', 'n', 'Q', 'R', 'B', 'N']:
+    if move_notation and len(move_notation) == 5 and move_notation[4] in ['q', 'r', 'b', 'n', 'Q', 'R', 'B', 'N']:
         return True
     return False
 
 def get_promotion_piece_from_move(move_notation):
-    if len(move_notation) == 5:
+    if move_notation and len(move_notation) == 5:
         return move_notation[4].lower()
     return None
 
@@ -148,8 +148,8 @@ def wait_for_promotion_dialog(color_indicator, max_wait_time=1.5, check_interval
     return None
 
 def handle_pawn_promotion(
-    color_indicator, move, board_positions, chessboard_data,
-    auto_mode_var, root, move_mode, humanize=True, max_retries=2
+    color_indicator, move, board_positions, chessboard_data=None,
+    auto_mode_var=None, root=None, move_mode="drag", humanize=True, max_retries=2
 ):
     if not is_pawn_promotion_move(move):
         return False

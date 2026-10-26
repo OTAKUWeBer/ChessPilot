@@ -47,6 +47,7 @@ def get_fen_from_position(color, boxes):
 
     # Initialize an 8x8 grid to represent the board
     grid = [[None for _ in range(8)] for _ in range(8)]
+    confidence_grid = [[0.0 for _ in range(8)] for _ in range(8)]
 
     for box in filtered_boxes:
         x, y, w, h, confidence, class_id = box
@@ -61,9 +62,10 @@ def get_fen_from_position(color, boxes):
         row_index = int(rel_y // square_size)
         # Check if indices are within bounds
         if 0 <= file_index < 8 and 0 <= row_index < 8:
-            fen_char = class_to_fen.get(int(class_id), '?')  # Use '?' if class_id is unknown
-            # Place the piece in the grid (row_index corresponds to chess rank)
-            grid[row_index][file_index] = fen_char
+            if confidence > confidence_grid[row_index][file_index]:
+                fen_char = class_to_fen.get(int(class_id), '?')  # Use '?' if class_id is unknown
+                grid[row_index][file_index] = fen_char
+                confidence_grid[row_index][file_index] = confidence
 
     # Convert the grid to FEN notation
     fen_rows = []

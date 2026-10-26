@@ -4,7 +4,7 @@ import threading
 from PyQt6.QtCore import QTimer
 from board_detection import get_positions, get_fen_from_position
 from utils.system_interaction import capture_screenshot_in_memory
-from core.board_utils import capture_and_extract_fen, store_board_positions
+from core.board_utils import capture_and_extract_fen, store_board_positions, fen_to_list, algebraic_to_index
 from services.engine_service import EngineService
 from core.fen_utils import is_castling_possible, update_fen_castling_rights, get_current_fen, is_two_square_king_move
 from game.move_execution import MoveExecutor
@@ -280,8 +280,22 @@ def _execute_castling_pieces(
         rook_move = "h8f8" if is_kingside else "a8d8"
     
     MoveExecutor.move_piece(color_indicator, best_move, board_positions, auto_mode_var, root, btn_play, move_mode)
-    time.sleep(0.2)
-    MoveExecutor.move_piece(color_indicator, rook_move, board_positions, auto_mode_var, root, btn_play, move_mode)
+    time.sleep(0.25)
+
+    # Check if the platform automatically moved the rook on king castling
+    current_fen = capture_and_extract_fen(color_indicator, 0)
+    rook_auto_castled = False
+    if current_fen:
+        rook_target = rook_move[2:4]
+        target_idx = algebraic_to_index(rook_target)
+        fen_list = fen_to_list(current_fen)
+        expected_rook = 'R' if color_indicator == 'w' else 'r'
+        if 0 <= target_idx < len(fen_list) and fen_list[target_idx] == expected_rook:
+            rook_auto_castled = True
+            logger.info(f"Platform auto-castled rook to {rook_target}; skipping manual rook move")
+
+    if not rook_auto_castled:
+        MoveExecutor.move_piece(color_indicator, rook_move, board_positions, auto_mode_var, root, btn_play, move_mode)
     delay = 0.4 if move_mode == "click" else 0.1
     time.sleep(delay)
 
@@ -327,15 +341,19 @@ def _handle_castling_failure(move, max_retries, update_status, auto_mode_var, ro
 
 def _disable_auto_mode(auto_mode_var, root):
     try:
-        if root is not None:
-            if hasattr(root, "auto_mode_var"):
-                root.auto_mode_var = False
-            if hasattr(root, "auto_mode_check"):
-                root.auto_mode_check.setChecked(False)
-            if hasattr(root, "btn_play"):
-                root.btn_play.setEnabled(True)
         if hasattr(auto_mode_var, "set") and callable(auto_mode_var.set):
             auto_mode_var.set(False)
+
+        def _update_ui():
+            if root is not None:
+                if hasattr(root, "auto_mode_var"):
+                    root.auto_mode_var = False
+                if hasattr(root, "auto_mode_check") and root.auto_mode_check is not None:
+                    root.auto_mode_check.setChecked(False)
+                if hasattr(root, "btn_play") and root.btn_play is not None:
+                    root.btn_play.setEnabled(True)
+
+        QTimer.singleShot(0, _update_ui)
     except Exception as e:
         logger.error(f"Error disabling auto mode: {e}", exc_info=True)
 

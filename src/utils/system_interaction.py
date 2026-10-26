@@ -28,12 +28,12 @@ def capture_screenshot_in_memory(root=None, auto_mode_var=None):
     grim_path = get_binary_path("grim") if is_wayland() else None
     try:
         if is_wayland():
-            logger.info("Capturing screenshot using grim (Wayland)...")
+            logger.debug("Capturing screenshot using grim (Wayland)...")
             creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
             result = subprocess.run([grim_path, "-"], stdout=subprocess.PIPE, check=True, creationflags=creation_flags)
             image = Image.open(io.BytesIO(result.stdout))
         else:
-            logger.info("Capturing screenshot using mss (non-Wayland)...")
+            logger.debug("Capturing screenshot using mss (non-Wayland)...")
             with mss.mss() as sct:
                 monitor = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
                 sct_img = sct.grab(monitor)
@@ -44,10 +44,14 @@ def capture_screenshot_in_memory(root=None, auto_mode_var=None):
         logger.error(f"Screenshot failed: {e}")
         if root:
             QTimer.singleShot(0, lambda: QMessageBox.critical(root, "Error", f"Screenshot failed: {str(e)}"))
-        if auto_mode_var:
-            if callable(auto_mode_var):
-                root.auto_mode_var = False
-                root.auto_mode_check.setChecked(False)
+        if auto_mode_var and callable(auto_mode_var):
+            def _turn_off():
+                if root:
+                    if hasattr(root, "auto_mode_var"):
+                        root.auto_mode_var = False
+                    if hasattr(root, "auto_mode_check") and root.auto_mode_check is not None:
+                        root.auto_mode_check.setChecked(False)
+            QTimer.singleShot(0, _turn_off)
         return None
 
 
@@ -140,7 +144,7 @@ def disable_auto_mode(root) -> None:
     
     try:
         if hasattr(root, "auto_mode_check") and root.auto_mode_check is not None:
-            root.auto_mode_check.setChecked(False)
+            QTimer.singleShot(0, lambda: root.auto_mode_check.setChecked(False))
             logger.debug("Unchecked auto_mode_check")
     except Exception:
         logger.debug("Could not uncheck auto_mode_check", exc_info=True)
