@@ -155,3 +155,19 @@ def move_mode(app, parent, text, method):
     """)
     btn.clicked.connect(lambda: app.set_move_mode(method))
     return btn
+
+
+def set_window_icon(app):
+    """Sets the application window icon from assets/logo.png."""
+    import os
+    from PyQt6.QtGui import QIcon
+    from utils.resource_path import resource_path
+
+    logo_path = resource_path(os.path.join('assets', 'logo.png'))
+    if os.path.exists(logo_path):
+        try:
+            icon = QIcon(logo_path)
+            app.setWindowIcon(icon)
+            logger.debug("Window icon set successfully")
+        except Exception as e:
+            logger.warning(f"Failed to set window icon: {e}")

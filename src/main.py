@@ -60,11 +60,9 @@ if not setup_resources(script_dir, project_dir):
     sys.exit(1)
 
 from core import GameState, AppConfig
-from game import MoveExecutor, BoardAnalyzer, MoveValidator, AutoPlayController
-from game.move_processor import process_move
+from game import AutoPlayController, process_move
 from services import EngineService
 
-from gui.set_window_icon import set_window_icon
 from gui.create_widget import create_widgets
 from gui.shortcuts import bind_shortcuts
 from gui.button_and_checkboxes import (
@@ -73,6 +71,7 @@ from gui.button_and_checkboxes import (
     castling_checkboxes,
     move_mode,
     shortcuts_button,
+    set_window_icon,
 )
 
 class ChessPilot(QMainWindow):
@@ -86,9 +85,6 @@ class ChessPilot(QMainWindow):
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
 
         self.game_state = GameState()
-        self.move_executor = MoveExecutor()
-        self.board_analyzer = BoardAnalyzer()
-        self.move_validator = MoveValidator()
         self.engine_service = EngineService()
 
         self.color_indicator = None
@@ -146,6 +142,7 @@ class ChessPilot(QMainWindow):
     def set_color(self, color):
         logger.info(f"Color selected: {'White' if color == 'w' else 'Black'}")
         self.color_indicator = color
+        self.game_state.set_color(color)
         self.color_frame.hide()
         self.main_frame.show()
         self.btn_play.setEnabled(True)
@@ -154,6 +151,7 @@ class ChessPilot(QMainWindow):
     def set_move_mode(self, mode):
         logger.info(f"Move method set to: {mode}")
         self.move_mode = mode
+        self.game_state.set_move_mode(mode)
         self.update_status(f"\nMove method: {mode.capitalize()}")
 
     def update_status(self, message):
@@ -209,72 +207,6 @@ class ChessPilot(QMainWindow):
             logger.info("Auto mode disabled")
             self.btn_play.setEnabled(True)
 
-    def capture_board_screenshot(self):
-        return self.board_analyzer.capture_screenshot(self, lambda: self.auto_mode_var)
-
-    def convert_move_to_indices(self, move: str):
-        return self.move_executor.convert_move_to_indices(
-            self.color_indicator, self, lambda: self.auto_mode_var, move
-        )
-
-    def relocate_cursor_to_play_button(self):
-        self.move_executor.relocate_cursor_to_button(self, lambda: self.auto_mode_var, self.btn_play)
-
-    def drag_piece(self, move: str):
-        self.move_executor.execute_move(
-            self.color_indicator, move, self.board_positions,
-            lambda: self.auto_mode_var, self, self.btn_play, self.move_mode
-        )
-
-    def expand_fen_row(self, row: str):
-        return self.board_analyzer.expand_fen_row(row)
-
-    def check_castling(self, fen: str):
-        return self.board_analyzer.check_castling_possible(fen, self.color_indicator)
-
-    def adjust_castling_fen(self, fen: str):
-        return self.board_analyzer.adjust_castling_fen(
-            self.color_indicator, lambda: self.kingside_var, lambda: self.queenside_var, fen
-        )
-
-    def check_move_validity(self, before_fen: str, after_fen: str, move: str):
-        return self.move_validator.check_move_validity(
-            self.color_indicator, before_fen, after_fen, move
-        )
-
-    def play_normal_move(self, move: str, mate_flag: bool, expected_fen: str):
-        logger.debug(f"Playing normal move via wrapper: {move}")
-        return self.move_executor.execute_normal_move(
-            self.board_positions,
-            self.color_indicator,
-            move,
-            mate_flag,
-            expected_fen,
-            self,
-            lambda: self.auto_mode_var,
-            self.update_status,
-            self.btn_play,
-            self.move_mode,
-        )
-
-    def query_best_move(self, fen: str):
-        return self.engine_service.get_best_move(
-            self.depth_var, fen, self, lambda: self.auto_mode_var
-        )
-
-    def read_current_fen(self):
-        return self.board_analyzer.read_current_fen(self.color_indicator)
-
-    def store_positions(self, x: int, y: int, size: int):
-        from core.board_utils import store_board_positions
-        logger.debug(f"Storing board positions: x={x}, y={y}, size={size}")
-        store_board_positions(self.board_positions, x, y, size)
-
-    def verify_move_wrapper(self, before_fen: str, expected_fen: str, attempts_limit: int = 3):
-        return self.move_validator.verify_move(
-            self.color_indicator, before_fen, expected_fen, attempts_limit
-        )
-
     def closeEvent(self, event):
         logger.info("Application closing - cleaning up Stockfish process")
         self.auto_mode_var = False
@@ -282,6 +214,7 @@ class ChessPilot(QMainWindow):
         event.accept()
 
     def update_last_fen_for_color(self, fen: str):
+        self.game_state.update_last_fen_for_color(fen)
         parts = fen.split()
         placement, active_color = parts[0], parts[1]
         self.last_fen_by_color[active_color] = placement

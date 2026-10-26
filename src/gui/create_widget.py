@@ -2,10 +2,15 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QSlider, QDoubleSpinBox,
                              QRadioButton, QButtonGroup, QVBoxLayout, QHBoxLayout, QCheckBox)
 from PyQt6.QtCore import Qt
 import logging
-from gui.update_depth_label import update_depth_label
 from gui.shortcuts_dialog import show_shortcuts_dialog
 
 logger = logging.getLogger(__name__)
+
+def update_depth_label(app, value):
+    """Updates the depth label and app depth_var when slider changes."""
+    logger.debug(f"Depth slider changed to {value}")
+    app.depth_var = int(value)
+    app.depth_label.setText(f"Depth: {int(value)}")
 
 def create_widgets(app):
     central_widget = QWidget()

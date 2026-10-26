@@ -8,8 +8,10 @@ logger.setLevel(logging.DEBUG)
 def get_fen_from_position(color, boxes):
     logger.debug(f"Processing {len(boxes)} detected boxes")
     
+    from board_detection.model_classes import CLASS_TO_FEN, CHESSBOARD_CLASS_ID
+
     # Find the chessboard (class_id 12.0)
-    chessboard_boxes = [box for box in boxes if box[5] == 12.0]
+    chessboard_boxes = [box for box in boxes if box[5] == CHESSBOARD_CLASS_ID]
     
     detected_classes = set([box[5] for box in boxes])
     logger.debug(f"Detected class IDs: {detected_classes}")
@@ -26,21 +28,7 @@ def get_fen_from_position(color, boxes):
     chessboard_y = chessboard_box[1]
     square_size = chessboard_box[2] / 8.0  # Calculate square size based on chessboard width
 
-    # Mapping from class_id to FEN characters
-    class_to_fen = {
-        0: 'p',
-        1: 'r',
-        2: 'n',
-        3: 'b',
-        4: 'q',
-        5: 'k',
-        6: 'P',
-        7: 'R',
-        8: 'N',
-        9: 'B',
-        10: 'Q',
-        11: 'K',
-    }
+    class_to_fen = CLASS_TO_FEN
 
     # Filter out the chessboard and process other detections
     filtered_boxes = [box for box in boxes if box[5] != 12.0]

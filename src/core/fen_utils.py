@@ -1,7 +1,6 @@
 import logging
 from typing import Tuple
-from board_detection import get_positions, get_fen_from_position
-from utils.system_interaction import capture_screenshot_in_memory
+from board_detection.board_reader import get_current_fen
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -15,18 +14,6 @@ def expand_fen_row(row: str) -> str:
         else:
             expanded += char
     return expanded
-
-
-def get_current_fen(color_indicator):
-    try:
-        screenshot = capture_screenshot_in_memory()
-        boxes = get_positions(screenshot)
-        if boxes:
-            _, _, _, fen = get_fen_from_position(color_indicator, boxes)          
-            return fen
-    except Exception:
-        logging.error("Failed to get current FEN", exc_info=True)
-        return None
 
 
 def is_castling_possible(fen: str, color: str, side: str) -> bool:

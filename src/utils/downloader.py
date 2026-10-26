@@ -1,387 +1,79 @@
+"""
+Stockfish release resolution, streaming download, and archive extraction subsystem.
+Coordinates release asset selection and installation for ChessPilot.
+"""
+
 import os
-import platform
-import subprocess
-import tarfile
-import zipfile
-import shutil
-import tempfile
-import threading
-import requests
-from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QProgressBar, QPushButton
-from PyQt6.QtCore import Qt, QTimer, QObject, pyqtSignal
-from pathlib import Path
-import logging
 import sys
 import time
-import struct
-import cpuinfo
+import shutil
+import tarfile
+import zipfile
+import tempfile
+import logging
+from pathlib import Path
+import requests
+from PyQt6.QtWidgets import QApplication
+
+from utils.cpu_features import detect_os, detect_cpu_info, format_bytes
+from gui.download_dialog import StockfishDownloaderApp, SILENT_MODE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-SILENT_MODE = False
-
-class ProgressSignals(QObject):
-    """Signals for thread-safe UI updates"""
-    progress_update = pyqtSignal(int)  # percentage
-    label_update = pyqtSignal(str)
-    sub_label_update = pyqtSignal(str)
-    show_retry = pyqtSignal()
-    close_window = pyqtSignal(int)  # delay in ms
-
-# ------------------------ Visual style (match ChessPilot) ------------------------
-BG_COLOR = "#2D2D2D"
-FRAME_COLOR = "#373737"
-ACCENT_COLOR = "#4CAF50"
-TEXT_COLOR = "#FFFFFF"
-HOVER_COLOR = "#45a049"
-
-# ------------------------ Helpers ------------------------
-def detect_os():
-    p = platform.system().lower()
-    if "windows" in p:
-        return "windows"
-    if "linux" in p:
-        return "linux"
-    if "darwin" in p:
-        return "mac"
-    return p
-
-def detect_cpu_info():
-    """Detect CPU vendor and features"""
-    arch = platform.machine().lower()
-    os_name = detect_os()
-    
-    vendor = "unknown"
-    flags = set()
-    
-    try:
-        if os_name == "linux":
-            vendor, flags = _detect_linux_cpu_info()
-        elif os_name == "mac":
-            vendor, flags = _detect_mac_cpu_info()
-        elif os_name == "windows":
-            vendor, flags = _detect_windows_cpu_info()
-    except Exception as e:
-        logger.warning(f"CPU detection failed, using defaults: {e}")
-        # Fallback to safe defaults
-        vendor = "generic"
-        flags = {"sse4_1", "sse4_2", "popcnt"}
-    
-    logger.info(f"CPU Vendor: {vendor}, Flags: {sorted(flags)[:10]}...")
-    return arch, vendor, flags
-
-def _detect_linux_cpu_info():
-    vendor = "unknown"
-    flags = set()
-    
-    try:
-        # Get CPU info
-        with open("/proc/cpuinfo", "r") as f:
-            for line in f:
-                line_lower = line.lower()
-                if "vendor_id" in line_lower:
-                    if "amd" in line_lower:
-                        vendor = "amd"
-                    elif "intel" in line_lower:
-                        vendor = "intel"
-                elif "flags" in line_lower:
-                    parts = line.split(":", 1)
-                    if len(parts) > 1:
-                        flags.update(parts[1].strip().split())
-    except Exception as e:
-        logger.warning(f"Could not read /proc/cpuinfo: {e}")
-        # Fallback to lscpu
-        try:
-            creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-            out = subprocess.check_output(["/usr/bin/lscpu"], text=True, timeout=10, creationflags=creation_flags)
-            for line in out.splitlines():
-                if "vendor id" in line.lower():
-                    if "amd" in line.lower():
-                        vendor = "amd"
-                    elif "intel" in line.lower():
-                        vendor = "intel"
-                elif "flags" in line.lower():
-                    flags.update(line.split(":")[1].strip().split())
-        except Exception as e2:
-            logger.warning(f"Could not detect CPU with lscpu: {e2}")
-    
-    return vendor, flags
-
-def _detect_mac_cpu_info():
-    vendor = "apple"  # Modern Macs are Apple Silicon or Intel
-    flags = set()
-    
-    try:
-        creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-        # Check for Apple Silicon
-        out = subprocess.check_output(["/usr/sbin/sysctl", "-n", "machdep.cpu.brand_string"], 
-                                     text=True, timeout=5, creationflags=creation_flags).strip()
-        if "apple" in out.lower():
-            vendor = "apple"
-        elif "intel" in out.lower():
-            vendor = "intel"
-        elif "amd" in out.lower():
-            vendor = "amd"
-            
-        # Get CPU features
-        out = subprocess.check_output(["/usr/sbin/sysctl", "-a"], text=True, timeout=10, creationflags=creation_flags)
-        for line in out.splitlines():
-            key = line.split(":")[0].strip().lower()
-            if "machdep.cpu.features" in key or "machdep.cpu.leaf7_features" in key:
-                flags.update(line.split(":")[1].strip().split())
-    except Exception as e:
-        logger.warning(f"Could not detect CPU on macOS: {e}")
-    
-    return vendor, flags
-
-def _detect_windows_cpu_info():
-    """
-    Detect CPU vendor and flags on Windows.
-    Returns: tuple of (vendor: str, flags: set)
-    """
-    vendor = _get_cpu_vendor()
-    flags = _get_cpu_flags()
-    
-    logger.info(f"Windows CPU detection complete: vendor={vendor}, flags={sorted(list(flags))[:10]}")
-    return vendor, flags
-
-
-def _get_cpu_vendor():
-    """Try multiple methods to detect CPU vendor, returning the first successful result."""
-    vendor = _try_cpuinfo_vendor() or _try_platform_vendor() or _try_wmic_vendor()
-    
-    if not vendor or vendor == "unknown":
-        vendor = "generic"
-        logger.info("Could not determine CPU vendor, using 'generic'")
-    
-    return vendor
-
-
-def _try_cpuinfo_vendor():
-    """Attempt to get CPU vendor from cpuinfo module."""
-    try:
-        info = cpuinfo.get_cpu_info()
-        brand = info.get('brand_raw', '').lower()
-        
-        vendor = _parse_vendor_from_string(brand)
-        if vendor != "unknown":
-            logger.info(f"CPU vendor from cpuinfo module: {vendor}")
-            return vendor
-    except ImportError:
-        logger.debug("cpuinfo module not available")
-    except Exception as e:
-        logger.debug(f"cpuinfo module failed: {e}")
-    
-    return None
-
-
-def _try_platform_vendor():
-    """Attempt to get CPU vendor from platform module."""
-    try:
-        processor_name = platform.processor().lower()
-        if processor_name:
-            vendor = _parse_vendor_from_string(processor_name)
-            if vendor != "unknown":
-                logger.info(f"CPU vendor from platform.processor(): {vendor}")
-                return vendor
-    except Exception as e:
-        logger.debug(f"platform.processor() failed: {e}")
-    
-    return None
-
-
-def _try_wmic_vendor():
-    """Attempt to get CPU vendor from WMIC command."""
-    try:
-        wmic_path = _get_wmic_path()
-        if not wmic_path:
-            return None
-        
-        output = _run_wmic_command(wmic_path)
-        if output:
-            vendor = _parse_vendor_from_string(output.lower())
-            if vendor != "unknown":
-                logger.info(f"CPU vendor from WMIC: {vendor}")
-                return vendor
-    except subprocess.TimeoutExpired:
-        logger.warning("WMIC command timed out")
-    except Exception as e:
-        logger.warning(f"WMIC detection failed: {e}")
-    
-    return None
-
-
-def _get_wmic_path():
-    """Get the full path to WMIC executable for security."""
-    system_root = os.environ.get('SYSTEMROOT', 'C:\\Windows')
-    wmic_path = os.path.join(system_root, 'System32', 'wbem', 'wmic.exe')
-    
-    if os.path.exists(wmic_path):
-        return wmic_path
-    
-    logger.warning(f"WMIC not found at expected path: {wmic_path}")
-    return None
-
-
-def _run_wmic_command(wmic_path):
-    """Execute WMIC command to get CPU name."""
-    creation_flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
-    
-    output = subprocess.check_output(
-        [wmic_path, "cpu", "get", "name"],
-        text=True,
-        timeout=10,
-        creationflags=creation_flags,
-        stderr=subprocess.DEVNULL  # Suppress stderr to prevent any output
-    ).strip()
-    
-    return output
-
-
-def _parse_vendor_from_string(text):
-    """Parse CPU vendor from a text string."""
-    if 'amd' in text or 'ryzen' in text:
-        return "amd"
-    elif 'intel' in text:
-        return "intel"
-    return "unknown"
-
-
-def _get_cpu_flags():
-    """Get CPU flags from cpuinfo module or use reasonable defaults."""
-    flags = _try_cpuinfo_flags()
-    
-    if not flags:
-        flags = _get_default_windows_flags()
-    
-    return flags
-
-
-def _try_cpuinfo_flags():
-    """Attempt to get CPU flags from cpuinfo module."""
-    try:
-        info = cpuinfo.get_cpu_info()
-        cpu_flags = info.get('flags', [])
-        if cpu_flags:
-            flags = set(cpu_flags)
-            logger.info(f"CPU flags from cpuinfo module: count={len(flags)}")
-            return flags
-    except (ImportError, Exception) as e:
-        logger.debug(f"Could not get CPU flags from cpuinfo: {e}")
-    
-    return None
-
-
-def _get_default_windows_flags():
-    """Return default CPU flags for modern Windows systems."""
-    flags = {"sse4_1", "sse4_2", "popcnt", "sse4.1", "sse4.2"}
-    
-    # Assume AVX support on 64-bit systems
-    if _is_64bit_system():
-        flags.add("avx")
-        flags.add("avx2")
-        logger.debug("Assumed AVX/AVX2 support on 64-bit Windows")
-    
-    return flags
-
-
-def _is_64bit_system():
-    """Check if the system is 64-bit."""
-    try:
-        return struct.calcsize("P") * 8 == 64
-    except Exception as e:
-        logger.error(f"Could not determine system architecture: {e}")
-        return False
-
-def detect_arch_flags():
-    """Legacy function for compatibility"""
-    arch, vendor, flags = detect_cpu_info()
-    return arch, flags
-
-def format_bytes(n):
-    n = float(n or 0)
-    for unit in ["B", "KB", "MB", "GB"]:
-        if n < 1024:
-            return f"{n:.1f} {unit}"
-        n /= 1024
-    return f"{n:.1f} TB"
 
 # ------------------------ Asset selection ------------------------
 def choose_best_asset(assets, os_name, arch, vendor, flags):
-    """Choose the best Stockfish binary based on OS, CPU vendor, and features"""
+    """
+    Selects the best matching Stockfish asset for the given OS, architecture, vendor, and CPU flags.
+    """
     filtered = _filter_assets_by_os(assets, os_name)
     if not filtered:
-        logger.error("No assets found for this OS")
         return None
-    
     return _select_best_by_cpu_features(filtered, vendor, flags)
+
 
 def _filter_assets_by_os(assets, os_name):
     filtered = []
-    
-    # First pass: Look for OS-specific prefixes
     for a in assets:
-        n = a["name"].lower()
-        if _matches_os_prefix(n, os_name):
+        name = a["name"].lower()
+        if os_name == "windows" and _matches_os_prefix(name, "windows"):
             filtered.append(a)
-    
-    # Second pass: Fallback to generic OS indicators
+        elif os_name == "linux" and _matches_os_prefix(name, "linux"):
+            filtered.append(a)
+        elif os_name == "mac" and (_matches_os_prefix(name, "mac") or _matches_os_prefix(name, "apple")):
+            filtered.append(a)
+            
     if not filtered:
-        for a in assets:
-            n = a["name"].lower()
-            if _matches_os_generic(n, os_name):
-                filtered.append(a)
-    
+        filtered = [a for a in assets if _matches_os_generic(a["name"].lower(), os_name)]
     return filtered
 
-def _matches_os_prefix(name, os_name):
-    if os_name == "linux" and name.startswith("stockfish-ubuntu"):
-        return True
-    if os_name == "mac" and name.startswith("stockfish-macos"):
-        return True
-    if os_name == "windows" and name.startswith("stockfish-windows"):
-        return True
-    return False
+
+def _matches_os_prefix(name, os_prefix):
+    return (name.startswith(f"stockfish-{os_prefix}-") or 
+            name.startswith(f"stockfish_{os_prefix}_") or
+            name.startswith(f"stockfish-{os_prefix}."))
+
 
 def _matches_os_generic(name, os_name):
-    if os_name == "linux" and "linux" in name:
-        return True
-    if os_name == "mac" and ("mac" in name or "darwin" in name):
-        return True
-    if os_name == "windows" and ("win" in name or name.endswith(".zip")):
-        return True
-    return False
+    if os_name == "mac":
+        return "mac" in name or "apple" in name or "darwin" in name
+    return os_name in name
+
 
 def _select_best_by_cpu_features(filtered, vendor, flags):
-    """Select the best binary based on CPU features
-    
-    Stockfish naming conventions:
-    - x86-64-avx512 (newest, requires AVX-512)
-    - x86-64-bmi2 (modern Intel/AMD with BMI2)
-    - x86-64-avx2 (requires AVX2)
-    - x86-64-sse41-popcnt (older CPUs)
-    - x86-64-modern (generic modern)
-    - x86-64 (basic fallback)
-    """
-    score_map = {}
+    best_asset = None
+    best_score = -1
     
     for a in filtered:
-        score = _calculate_cpu_score(a["name"].lower(), vendor, flags)
-        score_map[a["name"]] = score
-        logger.debug(f"Asset: {a['name']} -> Score: {score}")
-    
-    if not score_map:
-        return filtered[0] if filtered else None
-    
-    best_name = max(score_map.items(), key=lambda kv: kv[1])[0]
-    logger.info(f"Best match: {best_name} (score: {score_map[best_name]})")
-    
-    for a in filtered:
-        if a["name"] == best_name:
-            return a
-    
-    return filtered[0]
+        score = _calculate_cpu_score(a["name"], vendor, flags)
+        logger.debug("Scoring asset %s: %s", a["name"], score)
+        if score > best_score:
+            best_score = score
+            best_asset = a
+            
+    return best_asset
+
 
 def _calculate_cpu_score(name, vendor, flags):
     """Calculate a score for how well this binary matches the CPU"""
@@ -497,7 +189,8 @@ def _calculate_vendor_penalty(name, vendor):
     
     return penalty
 
-# ------------------------ Download & extraction ------------------------
+
+# ------------------------ Download & Extraction ------------------------
 def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeout=60):
     """
     Downloads a file while calling progress_callback(downloaded_bytes, total_bytes_or_None, speed_bytes_per_sec)
@@ -532,10 +225,10 @@ def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeo
                                     
     except requests.exceptions.Timeout as e:
         logger.error(f"Download timeout: {e}")
-        raise Exception(f"Download timed out. Please check your internet connection.")
+        raise Exception("Download timed out. Please check your internet connection.")
     except requests.exceptions.ConnectionError as e:
         logger.error(f"Connection error: {e}")
-        raise Exception(f"Connection failed. Please check your internet connection.")
+        raise Exception("Connection failed. Please check your internet connection.")
     except requests.exceptions.RequestException as e:
         logger.error(f"Download failed: {e}")
         raise Exception(f"Download failed: {str(e)}")
@@ -544,6 +237,7 @@ def download_file(url, dest_path, progress_callback=None, chunk_size=8192, timeo
         raise Exception(f"Could not write file: {str(e)}")
         
     logger.debug("Download finished")
+
 
 class BinaryExtractor:
     def __init__(self, archive_path):
@@ -637,11 +331,13 @@ class BinaryExtractor:
         if self.tmpdir:
             shutil.rmtree(self.tmpdir, ignore_errors=True)
 
+
 def extract_binary(archive_path):
     extractor = BinaryExtractor(archive_path)
     return extractor.extract_binary()
 
-# ------------------------ Download workflow ------------------------
+
+# ------------------------ Download Workflow ------------------------
 class DownloadWorkflow:
     def __init__(self, signals):
         self.signals = signals
@@ -846,128 +542,15 @@ class DownloadWorkflow:
             self.signals.sub_label_update.emit(str(e))
             self.signals.show_retry.emit()
 
-# ------------------------ Downloader UI ------------------------
-class StockfishDownloaderApp(QWidget):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Stockfish Downloader")
-        self.setFixedSize(420, 180)
-        self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
-        
-        if SILENT_MODE:
-            self.hide()
 
-        self.signals = ProgressSignals()
-        self.signals.progress_update.connect(self._update_progress)
-        self.signals.label_update.connect(self._update_label)
-        self.signals.sub_label_update.connect(self._update_sub_label)
-        self.signals.show_retry.connect(self._show_retry_button)
-        self.signals.close_window.connect(self._close_after)
-
-        self._setup_styles()
-        self._create_widgets()
-
-        threading.Thread(target=self._start_download_flow, daemon=True).start()
-
-    def _setup_styles(self):
-        self.setStyleSheet(f"""
-            QWidget {{
-                background-color: {BG_COLOR};
-            }}
-            QLabel {{
-                color: {TEXT_COLOR};
-                background-color: {BG_COLOR};
-            }}
-            QProgressBar {{
-                border: 1px solid {FRAME_COLOR};
-                background-color: {FRAME_COLOR};
-                text-align: center;
-                color: {TEXT_COLOR};
-                border-radius: 3px;
-            }}
-            QProgressBar::chunk {{
-                background-color: {ACCENT_COLOR};
-                border-radius: 2px;
-            }}
-            QPushButton {{
-                background-color: {ACCENT_COLOR};
-                color: {TEXT_COLOR};
-                border: none;
-                border-radius: 3px;
-                font-family: 'Segoe UI';
-                font-size: 10pt;
-                font-weight: bold;
-                padding: 8px 15px;
-            }}
-            QPushButton:hover {{
-                background-color: {HOVER_COLOR};
-            }}
-        """)
-
-    def _create_widgets(self):
-        layout = QVBoxLayout()
-        layout.setContentsMargins(15, 15, 15, 15)
-        layout.setSpacing(8)
-
-        self.label = QLabel("Preparing download...")
-        self.label.setWordWrap(True)
-        layout.addWidget(self.label)
-
-        self.pb = QProgressBar()
-        self.pb.setMinimum(0)
-        self.pb.setMaximum(100)
-        self.pb.setValue(0)
-        self.pb.setFixedHeight(25)
-        layout.addWidget(self.pb)
-
-        self.sub_label = QLabel("")
-        self.sub_label.setWordWrap(True)
-        layout.addWidget(self.sub_label)
-
-        self.retry_button = QPushButton("Retry Download")
-        self.retry_button.clicked.connect(self._retry_download)
-        self.retry_button.hide()
-        layout.addWidget(self.retry_button)
-
-        self.setLayout(layout)
-
-    def _update_label(self, text):
-        self.label.setText(text)
-
-    def _update_sub_label(self, text):
-        self.sub_label.setText(text)
-
-    def _update_progress(self, pct):
-        self.pb.setValue(pct)
-
-    def _show_retry_button(self):
-        self.retry_button.show()
-
-    def _close_after(self, ms):
-        logger.debug("Window will close in %d ms", ms)
-        if SILENT_MODE:
-            QTimer.singleShot(100, self.close)
-        else:
-            QTimer.singleShot(ms, self.close)
-
-    def _retry_download(self):
-        self.retry_button.hide()
-        self.pb.setValue(0)
-        threading.Thread(target=self._start_download_flow, daemon=True).start()
-
-    def _start_download_flow(self):
-        workflow = DownloadWorkflow(self.signals)
-        workflow.execute()
-
-# ------------------------ Main ------------------------
+# ------------------------ Main Entrypoint ------------------------
 def download_stockfish(target_path=None):
     """
     Main entry point for downloading Stockfish.
     Creates a QApplication and shows the downloader UI (unless SILENT_MODE is True).
     
     Args:
-        target_path: Optional path where to install Stockfish (currently unused, 
-                    the downloader determines the path automatically)
+        target_path: Optional path where to install Stockfish
     
     Returns:
         True if download/install succeeded, False otherwise
@@ -975,20 +558,15 @@ def download_stockfish(target_path=None):
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)
-        app_created = True
-    else:
-        app_created = False
     
-    downloader = StockfishDownloaderApp()
+    downloader = StockfishDownloaderApp(workflow_factory=DownloadWorkflow)
     if not SILENT_MODE:
         downloader.show()
     app.exec()
     
-    # Check if stockfish was successfully installed
     if target_path:
         return Path(target_path).exists()
     
-    # Check default locations
     if detect_os() == "windows":
         if getattr(sys, 'frozen', False):
             default_path = Path(sys.executable).parent / "stockfish.exe"
@@ -1001,6 +579,7 @@ def download_stockfish(target_path=None):
             default_path = Path.cwd() / "stockfish"
     
     return default_path.exists()
+
 
 if __name__ == "__main__":
     success = download_stockfish()
