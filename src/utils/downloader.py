@@ -284,7 +284,10 @@ class BinaryExtractor:
         with tarfile.open(self.archive_path, "r:*") as t:
             for member in t.getmembers():
                 if self._is_safe_path(member.name):
-                    t.extract(member, self.tmpdir)
+                    if hasattr(tarfile, 'data_filter'):
+                        t.extract(member, self.tmpdir, filter='data')
+                    else:
+                        t.extract(member, self.tmpdir)
                     
             for root, _, files in os.walk(self.tmpdir):
                 for f in files:
