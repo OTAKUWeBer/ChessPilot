@@ -33,6 +33,15 @@
 
 ## 🎉 Highlights (What's New)
 
+### **v2.3.0 — Architectural Modularization, Reliability & Quality**
+
+* **Modular Subsystem Separation** — Refactored the monolithic downloader into focused, decoupled modules: [`cpu_features.py`](src/utils/cpu_features.py), [`download_dialog.py`](src/gui/download_dialog.py), and [`downloader.py`](src/utils/downloader.py).
+* **Pure Core Domain & Perception Service** — Extracted desktop screen capture and ONNX board inference out of `core/` into a dedicated perception service ([`board_reader.py`](src/board_detection/board_reader.py)), keeping the core domain purely mathematical and free of I/O.
+* **Automated Unit & Integration Test Suite** — Added a 25-test automated test suite covering live Stockfish UCI communication, archive extraction, coordinate notation, FEN serialization, and move validation (`python -m unittest discover tests -v`).
+* **Hardened Exception Architecture** — 100% of bare `try-except-pass` blocks eliminated across the codebase; replaced with strictly typed exceptions and structured debug logging (CodeFactor A+ grade).
+* **Safe Extraction for Modern Python** — Added `filter='data'` archive extraction support, ensuring complete forward compatibility with Python 3.12, 3.13, and 3.14.
+* **Centralized Detection Constants** — Unified piece class IDs and detection mappings into [`model_classes.py`](src/board_detection/model_classes.py).
+
 ### **v2.2.1 — Production Stability, Automation & Performance**
 
 * **Universal Move Automation** — Added intermediate drag-and-drop movement events on Windows for seamless recognition on Chromium-based browsers (Chess.com, Lichess).
@@ -184,6 +193,14 @@ python src/main.py
 3. Adjust analysis depth.
 4. Pick **Manual** or **Auto** mode.
 5. (Press **ESC** to reopen color selection.)
+
+### **Running Tests**
+
+To run the automated test suite:
+
+```bash
+python -m unittest discover tests -v
+```
 
 ---
 

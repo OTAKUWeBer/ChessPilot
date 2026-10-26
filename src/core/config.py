@@ -1,4 +1,5 @@
 class AppConfig:
+    VERSION = "2.3.0"
     BG_COLOR = "#2D2D2D"
     FRAME_COLOR = "#373737"
     ACCENT_COLOR = "#4CAF50"

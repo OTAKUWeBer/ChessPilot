@@ -11,7 +11,7 @@ if __name__ == "__main__":
     if sys.platform == 'win32':
         import ctypes
         try:
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('otakuweber.chesspilot.2.2.1')
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('otakuweber.chesspilot.2.3.0')
         except (AttributeError, OSError) as err:
             logging.getLogger(__name__).debug("AppUserModelID could not be set: %s", err)
         if getattr(sys, 'frozen', False):
@@ -27,6 +27,7 @@ from PyQt6.QtCore import Qt
 from utils.logging_setup import setup_logging, get_log_file_path
 from utils.chess_resources_manager import setup_resources
 from utils.system_info import log_system_info, log_dependency_status
+from core.config import AppConfig
 
 setup_logging()
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ os.chdir(script_dir)
 
 logger.info("=" * 60)
 logger.info("ChessPilot starting...")
-logger.info("Version: 2.2.1")
+logger.info(f"Version: {AppConfig.VERSION}")
 logger.info(f"Log file: {get_log_file_path()}")
 logger.info("=" * 60)
 
