@@ -13,10 +13,7 @@ import tempfile
 import logging
 from pathlib import Path
 import requests
-from PyQt6.QtWidgets import QApplication
-
 from utils.cpu_features import detect_os, detect_cpu_info, format_bytes
-from gui.download_dialog import StockfishDownloaderApp, SILENT_MODE
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
@@ -558,6 +555,9 @@ def download_stockfish(target_path=None):
     Returns:
         True if download/install succeeded, False otherwise
     """
+    from PyQt6.QtWidgets import QApplication
+    from gui.download_dialog import StockfishDownloaderApp, SILENT_MODE
+
     app = QApplication.instance()
     if app is None:
         app = QApplication(sys.argv)

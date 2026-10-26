@@ -7,7 +7,10 @@ from PIL import Image
 from typing import Optional, Tuple
 from PyQt6.QtCore import QTimer, QRect, QPoint
 from PyQt6.QtWidgets import QMessageBox, QPushButton
-import pyautogui
+try:
+    import pyautogui
+except Exception:
+    pyautogui = None
 from utils.get_binary_path import get_binary_path
 
 logger = logging.getLogger(__name__)

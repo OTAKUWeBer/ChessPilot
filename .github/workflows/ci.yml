@@ -25,6 +25,26 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install Linux GUI / X11 Dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 \
+            libgl1 \
+            libgl1-mesa-dri \
+            libxkbcommon-x11-0 \
+            libxcb-cursor0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-xinerama0 \
+            libxcb-xfixes0 \
+            libxcb-shape0 \
+            xvfb
+
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
@@ -34,6 +54,16 @@ jobs:
         run: |
           python -m compileall src
 
-      - name: Run Test Suite
+      - name: Run Test Suite (Linux with Xvfb)
+        if: runner.os == 'Linux'
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: |
+          xvfb-run -a python -m unittest discover tests -v
+
+      - name: Run Test Suite (Windows)
+        if: runner.os == 'Windows'
+        env:
+          QT_QPA_PLATFORM: offscreen
         run: |
           python -m unittest discover tests -v

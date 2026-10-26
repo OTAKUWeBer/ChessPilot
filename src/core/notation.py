@@ -1,6 +1,4 @@
 import logging
-from PyQt6.QtWidgets import QMessageBox
-from PyQt6.QtCore import QTimer
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -29,7 +27,13 @@ def chess_notation_to_index(color_indicator, root, auto_mode_var, move):
 
     except (KeyError, IndexError, TypeError) as e:
         logger.error(f"Invalid move notation: {move}, Error: {e}")
-        QTimer.singleShot(0, lambda: QMessageBox.critical(root, "Error", f"Invalid move notation: {move}"))
+        if root:
+            try:
+                from PyQt6.QtWidgets import QMessageBox
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(0, lambda: QMessageBox.critical(root, "Error", f"Invalid move notation: {move}"))
+            except (ImportError, Exception) as ui_err:
+                logger.debug("Could not display QMessageBox: %s", ui_err)
         if callable(auto_mode_var):
             def _turn_off():
                 if root:
@@ -37,5 +41,9 @@ def chess_notation_to_index(color_indicator, root, auto_mode_var, move):
                         root.auto_mode_var = False
                     if hasattr(root, "auto_mode_check") and root.auto_mode_check is not None:
                         root.auto_mode_check.setChecked(False)
-            QTimer.singleShot(0, _turn_off)
+            try:
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(0, _turn_off)
+            except (ImportError, Exception):
+                _turn_off()
         return None, None

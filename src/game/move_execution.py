@@ -2,7 +2,10 @@ import time
 import logging
 import os
 import random
-import pyautogui
+try:
+    import pyautogui
+except Exception:
+    pyautogui = None
 from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtCore import QTimer
 from board_detection import get_positions, get_fen_from_position
