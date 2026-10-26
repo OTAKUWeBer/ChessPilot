@@ -1,0 +1,100 @@
+name: "🐛 Bug Report"
+description: "Report a bug or unexpected behavior in ChessPilot"
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for taking the time to report an issue!
+        Before submitting, please check the [Troubleshooting & FAQ](https://github.com/OTAKUWeBer/ChessPilot#%EF%B8%8F-troubleshooting--faq) section in the README.
+
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System & Display Server
+      description: Which operating system and display server are you using?
+      options:
+        - "Windows 11"
+        - "Windows 10"
+        - "Linux - Wayland (e.g., GNOME / KDE / Hyprland)"
+        - "Linux - X11"
+        - "macOS"
+        - "Other"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_type
+    attributes:
+      label: Installation / Execution Type
+      description: How are you running ChessPilot?
+      options:
+        - "Windows Pre-built Binary (.exe)"
+        - "Linux AppImage (.AppImage)"
+        - "Linux DEB package (.deb)"
+        - "Running from source (python src/main.py)"
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: ChessPilot Version
+      description: Which version of ChessPilot are you running? (Check top of chesspilot.log or release tag)
+      placeholder: "e.g., v2.3.0"
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Chess Platform & Browser
+      description: Where are you playing chess?
+      placeholder: "e.g., Chess.com on Google Chrome, Lichess on Firefox"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem Description
+      description: A clear and concise description of what went wrong.
+      placeholder: "Describe what happened..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Step-by-step instructions to reproduce the issue.
+      value: |
+        1. Open ChessPilot
+        2. Select color '...'
+        3. Enable Auto Mode / Click 'Play Next Move'
+        4. See error
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log File Output (chesspilot.log)
+      description: |
+        Please paste the relevant log output from `chesspilot.log`.
+        * Quick access: Press 'L' in the ChessPilot window or click '⌨ Shortcuts' -> 'Open Logs Folder'.
+        * Windows path: `%LOCALAPPDATA%\ChessPilot\logs\chesspilot.log`
+        * Linux path: `~/.local/share/chesspilot/logs/chesspilot.log` (or `$XDG_STATE_HOME/chesspilot/logs`)
+      placeholder: "Paste contents of chesspilot.log here..."
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or Screen Recordings
+      description: If the issue involves board detection, FEN reading, or mouse relocation, please attach a screenshot of the chessboard as it appears on your screen.
+    validations:
+      required: false

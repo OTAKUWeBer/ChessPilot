@@ -223,10 +223,18 @@ python -m unittest discover tests -v
 → System-installed Stockfish from your PATH is also automatically detected on Linux.
 
 **Where to find logs**
-→ Click **"⌨ Shortcuts"** in the app and select **"Open Logs Folder"**.
+→ Click **"⌨ Shortcuts"** in the app and select **"Open Logs Folder"** (or press <kbd>L</kbd>).
 → Or open manually:
   * **Windows:** `%LOCALAPPDATA%\ChessPilot\logs\chesspilot.log`
   * **Linux:** `~/.local/share/chesspilot/logs/chesspilot.log` (or `$XDG_STATE_HOME/chesspilot/logs`)
+
+**How to report an issue**
+When opening an issue on GitHub, please make sure to include:
+1. **Operating System & Display Server**: (e.g. Windows 11, or Ubuntu 24.04 Wayland/X11).
+2. **Installation Method**: (Pre-built Windows `.exe`, Linux AppImage/DEB, or from source).
+3. **Log File (`chesspilot.log`)**: Include relevant log output (or attach the file).
+4. **Chess Platform & Browser**: (e.g. Chess.com on Google Chrome, Lichess on Firefox).
+5. **Screenshots / Video**: If board detection fails, attach a screenshot of the chessboard as shown on your display.
 
 ---
 

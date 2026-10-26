@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: "📖 Troubleshooting & FAQ"
+    url: "https://github.com/OTAKUWeBer/ChessPilot#%EF%B8%8F-troubleshooting--faq"
+    about: "Check common solutions for board detection, offline setup, and permissions before filing an issue."

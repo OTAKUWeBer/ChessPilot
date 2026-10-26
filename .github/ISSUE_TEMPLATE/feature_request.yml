@@ -1,0 +1,35 @@
+name: "💡 Feature Request"
+description: "Suggest an idea or enhancement for ChessPilot"
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Have an idea to improve ChessPilot? We'd love to hear it!
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Is your feature request related to a problem?
+      description: A clear and concise description of the limitation or problem you are encountering.
+      placeholder: "e.g., I'm always frustrated when..."
+    validations:
+      required: false
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution / Enhancement
+      description: Describe what you would like ChessPilot to do and how it should work.
+      placeholder: "Describe the desired feature..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives or Additional Context
+      description: Any alternative solutions, mockups, or extra context considered.
+    validations:
+      required: false
