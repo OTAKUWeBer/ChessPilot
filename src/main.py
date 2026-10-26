@@ -23,6 +23,7 @@ if __name__ == "__main__":
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QScreen
 
 from utils.logging_setup import setup_logging, get_log_file_path
 from utils.chess_resources_manager import setup_resources
@@ -81,8 +82,30 @@ class ChessPilot(QMainWindow):
         logger.info("Initializing ChessPilot application")
 
         self.setWindowTitle(AppConfig.WINDOW_TITLE)
-        self.resize(AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT)
-        self.setMinimumSize(360, 480)
+
+        # Scale window size to occupy a similar screen fraction across
+        # resolutions.  The 380×520 default was designed for 1920×1080
+        # (common on Windows with no extra scaling).  On higher-res
+        # displays without OS scaling (typical on Linux), the window
+        # appears physically too small, so we scale it up.
+        scale = 1.0
+        qapp = QApplication.instance()
+        if qapp is not None:
+            screen = qapp.primaryScreen()
+            if screen is not None:
+                ratio = screen.devicePixelRatio()
+                avail = screen.availableSize()
+                logical_h = avail.height() / ratio
+                # Reference: 1080 logical pixels (1920×1080 at 100%)
+                scale = max(logical_h / 1080.0, 1.0)
+                logger.debug(
+                    f"Screen: {avail.width()}x{avail.height()}, "
+                    f"pixelRatio: {ratio}, scale factor: {scale:.2f}"
+                )
+
+        self.resize(int(AppConfig.WINDOW_WIDTH * scale),
+                    int(AppConfig.WINDOW_HEIGHT * scale))
+        self.setMinimumSize(int(360 * scale), int(480 * scale))
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
 
         self.game_state = GameState()
