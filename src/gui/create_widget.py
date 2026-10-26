@@ -276,6 +276,30 @@ def create_widgets(app):
     main_frame_layout = QVBoxLayout(app.main_frame)
     main_frame_layout.setContentsMargins(15, 15, 15, 15)
 
+    main_header_container = QWidget()
+    main_header_layout = QHBoxLayout(main_header_container)
+    main_header_layout.setContentsMargins(0, 0, 0, 0)
+    main_header_layout.setSpacing(10)
+
+    main_header = QLabel("ChessPilot")
+    main_header.setStyleSheet(f"""
+        color: {app.accent_color};
+        font-family: 'Segoe UI';
+        font-size: 20pt;
+        font-weight: bold;
+    """)
+    main_header.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+    app.shortcuts_btn_main = app.create_shortcuts_button(main_header_container, lambda: show_shortcuts_dialog(app))
+
+    main_header_layout.addStretch()
+    main_header_layout.addWidget(main_header)
+    main_header_layout.addStretch()
+    main_header_layout.addWidget(app.shortcuts_btn_main)
+
+    main_frame_layout.addWidget(main_header_container)
+    main_frame_layout.addSpacing(10)
+
     control_panel = QWidget()
     control_panel.setStyleSheet(f"background-color: {app.frame_color}; border-radius: 8px;")
     control_layout = QVBoxLayout(control_panel)

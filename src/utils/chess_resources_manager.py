@@ -240,8 +240,8 @@ def rename_onnx_model():
     
     # Check if bundled
     bundled_result = _check_bundled_onnx()
-    if bundled_result is True:
-        logger.info("Using bundled ONNX model")
+    if bundled_result:
+        logger.info(f"Using bundled ONNX model: {bundled_result}")
         return True
     elif bundled_result is False:
         logger.error("ONNX model missing from bundle")

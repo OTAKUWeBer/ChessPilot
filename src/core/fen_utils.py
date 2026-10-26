@@ -63,6 +63,8 @@ def is_two_square_king_move(move_str: str, current_fen: str, color: str) -> Tupl
     from current_fen for this color.  side is either 'kingside' or 'queenside'.
     Otherwise returns (False, "").
     """
+    if not move_str or len(move_str) < 4 or move_str == "(none)":
+        return False, ""
     f_file, f_rank, t_file, t_rank = move_str[0], move_str[1], move_str[2], move_str[3]
     if f_rank != t_rank:
         return False, ""

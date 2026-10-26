@@ -10,21 +10,25 @@ import logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
-# Use the helper function to get the correct model path
-model_path = resource_path("chess_detection.onnx")
-if not os.path.exists(model_path):
-    logger.error(
-        "Missing chess_detection.onnx – please download and place it in the project root. "
-        "See README for instructions: https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
-    )
-    sys.exit(1)
-
-# Load the ONNX model from the correct path
-session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
-input_name = session.get_inputs()[0].name
-output_name = session.get_outputs()[0].name
-
+_session = None
+_input_name = None
+_output_name = None
 conf = 0.5  # Lowered from 0.7 to detect boards more reliably
+
+def get_session():
+    """Lazily load the ONNX model."""
+    global _session, _input_name, _output_name
+    if _session is None:
+        model_path = resource_path("chess_detection.onnx")
+        if not os.path.exists(model_path):
+            raise FileNotFoundError(
+                f"Missing chess_detection.onnx at {model_path}. "
+                "See README for instructions: https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md"
+            )
+        _session = ort.InferenceSession(model_path, providers=["CPUExecutionProvider"])
+        _input_name = _session.get_inputs()[0].name
+        _output_name = _session.get_outputs()[0].name
+    return _session, _input_name, _output_name
 
 def letterbox_resize(image, target_size):
     """
@@ -75,6 +79,12 @@ def predict(image):
     """
     Runs model inference and returns processed detections.
     """
+    try:
+        session, input_name, output_name = get_session()
+    except Exception as e:
+        logger.error(f"Cannot run prediction - ONNX model error: {e}")
+        return []
+
     img_array, x_offset, y_offset, scale = preprocess_image(image)
     output = session.run([output_name], {input_name: img_array})[0]
     output = np.squeeze(output)

@@ -34,9 +34,9 @@ class GameState:
         self.chessboard_y = y
         self.square_size = size
 
+        self.board_positions.clear()
         for row in range(8):
             for col in range(8):
-                square_index = row * 8 + col
-                square_x = x + col * size + size / 2
-                square_y = y + row * size + size / 2
-                self.board_positions[square_index] = (int(square_x), int(square_y))
+                square_x = x + col * size + (size // 2)
+                square_y = y + row * size + (size // 2)
+                self.board_positions[(col, row)] = (int(square_x), int(square_y))

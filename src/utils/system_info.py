@@ -92,6 +92,8 @@ def check_dependencies():
         "requests": "requests",
         "cpuinfo": "cpuinfo",
     }
+    if sys.platform == "win32":
+        dependency_map["pywin32 (win32api)"] = "win32api"
 
     results = {}
 

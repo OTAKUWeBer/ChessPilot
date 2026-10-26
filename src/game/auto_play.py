@@ -1,6 +1,7 @@
 import time
 import threading
 import logging
+from PyQt6.QtCore import QTimer
 
 from board_detection import get_positions, get_fen_from_position
 from utils.system_interaction import capture_screenshot_in_memory
@@ -264,7 +265,7 @@ def _stop_auto_mode(root, auto_mode_var, btn_play, update_status_callback, messa
             logger.info("Re-enabled play button")
         
         if update_status_callback:
-            root.after(0, lambda: update_status_callback(f"\n{message}"))
+            QTimer.singleShot(0, lambda: update_status_callback(f"\n{message}"))
             
     except Exception as e:
         logger.error(f"Error stopping auto mode: {e}", exc_info=True)

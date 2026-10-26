@@ -7,13 +7,18 @@ import multiprocessing
 
 # Must be at the very top for PyInstaller on Windows
 if __name__ == "__main__":
-    # Hide console window on Windows when frozen
-    if sys.platform == 'win32' and getattr(sys, 'frozen', False):
+    # Hide console window on Windows when frozen and register app model ID for taskbar icon
+    if sys.platform == 'win32':
         import ctypes
-        ctypes.windll.user32.ShowWindow(
-            ctypes.windll.kernel32.GetConsoleWindow(), 
-            0  # SW_HIDE
-        )
+        try:
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('otakuweber.chesspilot.2.2.0')
+        except Exception:
+            pass
+        if getattr(sys, 'frozen', False):
+            ctypes.windll.user32.ShowWindow(
+                ctypes.windll.kernel32.GetConsoleWindow(), 
+                0  # SW_HIDE
+            )
     multiprocessing.freeze_support()
 
 from PyQt6.QtWidgets import QApplication, QMainWindow, QMessageBox
@@ -48,9 +53,8 @@ if not setup_resources(script_dir, project_dir):
         None,
         "Setup Failed",
         "Failed to setup required resources (Stockfish or ONNX model).\n\n"
-        "Please check:\n"
-        "1. Your internet connection\n"
-        "2. That you have write permissions\n\n"
+        "If you are offline, you can manually place 'stockfish' (or 'stockfish.exe') "
+        "and 'chess_detection.onnx' in the ChessPilot folder.\n\n"
         f"Log file location:\n{get_log_file_path()}"
     )
     sys.exit(1)
@@ -77,8 +81,8 @@ class ChessPilot(QMainWindow):
         logger.info("Initializing ChessPilot application")
 
         self.setWindowTitle(AppConfig.WINDOW_TITLE)
-        self.setGeometry(100, 100, AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT)
-        self.setFixedSize(AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT)
+        self.resize(AppConfig.WINDOW_WIDTH, AppConfig.WINDOW_HEIGHT)
+        self.setMinimumSize(360, 480)
         self.setWindowFlag(Qt.WindowType.WindowStaysOnTopHint)
 
         self.game_state = GameState()

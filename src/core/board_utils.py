@@ -56,8 +56,12 @@ def fen_to_list(fen):
 
 def algebraic_to_index(sq):
     """Convert algebraic notation to board index (0-63)."""
-    file = ord(sq[0]) - ord('a')         # 0..7
-    rank = 8 - int(sq[1])               # '1'→7 down to '8'→0
+    if not sq or len(sq) < 2 or not sq[0].isalpha() or not sq[1].isdigit():
+        return 0
+    file = ord(sq[0].lower()) - ord('a')         # 0..7
+    rank = 8 - int(sq[1])                       # '1'→7 down to '8'→0
+    file = max(0, min(7, file))
+    rank = max(0, min(7, rank))
     return rank * 8 + file
 
 def store_board_positions(board_positions, x, y, size):

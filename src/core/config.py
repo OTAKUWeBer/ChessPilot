@@ -34,4 +34,4 @@ class AppConfig:
 
     WINDOW_TITLE = "ChessPilot"
     WINDOW_WIDTH = 380
-    WINDOW_HEIGHT = 480
+    WINDOW_HEIGHT = 520

@@ -37,10 +37,22 @@ class MoveValidator:
         else:
             moved_to = (after_char == piece_char)
         
-        logger.debug(f"After piece at end square: '{after_char}'")
+        allowed_indices = {start_i, end_i}
+
+        # En Passant capture check: pawn moves diagonally to an empty destination square
+        is_pawn = piece_char in ('P', 'p')
+        start_file = ord(move[0]) - ord('a')
+        end_file = ord(move[2]) - ord('a')
+        if is_pawn and abs(start_file - end_file) == 1 and before_list[end_i] == ' ':
+            captured_sq = move[2] + move[1]
+            captured_i = algebraic_to_index(captured_sq)
+            opp_pawn = 'p' if color_indicator == 'w' else 'P'
+            if before_list[captured_i] == opp_pawn and after_list[captured_i] == ' ':
+                allowed_indices.add(captured_i)
+                logger.debug(f"En passant capture verified: captured pawn at {captured_sq}")
 
         unchanged_elsewhere = all(
-            (b == a) or idx in (start_i, end_i)
+            (b == a) or idx in allowed_indices
             for idx, (b, a) in enumerate(zip(before_list, after_list))
         )
         logger.debug(f"moved_from={moved_from}, moved_to={moved_to}, unchanged_elsewhere={unchanged_elsewhere}")

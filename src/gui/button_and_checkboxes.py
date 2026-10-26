@@ -58,9 +58,9 @@ def action_button(app, parent, text, command):
     return btn
 
 def shortcuts_button(app, parent, command):
-    """Create a small button to show keyboard shortcuts"""
-    btn = QPushButton("❗ Keys", parent)
-    btn.setFixedWidth(70)
+    """Create a button to show keyboard shortcuts"""
+    btn = QPushButton("⌨ Shortcuts", parent)
+    btn.setFixedWidth(95)
     btn.setFixedHeight(30)
     btn.setStyleSheet(f"""
         QPushButton {{

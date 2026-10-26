@@ -7,14 +7,22 @@ logger = logging.getLogger(__name__)
 def handle_esc_key(app):
     logger.info("ESC key pressed; returning to color selection")
     if app.main_frame.isVisible():
+        if hasattr(app, 'auto_mode_var') and app.auto_mode_var:
+            app.auto_mode_var = False
+            if hasattr(app, 'auto_mode_check'):
+                app.auto_mode_check.setChecked(False)
         app.main_frame.hide()
         app.color_frame.show()
         app.color_indicator = None
         app.btn_play.setEnabled(False)
         app.update_status("")
+
+def set_color_with_safeguard(app, color):
+    if hasattr(app, 'auto_mode_var') and app.auto_mode_var:
         app.auto_mode_var = False
-        app.auto_mode_check.setChecked(False)
-        app.btn_play.setEnabled(True)
+        if hasattr(app, 'auto_mode_check'):
+            app.auto_mode_check.setChecked(False)
+    app.set_color(color)
 
 def bind_shortcuts(app):
     # ESC key - return to color selection
@@ -24,10 +32,10 @@ def bind_shortcuts(app):
     
     # Color selection shortcuts (W/B)
     QShortcut(QKeySequence(Qt.Key.Key_W), app).activated.connect(
-        lambda: app.set_color('w')
+        lambda: set_color_with_safeguard(app, 'w')
     )
     QShortcut(QKeySequence(Qt.Key.Key_B), app).activated.connect(
-        lambda: app.set_color('b')
+        lambda: set_color_with_safeguard(app, 'b')
     )
     
     # Move mode shortcuts (D/C) - only work before color selection

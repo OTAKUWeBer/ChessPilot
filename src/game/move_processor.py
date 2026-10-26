@@ -13,6 +13,7 @@ from core.config import AppConfig
 
 logger = logging.getLogger(__name__)
 
+processing_lock = threading.Lock()
 processing_event = threading.Event()
 
 def process_move(
@@ -29,10 +30,13 @@ def process_move(
     last_fen_by_color,
     screenshot_delay_var,
 ):
-    if not _can_start_processing():
+    if not processing_lock.acquire(blocking=False):
+        logger.warning("Move already being processed; aborting this call.")
         return
     
-    _initialize_move_processing(root, btn_play, update_status)
+    processing_event.set()
+    QTimer.singleShot(0, lambda: btn_play.setEnabled(False))
+    QTimer.singleShot(0, lambda: update_status("\nAnalyzing board..."))
     
     try:
         board_data = _extract_board_position(root, auto_mode_var, color_indicator, update_status)
@@ -170,8 +174,13 @@ def _calculate_best_move(root, fen, auto_mode_var, update_status):
     depth = root.depth_var if hasattr(root, "depth_var") else 15
     best_move, updated_fen, mate_flag = EngineService.get_best_move(depth, fen, root, auto_mode_var)
     
-    if not best_move:
-        QTimer.singleShot(0, lambda: update_status("No valid move found!"))
+    if not best_move or best_move == "(none)":
+        if best_move == "(none)":
+            msg = "Game Over: Checkmate!" if mate_flag else "Game Over: Stalemate / No legal moves"
+            QTimer.singleShot(0, lambda: update_status(f"\n{msg}"))
+            _disable_auto_mode(auto_mode_var, root)
+        else:
+            QTimer.singleShot(0, lambda: update_status("No valid move found!"))
         return None
     return best_move, updated_fen, mate_flag
 
@@ -340,6 +349,11 @@ def _handle_processing_error(error, root, update_status, auto_mode_var):
 
 def _finalize_move_processing(root, auto_mode_var, btn_play):
     processing_event.clear()
+    if processing_lock.locked():
+        try:
+            processing_lock.release()
+        except RuntimeError:
+            pass
     auto_val = auto_mode_var() if callable(auto_mode_var) else auto_mode_var
     if not auto_val:
         QTimer.singleShot(0, lambda: btn_play.setEnabled(True))

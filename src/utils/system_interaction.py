@@ -35,7 +35,7 @@ def capture_screenshot_in_memory(root=None, auto_mode_var=None):
         else:
             logger.info("Capturing screenshot using mss (non-Wayland)...")
             with mss.mss() as sct:
-                monitor = sct.monitors[1]
+                monitor = sct.monitors[1] if len(sct.monitors) > 1 else sct.monitors[0]
                 sct_img = sct.grab(monitor)
                 image = Image.frombytes("RGB", sct_img.size, sct_img.rgb)
         logger.debug("Screenshot captured successfully")

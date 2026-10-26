@@ -190,10 +190,17 @@ python src/main.py
 
 **Board detection is incorrect**
 → Move the ChessPilot UI aside so the detector has a clear view of the board.
+→ Ensure the board is 2D and unobstructed.
 
-**Stockfish didn’t download**
-→ Check your internet connection and firewall settings.
-→ Alternatively, manually place a Stockfish ZIP or binary in the `src/` folder.
+**Offline Setup / Stockfish didn’t download**
+→ ChessPilot is 100% offline-ready. If you have no internet access or automatic download fails, simply place your `stockfish` (or `stockfish.exe`) binary and `chess_detection.onnx` next to the ChessPilot executable (or in the `src/` directory when running from source).
+→ System-installed Stockfish from your PATH is also automatically detected on Linux.
+
+**Where to find logs**
+→ Click **"⌨ Shortcuts"** in the app and select **"Open Logs Folder"**.
+→ Or open manually:
+  * **Windows:** `%LOCALAPPDATA%\ChessPilot\logs\chesspilot.log`
+  * **Linux:** `~/.local/share/chesspilot/logs/chesspilot.log` (or `$XDG_STATE_HOME/chesspilot/logs`)
 
 ---
 
