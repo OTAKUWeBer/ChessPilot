@@ -1,16 +1,35 @@
 # -*- mode: python ; coding: utf-8 -*-
+import os
 
+binaries = []
+for b in ['grim', 'wayland-info']:
+    if os.path.exists(b):
+        binaries.append((b, '.'))
+
+datas = [
+    ('assets/logo.png', 'assets'),
+    ('src/chess_detection.onnx', '.'),
+]
 
 a = Analysis(
     ['src/main.py'],
-    pathex=[],
-    binaries=[('grim', '.'), ('wayland-info', '.')],
-    datas=[('assets/logo.png', 'assets'),('src/chess_detection.onnx', '.')],
-    hiddenimports=[],
+    pathex=['.', 'src'],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=[
+        'PyQt6.QtCore',
+        'PyQt6.QtGui',
+        'PyQt6.QtWidgets',
+        'onnxruntime',
+        'PIL',
+        'cpuinfo',
+        'mss',
+        'pyautogui',
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['tkinter', 'matplotlib', 'scipy'],
     noarchive=False,
     optimize=0,
 )
