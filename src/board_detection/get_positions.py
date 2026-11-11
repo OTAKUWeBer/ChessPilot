@@ -5,6 +5,8 @@ from utils.resource_path import resource_path
 import sys
 import os
 import logging
+from board_detection.fen_extractor import get_fen_from_position
+from board_detection.model_classes import CHESSBOARD_CLASS_ID
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -99,9 +101,36 @@ def predict(image):
     
     return detections
 
-def get_positions(image_input):
+def _predict_region(image, region):
+    boxes = predict(image.crop(region))
+    for box in boxes:
+        box[0] += region[0]
+        box[1] += region[1]
+    return boxes
+
+
+def _refine_board(image, boxes):
+    for board in boxes:
+        if board[5] != CHESSBOARD_CLASS_ID:
+            continue
+        x, y, width, height = board[:4]
+        padding = max(width, height) * 0.05
+        region = (
+            max(0, int(x - padding)), max(0, int(y - padding)),
+            min(image.width, int(x + width + padding)),
+            min(image.height, int(y + height + padding)),
+        )
+        if region[2] <= region[0] or region[3] <= region[1]:
+            continue
+        refined = _predict_region(image, region)
+        if refined and get_fen_from_position('w', refined) is not None:
+            return refined
+    return None
+
+
+def get_positions(image_input, refined_search=True):
     """
-    Handles image loading and executes prediction.
+    Detect normally, then refine board crops and overlapping tiles if needed.
     """
     try:
         if isinstance(image_input, str):
@@ -113,7 +142,29 @@ def get_positions(image_input):
         return []
 
     predictions = predict(image)
-    return predictions if predictions else None
+    if not refined_search or (predictions and get_fen_from_position('w', predictions) is not None):
+        return predictions or None
+
+    logger.info("Normal board detection failed; trying refined search")
+    refined = _refine_board(image, predictions)
+    if refined:
+        return refined
+
+    # Square tiles keep small boards from disappearing during full-screen resizing.
+    size = max(1, min(min(image.size), max(image.size) // 2))
+    x_offsets = sorted({0, (image.width - size) // 2, image.width - size})
+    y_offsets = sorted({0, (image.height - size) // 2, image.height - size})
+    for top in y_offsets:
+        for left in x_offsets:
+            boxes = _predict_region(image, (left, top, left + size, top + size))
+            refined = _refine_board(image, boxes)
+            if refined:
+                return refined
+            if boxes and get_fen_from_position('w', boxes) is not None:
+                return boxes
+
+    logger.warning("Board detection failed after normal and refined search")
+    return None
 
 if __name__ == "__main__":
     image_path = "screenshot.png"

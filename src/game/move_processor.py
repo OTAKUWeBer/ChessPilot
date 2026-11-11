@@ -84,7 +84,7 @@ def _extract_board_position(root, auto_mode_var, color_indicator, update_status)
                 time.sleep(AppConfig.FEN_RETRY_DELAY)
                 continue
             
-            QTimer.singleShot(0, lambda: update_status("\nNo board detected after retries"))
+            QTimer.singleShot(0, lambda: update_status("\nBoard detection failed after normal and refined search. Keep the full board visible, then retry."))
             if callable(auto_mode_var):
                 root.auto_mode_var = False
                 if hasattr(root, 'auto_mode_check'):
@@ -113,7 +113,7 @@ def _extract_fen_from_boxes(boxes, color_indicator, root, update_status, auto_mo
             if attempt < max_retries - 1:
                 QTimer.singleShot(0, lambda: update_status(f"Retrying FEN extraction ({attempt + 2}/{max_retries})…"))
             else:
-                QTimer.singleShot(0, lambda: update_status("Error: Could not detect board/FEN"))
+                QTimer.singleShot(0, lambda: update_status("Board detection failed: keep the full board and both kings visible, then retry."))
                 if callable(auto_mode_var):
                     root.auto_mode_var = False
                     if hasattr(root, 'auto_mode_check'):

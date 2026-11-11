@@ -386,7 +386,7 @@ class EngineService:
                     logger.info("Stockfish returned (none) - game over (checkmate or stalemate)")
                     return "(none)", None, mate_flag
                 return _handle_stockfish_failure(
-                    "Stockfish did not respond. Please download the correct version according to your CPU architecture.",
+                    "Stockfish stopped before returning a move. Check the log for the engine error.",
                     root, auto_mode_var
                 )
             

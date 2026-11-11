@@ -1,5 +1,4 @@
 import logging
-from .get_positions import get_positions
 
 # Logger setup
 logger = logging.getLogger(__name__)
@@ -74,6 +73,15 @@ def get_fen_from_position(color, boxes):
 
     # FEN starts with rank 8, which is the first row in our grid
     fen_piece_placement = '/'.join(fen_rows)
+    if (fen_piece_placement.count('K') != 1
+            or fen_piece_placement.count('k') != 1
+            or '?' in fen_piece_placement):
+        logger.warning(
+            "Invalid board detection: expected one king per color and known pieces; got %s",
+            fen_piece_placement,
+        )
+        return None
+
     # Complete FEN string with default values for other fields
     fen = f"{fen_piece_placement} {color} - - 0 1"
 
@@ -90,6 +98,8 @@ def flip_board(fen):
     return "/".join(flipped_rows) + " " + ' '.join(fen.split()[1:])
 
 if __name__ == "__main__":
+    from board_detection.get_positions import get_positions
+
     # Ask for the color (w or b)
     image_path = "chess-screenshot.png"
     boxes = get_positions(image_path)

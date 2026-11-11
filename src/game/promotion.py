@@ -119,7 +119,7 @@ def wait_for_promotion_dialog(color_indicator, max_wait_time=1.5, check_interval
                 elapsed += check_interval
                 continue
             
-            boxes = get_positions(img)
+            boxes = get_positions(img, refined_search=False)
             if not boxes:
                 time.sleep(check_interval)
                 elapsed += check_interval
