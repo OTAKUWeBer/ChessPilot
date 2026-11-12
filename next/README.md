@@ -13,16 +13,23 @@ Branch: `rust`. Python v2.3.1 remains the runnable reference in `src/`.
 * Persistent Rust Stockfish service: UCI handshake, config options, depth/evaluation progress, best move, updated FEN, stop/cancel deadlines, stderr draining, process cleanup and restart on the next request after failure.
 * Resource lookup and portable/user config creation preserve existing user files. Engine options and FEN input are validated before entering the UCI protocol.
 * Subprocess fixtures cover silent/crashed/unresponsive engines, invalid output, stderr flooding, cancellation, and persistence. The local real Stockfish passed opening/checkmate analysis and persistent-process reuse.
+* Flutter now uses the real Rust runtime DLL through a length-delimited C ABI. Rust owns settings, color/session state, engine work and progress; Dart renders snapshots. Engine operations run on a native worker, and changing color/Stop invalidates old results.
+* Native buffer ownership, invalid requests, transactional settings and isolated sessions have tests. Dart integration tests exercise the compiled library and local Stockfish, not a mocked backend.
 
 ## Commands
 
+Build the Rust runtime library first (use the GNU settings below on this workstation), then start Flutter:
+
 ```powershell
+cargo build --manifest-path next/native/Cargo.toml -p chesspilot-runtime
 cd next/app
 flutter pub get
 flutter test
 flutter analyze
 flutter run -d windows
 ```
+
+In development the Dart loader finds `next/native/target/debug/chesspilot_runtime.dll` (or `libchesspilot_runtime.so` on Linux). `CHESSPILOT_LIBRARY_PATH` can select an explicit library for tests. Release app bundling of this library and Android native-library packaging are still pending; a missing native component is reported rather than replaced by simulated state. The real-engine Dart test requires `CHESSPILOT_STOCKFISH`, just like the native integration test below.
 
 With a normal native Rust toolchain:
 
@@ -53,13 +60,13 @@ Flutter desktop compilation still needs Visual C++ Build Tools; Android compilat
 
 1. Extend differential fixtures for remaining domain/detection behavior, preserving current valid-input contracts. Record intentional deviations individually.
 2. Finish resource installation/download and rotating file logging; the persistent desktop Stockfish service and resource/config resolution are ported and tested.
-3. Connect the Rust runtime to Flutter; move settings/session ownership out of temporary Dart UI state. No duplicated engine or chess logic in Dart.
+3. Complete native-library build/bundling and window-close lifecycle integration. Flutter is connected to the Rust session/engine; settings/session ownership is native, not duplicated in Dart. Desktop application exit and Android service teardown still need real platform verification.
 4. Port capture/ONNX preprocessing, model inference and normal/refined search using the existing model.
 5. Port native Windows automation and existing Wayland virtual-pointer behavior, add X11/portal adapters, then verify moves/castling/promotion through actual frames.
 6. Implement Android capture foreground service, AccessibilityService/JNI gestures and floating controls.
 7. Finish shortcuts, UI lifecycle/stop/recovery, offline packages and platform acceptance.
 
-See `../docs/automation-plan.md` and `../docs/android-pc-migration-plan.md` for the full scope and release gates. This is not yet an automation-capable replacement. No phone or desktop binary has been built, and native window behavior has not been observed on a real desktop.
+See `../docs/automation-plan.md` and `../docs/android-pc-migration-plan.md` for the full scope and release gates. This is not yet an automation-capable replacement. The Windows Rust runtime DLL is built and exercised, but no complete phone or desktop app binary has been built, and native window behavior has not been observed on a real desktop.
 
 ## Deliberate differences recorded during the port
 

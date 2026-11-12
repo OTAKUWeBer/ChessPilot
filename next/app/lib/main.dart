@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'pilot_controller.dart';
 
 void main() => runApp(const ChessPilotApp());
 
 class ChessPilotApp extends StatelessWidget {
-  const ChessPilotApp({super.key});
+  final PilotController? controller;
+  const ChessPilotApp({super.key, this.controller});
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: 'ChessPilot',
@@ -19,182 +21,248 @@ class ChessPilotApp extends StatelessWidget {
       ),
       cardTheme: const CardThemeData(color: Color(0xff373737)),
     ),
-    home: const PilotControls(),
+    home: PilotControls(controller: controller),
   );
 }
 
 class PilotControls extends StatefulWidget {
-  const PilotControls({super.key});
+  final PilotController? controller;
+  const PilotControls({super.key, this.controller});
   @override
   State<PilotControls> createState() => _PilotControlsState();
 }
 
 class _PilotControlsState extends State<PilotControls> {
-  String? color;
-  String mode = 'drag';
-  int depth = 15;
-  double delay = 0.4;
-  bool kingside = false, queenside = false;
-  void selectColor(String value) => setState(() => color = value);
+  late final PilotController controller;
+  String? get color => switch (controller.state?['color']) {
+    'w' => 'White',
+    'b' => 'Black',
+    _ => null,
+  };
+  String get mode => controller.state!['mode'] as String;
+  int get depth => controller.state!['depth'] as int;
+  double get delay => (controller.state!['delay'] as num).toDouble();
+  bool get kingside => controller.state!['kingside'] as bool;
+  bool get queenside => controller.state!['queenside'] as bool;
+  void selectColor(String value) =>
+      controller.configure({'color': value == 'White' ? 'w' : 'b'});
+  void refresh() {
+    if (mounted) setState(() {});
+  }
 
   @override
-  Widget build(BuildContext context) => CallbackShortcuts(
-    bindings: {
-      const SingleActivator(LogicalKeyboardKey.escape): () =>
-          setState(() => color = null),
-      const SingleActivator(LogicalKeyboardKey.keyW): () =>
-          selectColor('White'),
-      const SingleActivator(LogicalKeyboardKey.keyB): () =>
-          selectColor('Black'),
-      const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
-          setState(() => depth = (depth + 1).clamp(10, 30)),
-      const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
-          setState(() => depth = (depth - 1).clamp(10, 30)),
-    },
-    child: Focus(
-      autofocus: true,
-      child: Scaffold(
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.all(15),
-            children: [
-              Row(
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'ChessPilot',
-                      style: TextStyle(
-                        color: Color(0xff4caf50),
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Shortcuts',
-                    icon: const Icon(Icons.keyboard),
-                    onPressed: () => showDialog<void>(
-                      context: context,
-                      builder: (_) => const AlertDialog(
-                        title: Text('Keyboard shortcuts'),
-                        content: Text(
-                          'W / B — choose color\n← / → — analysis depth\nEsc — color selection',
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Card(
-                margin: EdgeInsets.zero,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      if (color == null) ...[
-                        const Text(
-                          'Select Your Color:',
-                          textAlign: TextAlign.center,
-                        ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: () => selectColor('White'),
-                                child: const Text('White'),
-                              ),
+  void initState() {
+    super.initState();
+    controller = widget.controller ?? PilotController();
+    controller.addListener(refresh);
+    controller.initialize();
+  }
+
+  @override
+  void dispose() {
+    controller.removeListener(refresh);
+    if (widget.controller == null) controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => controller.state == null
+      ? Scaffold(
+          body: Center(
+            child: Text(controller.error ?? 'Starting ChessPilot...'),
+          ),
+        )
+      : CallbackShortcuts(
+          bindings: {
+            const SingleActivator(LogicalKeyboardKey.escape): () {
+              controller.command('stop');
+              controller.configure({'color': null});
+            },
+            const SingleActivator(LogicalKeyboardKey.keyW): () =>
+                selectColor('White'),
+            const SingleActivator(LogicalKeyboardKey.keyB): () =>
+                selectColor('Black'),
+            const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+                controller.configure({'depth': (depth + 1).clamp(10, 30)}),
+            const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+                controller.configure({'depth': (depth - 1).clamp(10, 30)}),
+          },
+          child: Focus(
+            autofocus: true,
+            child: Scaffold(
+              body: SafeArea(
+                child: ListView(
+                  padding: const EdgeInsets.all(15),
+                  children: [
+                    Row(
+                      children: [
+                        const Expanded(
+                          child: Text(
+                            'ChessPilot',
+                            style: TextStyle(
+                              color: Color(0xff4caf50),
+                              fontSize: 26,
+                              fontWeight: FontWeight.bold,
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: () => selectColor('Black'),
-                                child: const Text('Black'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ] else ...[
-                        Text('Playing as $color', textAlign: TextAlign.center),
-                        const SizedBox(height: 12),
-                        const SizedBox(
-                          height: 45,
-                          child: FilledButton(
-                            onPressed: null,
-                            child: Text('Play Next Move'),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        const Text('Castling Rights:'),
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Kingside Castle'),
-                          value: kingside,
-                          onChanged: (v) => setState(() => kingside = v!),
-                        ),
-                        CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Queenside Castle'),
-                          value: queenside,
-                          onChanged: (v) => setState(() => queenside = v!),
-                        ),
-                        const CheckboxListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text('Auto Next Moves'),
-                          value: false,
-                          onChanged: null,
-                        ),
-                        const Text(
-                          'Move controls become available when engine and capture are connected.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white70),
+                        IconButton(
+                          tooltip: 'Shortcuts',
+                          icon: const Icon(Icons.keyboard),
+                          onPressed: () => showDialog<void>(
+                            context: context,
+                            builder: (_) => const AlertDialog(
+                              title: Text('Keyboard shortcuts'),
+                              content: Text(
+                                'W / B — choose color\n← / → — analysis depth\nEsc — color selection',
+                              ),
+                            ),
+                          ),
                         ),
                       ],
-                      const SizedBox(height: 16),
-                      Text('Stockfish Depth: $depth'),
-                      Slider(
-                        min: 10,
-                        max: 30,
-                        divisions: 20,
-                        value: depth.toDouble(),
-                        semanticFormatterCallback: (v) => 'Depth ${v.round()}',
-                        onChanged: (v) => setState(() => depth = v.round()),
+                    ),
+                    const SizedBox(height: 12),
+                    if (controller.error != null)
+                      Text(
+                        controller.error!,
+                        style: const TextStyle(color: Colors.orangeAccent),
                       ),
-                      if (color == null) ...[
-                        Text(
-                          'Screenshot Delay: ${delay.toStringAsFixed(1)} seconds',
-                        ),
-                        Slider(
-                          min: 0,
-                          max: 1,
-                          divisions: 10,
-                          value: delay,
-                          semanticFormatterCallback: (v) =>
-                              '${v.toStringAsFixed(1)} seconds',
-                          onChanged: (v) => setState(() => delay = v),
-                        ),
-                        const Text('Move Mode:'),
-                        const SizedBox(height: 8),
-                        SegmentedButton<String>(
-                          segments: const [
-                            ButtonSegment(value: 'drag', label: Text('Drag')),
-                            ButtonSegment(value: 'click', label: Text('Click')),
+                    if (controller.state!['engine_ready'] != true &&
+                        controller.state!['busy'] != true)
+                      OutlinedButton(
+                        onPressed: () =>
+                            controller.command('initialize_engine'),
+                        child: const Text('Retry engine'),
+                      ),
+                    Card(
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (color == null) ...[
+                              const Text(
+                                'Select Your Color:',
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: FilledButton(
+                                      onPressed: () => selectColor('White'),
+                                      child: const Text('White'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: FilledButton(
+                                      onPressed: () => selectColor('Black'),
+                                      child: const Text('Black'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ] else ...[
+                              Text(
+                                'Color: $color',
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 12),
+                              const SizedBox(
+                                height: 45,
+                                child: FilledButton(
+                                  onPressed: null,
+                                  child: Text('Play Next Move'),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              const Text('Castling Rights:'),
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Kingside Castle'),
+                                value: kingside,
+                                onChanged: (v) =>
+                                    controller.configure({'kingside': v!}),
+                              ),
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Queenside Castle'),
+                                value: queenside,
+                                onChanged: (v) =>
+                                    controller.configure({'queenside': v!}),
+                              ),
+                              const CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                title: Text('Auto Next Moves'),
+                                value: false,
+                                onChanged: null,
+                              ),
+                              Text(
+                                controller.error ??
+                                    controller.state!['status'] as String,
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                              if (controller.state!['busy'] == true)
+                                OutlinedButton(
+                                  onPressed: () => controller.command('stop'),
+                                  child: const Text('Stop'),
+                                ),
+                            ],
+                            const SizedBox(height: 16),
+                            Text('Stockfish Depth: $depth'),
+                            Slider(
+                              min: 10,
+                              max: 30,
+                              divisions: 20,
+                              value: depth.toDouble(),
+                              semanticFormatterCallback: (v) =>
+                                  'Depth ${v.round()}',
+                              onChanged: (v) =>
+                                  controller.configure({'depth': v.round()}),
+                            ),
+                            if (color == null) ...[
+                              Text(
+                                'Screenshot Delay: ${delay.toStringAsFixed(1)} seconds',
+                              ),
+                              Slider(
+                                min: 0,
+                                max: 1,
+                                divisions: 10,
+                                value: delay,
+                                semanticFormatterCallback: (v) =>
+                                    '${v.toStringAsFixed(1)} seconds',
+                                onChanged: (v) =>
+                                    controller.configure({'delay': v}),
+                              ),
+                              const Text('Move Mode:'),
+                              const SizedBox(height: 8),
+                              SegmentedButton<String>(
+                                segments: const [
+                                  ButtonSegment(
+                                    value: 'drag',
+                                    label: Text('Drag'),
+                                  ),
+                                  ButtonSegment(
+                                    value: 'click',
+                                    label: Text('Click'),
+                                  ),
+                                ],
+                                selected: {mode},
+                                onSelectionChanged: (v) =>
+                                    controller.configure({'mode': v.single}),
+                              ),
+                            ],
                           ],
-                          selected: {mode},
-                          onSelectionChanged: (v) =>
-                              setState(() => mode = v.single),
                         ),
-                      ],
-                    ],
-                  ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    ),
-  );
+        );
 }

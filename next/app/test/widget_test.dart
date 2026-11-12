@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:chesspilot/main.dart';
+import 'package:chesspilot/pilot_controller.dart';
 
 void main() {
   testWidgets('380x520 controls retain depth across color selection', (
@@ -11,7 +12,13 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(const ChessPilotApp());
+    final controller = PilotController()..initialize(initializeEngine: false);
+    expect(controller.error, isNull);
+    addTearDown(() async {
+      await controller.close();
+      controller.dispose();
+    });
+    await tester.pumpWidget(ChessPilotApp(controller: controller));
     expect(find.text('Select Your Color:'), findsOneWidget);
     await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
     await tester.pump();
