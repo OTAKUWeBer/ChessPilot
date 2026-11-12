@@ -23,3 +23,11 @@ Responses are `{"ok":true,"result":...}` or `{"ok":false,"error":"..."}`. `open`
 Capture/automation capability flags remain false until actual backends are connected. Progress/analysis includes a session generation; stale worker results cannot update a newly selected color. Multiple clients can own separate sessions, but one session admits only one engine job at a time. Native state is authoritative; Dart snapshots contain no separate chess rules or engine state.
 
 The UI currently polls status while a native operation is busy; capture frames and model tensors never cross this JSON UI boundary. Logging installation/download, frame transport, OS input, desktop shutdown and Android service ownership remain migration work.
+
+## Perception module
+
+`vision::BoardReader<OnnxPredictor>` owns a persistent native ONNX session and consumes checked packed RGB frames. It ports Python's 640×640 Pillow Lanczos letterbox, RGB/CHW float32 normalization, output decoding, board-crop refinement and overlapping tile search. All boxes return in capture-frame coordinates. Raw detection for promotion dialogs can disable refinement.
+
+ONNX Runtime is loaded explicitly from a shared library, using the 1.20 C API; no Python interpreter is involved. One process pins one runtime-library path. Model shape/type mismatches and unreadable positions return errors or no result. Cancellation is checked before and after each inference; an in-flight native inference completes before cancellation takes effect. Search is capped at 64 inferences per observation.
+
+The module is tested independently of capture. Session/UI capture capability remains false until a real capture backend and its lifecycle are connected. See `tests/fixtures/vision/README.md` for Python reference provenance and real-model parity checks. The resampling contract follows Pillow; its license is retained in `third_party/Pillow-LICENSE.txt`.
