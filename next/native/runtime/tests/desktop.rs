@@ -6,7 +6,7 @@ use chesspilot_core::{
 };
 use chesspilot_runtime::{
     desktop::{
-        input::{windows_move, InputError, PixelPoint, Pointer},
+        input::{windows_move, windows_tap, InputError, PixelPoint, Pointer},
         observe, Capture, CaptureBounds, CapturedFrame,
     },
     vision::{BoardReader, Predictor, RgbFrame},
@@ -283,5 +283,44 @@ fn invalid_or_already_cancelled_input_sends_no_events() {
         let result = windows_move(&mut pointer, start, end, MoveMode::Drag, &flag);
         assert!(result.is_err());
         assert!(pointer.events.is_empty());
+    }
+}
+
+#[test]
+fn promotion_tap_uses_fifty_milliseconds_and_releases_on_cancellation() {
+    for stop_at in [None, Some(3)] {
+        let flag = AtomicBool::new(false);
+        let mut pointer = Recording {
+            events: vec![],
+            fail_at: None,
+            stop_at,
+            cancelled: &flag,
+        };
+        let result = windows_tap(&mut pointer, Point { x: 10., y: 20. }, &flag);
+        if stop_at.is_some() {
+            assert!(matches!(
+                result,
+                Err(InputError::Cancelled { dispatched: true })
+            ));
+        } else {
+            result.unwrap();
+            assert_eq!(
+                pointer
+                    .events
+                    .iter()
+                    .filter(|e| matches!(e, Event::Wait(5)))
+                    .count(),
+                10
+            );
+        }
+        assert_eq!(
+            pointer
+                .events
+                .iter()
+                .filter(|e| **e == Event::Button(true))
+                .count(),
+            1
+        );
+        assert_eq!(pointer.events.last(), Some(&Event::Button(false)));
     }
 }

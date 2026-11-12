@@ -44,6 +44,11 @@ class _PilotControlsState extends State<PilotControls> {
   double get delay => (controller.state!['delay'] as num).toDouble();
   bool get kingside => controller.state!['kingside'] as bool;
   bool get queenside => controller.state!['queenside'] as bool;
+  bool get canPlay =>
+      color != null &&
+      controller.state!['busy'] != true &&
+      controller.state!['engine_ready'] == true &&
+      controller.state!['automation_ready'] == true;
   void selectColor(String value) =>
       controller.configure({'color': value == 'White' ? 'w' : 'b'});
   void refresh() {
@@ -86,6 +91,37 @@ class _PilotControlsState extends State<PilotControls> {
                 controller.configure({'depth': (depth + 1).clamp(10, 30)}),
             const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
                 controller.configure({'depth': (depth - 1).clamp(10, 30)}),
+            const SingleActivator(LogicalKeyboardKey.keyP): () {
+              if (canPlay) controller.command('play');
+            },
+            const SingleActivator(LogicalKeyboardKey.keyD): () {
+              if (color == null) controller.configure({'mode': 'drag'});
+            },
+            const SingleActivator(LogicalKeyboardKey.keyC): () {
+              if (color == null) controller.configure({'mode': 'click'});
+            },
+            const SingleActivator(LogicalKeyboardKey.arrowUp): () {
+              if (color == null) {
+                controller.configure({
+                  'delay': ((delay * 10).round() + 1).clamp(0, 10) / 10,
+                });
+              }
+            },
+            const SingleActivator(LogicalKeyboardKey.arrowDown): () {
+              if (color == null) {
+                controller.configure({
+                  'delay': ((delay * 10).round() - 1).clamp(0, 10) / 10,
+                });
+              }
+            },
+            const SingleActivator(LogicalKeyboardKey.keyK): () {
+              if (color != null) controller.configure({'kingside': !kingside});
+            },
+            const SingleActivator(LogicalKeyboardKey.keyQ): () {
+              if (color != null) {
+                controller.configure({'queenside': !queenside});
+              }
+            },
           },
           child: Focus(
             autofocus: true,
@@ -114,7 +150,7 @@ class _PilotControlsState extends State<PilotControls> {
                             builder: (_) => const AlertDialog(
                               title: Text('Keyboard shortcuts'),
                               content: Text(
-                                'W / B — choose color\n← / → — analysis depth\nEsc — color selection',
+                                'W / B — choose color\n← / → — analysis depth\n↑ / ↓ — screenshot delay before choosing color\nD / C — drag / click before choosing color\nP — play next move\nK / Q — castling rights\nEsc — stop and return to color selection',
                               ),
                             ),
                           ),
@@ -130,9 +166,16 @@ class _PilotControlsState extends State<PilotControls> {
                     if (controller.state!['engine_ready'] != true &&
                         controller.state!['busy'] != true)
                       OutlinedButton(
-                        onPressed: () =>
-                            controller.command('initialize_engine'),
+                        onPressed: () => controller.command('initialize'),
                         child: const Text('Retry engine'),
+                      ),
+                    if (controller.state!['engine_ready'] == true &&
+                        controller.state!['capture_ready'] != true &&
+                        controller.state!['busy'] != true)
+                      OutlinedButton(
+                        onPressed: () =>
+                            controller.command('initialize_capture'),
+                        child: const Text('Retry board capture'),
                       ),
                     Card(
                       margin: EdgeInsets.zero,
@@ -170,11 +213,13 @@ class _PilotControlsState extends State<PilotControls> {
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 12),
-                              const SizedBox(
+                              SizedBox(
                                 height: 45,
                                 child: FilledButton(
-                                  onPressed: null,
-                                  child: Text('Play Next Move'),
+                                  onPressed: canPlay
+                                      ? () => controller.command('play')
+                                      : null,
+                                  child: const Text('Play Next Move'),
                                 ),
                               ),
                               const SizedBox(height: 12),

@@ -164,3 +164,26 @@ pub fn windows_move(
     gesture.release()?;
     result
 }
+
+pub fn windows_tap(
+    pointer: &mut impl Pointer,
+    point: Point,
+    cancelled: &AtomicBool,
+) -> Result<(), InputError> {
+    let point = PixelPoint::try_from(point).map_err(InputError::NotDispatched)?;
+    let mut gesture = Gesture {
+        pointer,
+        cancelled,
+        held: false,
+        dispatched: false,
+    };
+    let result = (|| {
+        gesture.move_to(point)?;
+        gesture.button(true)?;
+        gesture.wait(50)?;
+        gesture.button(false)?;
+        gesture.check()
+    })();
+    gesture.release()?;
+    result
+}

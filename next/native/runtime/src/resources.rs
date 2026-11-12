@@ -7,6 +7,41 @@ use std::{
 
 pub const DEFAULT_CONFIG: &str = "# ChessPilot Engine Configuration\n# Restart the engine after editing.\nsetoption name Hash value 1024\nsetoption name Threads value 4\n";
 
+pub fn native_asset_directories() -> io::Result<Vec<PathBuf>> {
+    let exe = std::env::current_exe()?;
+    let mut directories = vec![exe
+        .parent()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Missing executable directory"))?
+        .to_path_buf()];
+    if cfg!(debug_assertions) {
+        directories.push(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../src"));
+    }
+    Ok(directories)
+}
+pub fn vision_paths(model: Option<&str>, runtime: Option<&str>) -> io::Result<(PathBuf, PathBuf)> {
+    let mut directories = native_asset_directories()?;
+    let model = match model {
+        Some(path) => PathBuf::from(path),
+        None => resource_path("chess_detection.onnx", &directories)?,
+    };
+    if cfg!(all(debug_assertions, windows)) {
+        directories.push(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../../venv/Lib/site-packages/onnxruntime/capi"),
+        );
+    }
+    let name = if cfg!(windows) {
+        "onnxruntime.dll"
+    } else {
+        "libonnxruntime.so"
+    };
+    let runtime = match runtime {
+        Some(path) => PathBuf::from(path),
+        None => resource_path(name, &directories)?,
+    };
+    Ok((model, runtime))
+}
+
 /// Resolve an existing bundle/development asset without moving the user's file.
 pub fn resource_path(name: &str, directories: &[PathBuf]) -> io::Result<PathBuf> {
     if Path::new(name).components().count() != 1 || name == "." || name == ".." {

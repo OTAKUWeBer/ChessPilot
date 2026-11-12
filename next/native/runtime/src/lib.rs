@@ -1,4 +1,5 @@
 //! Native services ported from src/services and src/utils.
+pub mod controller;
 pub mod desktop;
 pub mod engine;
 pub mod ffi;

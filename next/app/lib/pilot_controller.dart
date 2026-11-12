@@ -19,7 +19,7 @@ class PilotController extends ChangeNotifier {
       final result = _client!.request({'command': 'open'});
       _session = result['session'] as int;
       state = result['state'] as Map<String, dynamic>;
-      if (initializeEngine) command('initialize_engine');
+      if (initializeEngine) command('initialize');
     } catch (e) {
       error = '$e';
     }

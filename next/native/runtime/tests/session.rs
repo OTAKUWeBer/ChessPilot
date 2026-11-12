@@ -15,6 +15,7 @@ fn settings_are_transactional_and_sessions_are_isolated() {
         .as_u64()
         .unwrap();
     assert_eq!(first["state"]["depth"], 15);
+    assert!(request(json!({"command":"play","session":a})).is_err());
     assert!(request(json!({"command":"configure","session":a,"depth":18,"delay":2})).is_err());
     assert_eq!(
         request(json!({"command":"status","session":a})).unwrap()["state"]["depth"],
@@ -30,6 +31,35 @@ fn settings_are_transactional_and_sessions_are_isolated() {
     request(json!({"command":"close","session":a})).unwrap();
     assert!(request(json!({"command":"status","session":a})).is_err());
     request(json!({"command":"close","session":b})).unwrap();
+}
+
+#[test]
+#[cfg(windows)]
+#[ignore = "Requires CHESSPILOT_MODEL, CHESSPILOT_ORT and CHESSPILOT_STOCKFISH; probes native capture without sending input"]
+fn initialized_capture_gates_play_and_failed_reload_preserves_engine() {
+    let engine = std::env::var("CHESSPILOT_STOCKFISH").unwrap();
+    let model = std::env::var("CHESSPILOT_MODEL").unwrap();
+    let runtime = std::env::var("CHESSPILOT_ORT").unwrap();
+    let id = request(json!({"command":"open"})).unwrap()["session"]
+        .as_u64()
+        .unwrap();
+    request(json!({"command":"initialize","session":id,"engine_path":engine,"model_path":model,"runtime_path":runtime})).unwrap();
+    request(json!({"command":"configure","session":id,"color":"b"})).unwrap();
+    let ready = wait_idle(id);
+    assert!(ready["error"].is_null(), "{ready}");
+    assert_eq!(ready["engine_ready"], true);
+    assert_eq!(ready["capture_ready"], true);
+    assert_eq!(ready["automation_ready"], true);
+    assert!(ready["confirmed_fen"].is_null());
+    request(json!({"command":"configure","session":id,"color":null})).unwrap();
+    assert!(request(json!({"command":"play","session":id})).is_err());
+    request(json!({"command":"initialize_capture","session":id,"model_path":"missing.onnx","runtime_path":runtime})).unwrap();
+    let failed = wait_idle(id);
+    assert!(failed["error"].is_string());
+    assert_eq!(failed["capture_ready"], false);
+    assert_eq!(failed["engine_ready"], true);
+    assert!(request(json!({"command":"play","session":id})).is_err());
+    request(json!({"command":"close","session":id})).unwrap();
 }
 
 #[test]

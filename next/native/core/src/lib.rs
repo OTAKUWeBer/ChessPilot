@@ -4,6 +4,7 @@ pub mod config;
 pub mod detection;
 pub mod fen;
 pub mod notation;
+pub mod promotion;
 pub mod state;
 pub mod validation;
 

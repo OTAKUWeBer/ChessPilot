@@ -5,7 +5,7 @@ pub mod windows;
 use crate::vision::{BoardReader, Predictor, RgbFrame};
 use chesspilot_core::{
     board::Point,
-    detection::{get_fen_from_position, DetectedBoard},
+    detection::{get_fen_from_position, DetectedBoard, Detection},
     Color,
 };
 use std::{
@@ -60,18 +60,25 @@ impl CapturedFrame {
 pub trait Capture {
     fn capture(&mut self) -> Result<CapturedFrame, String>;
 }
+#[derive(Clone)]
 pub struct Observation {
     pub board: DetectedBoard,
     pub source: CaptureBounds,
     pub captured_at: Instant,
     pub inference_count: usize,
 }
-pub fn observe(
+pub struct RawObservation {
+    pub boxes: Vec<Detection>,
+    pub source: CaptureBounds,
+    pub captured_at: Instant,
+    pub inference_count: usize,
+}
+pub fn capture_positions(
     capture: &mut impl Capture,
     reader: &mut BoardReader<impl Predictor>,
-    color: Color,
+    refined: bool,
     cancelled: &AtomicBool,
-) -> Result<Observation, String> {
+) -> Result<RawObservation, String> {
     if cancelled.load(Ordering::Acquire) {
         return Err("Board capture cancelled".into());
     }
@@ -79,14 +86,30 @@ pub fn observe(
     if frame.bounds.width != frame.image.width() || frame.bounds.height != frame.image.height() {
         return Err("Capture dimensions changed without updating coordinate metadata".into());
     }
-    let boxes = reader.get_positions(&frame.image, true, cancelled)?.ok_or(
-        "Chessboard detection failed after refined search; check board size and visibility",
-    )?;
-    let board = get_fen_from_position(color, &boxes)?.ok_or("Chessboard is unreadable")?;
-    Ok(Observation {
-        board,
+    let boxes = reader
+        .get_positions(&frame.image, refined, cancelled)?
+        .unwrap_or_default();
+    Ok(RawObservation {
+        boxes,
         source: frame.bounds,
         captured_at: frame.captured_at,
         inference_count: reader.inference_count,
+    })
+}
+pub fn observe(
+    capture: &mut impl Capture,
+    reader: &mut BoardReader<impl Predictor>,
+    color: Color,
+    cancelled: &AtomicBool,
+) -> Result<Observation, String> {
+    let raw = capture_positions(capture, reader, true, cancelled)?;
+    let board = get_fen_from_position(color, &raw.boxes)?.ok_or(
+        "Chessboard detection failed after refined search; check board size and visibility",
+    )?;
+    Ok(Observation {
+        board,
+        source: raw.source,
+        captured_at: raw.captured_at,
+        inference_count: raw.inference_count,
     })
 }

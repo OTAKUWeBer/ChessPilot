@@ -19,7 +19,7 @@ pub enum MoveMode {
     Click,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Settings {
     pub depth: u32,
     pub screenshot_delay: f64,

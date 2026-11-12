@@ -44,6 +44,9 @@ pub fn request(value: Value) -> Result<Value, String> {
         "status" => {}
         "configure" => session.configure(&value)?,
         "initialize_engine" => session.initialize_engine(&value)?,
+        "initialize" => session.initialize(&value, true)?,
+        "initialize_capture" => session.initialize_capture(&value)?,
+        "play" => session.play()?,
         "analyze" => session.analyze(
             value
                 .get("fen")
