@@ -41,7 +41,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ChessPilot-v2.3.0-linux',
+    name='ChessPilot-v2.3.1-linux',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

@@ -16,7 +16,7 @@ if __name__ == "__main__":
         except (AttributeError, OSError) as err:
             logging.getLogger(__name__).debug("Per-monitor V2 DPI awareness could not be set: %s", err)
         try:
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('otakuweber.chesspilot.2.3.0')
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID('otakuweber.chesspilot.2.3.1')
         except (AttributeError, OSError) as err:
             logging.getLogger(__name__).debug("AppUserModelID could not be set: %s", err)
         if getattr(sys, 'frozen', False):

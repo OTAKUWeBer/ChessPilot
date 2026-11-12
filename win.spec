@@ -40,7 +40,7 @@ exe = EXE(
     a.binaries,
     a.datas,
     [],
-    name='ChessPilot-v2.3.0-windows',
+    name='ChessPilot-v2.3.1-windows',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
