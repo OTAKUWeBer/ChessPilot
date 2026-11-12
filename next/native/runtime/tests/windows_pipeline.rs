@@ -1,12 +1,18 @@
 #![cfg(windows)]
 //! Controlled local board: real capture, ONNX, Stockfish, OS mouse delivery and visual verification.
-use chesspilot_core::{board::fen_to_list, detection::CLASS_TO_FEN, Color};
-use chesspilot_runtime::{ffi::request, vision::RgbFrame};
+use chesspilot_core::{board::fen_to_list, detection::CLASS_TO_FEN, notation::Move, Color};
+use chesspilot_runtime::{
+    engine::{Analysis, EngineService, Timeouts},
+    ffi::request,
+    vision::RgbFrame,
+};
 use serde_json::{json, Value};
 use std::{
     collections::HashMap,
     mem::size_of,
+    process::Command,
     ptr::{null, null_mut},
+    sync::atomic::AtomicBool,
     sync::Mutex,
     time::{Duration, Instant},
 };
@@ -317,6 +323,59 @@ impl Target {
             InvalidateRect(self.hwnd, null(), 1);
         }
     }
+    fn pump_for(&self, duration: Duration) {
+        let until = Instant::now() + duration;
+        while Instant::now() < until {
+            self.pump();
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
+    fn opponent_reply(&self, before: &str, analysis: &Analysis) {
+        let mv = Move::parse(analysis.best_move.as_deref().unwrap()).unwrap();
+        {
+            let mut guard = BOARD.lock().unwrap();
+            let board = guard.as_mut().unwrap();
+            assert_eq!(board.pieces, fen_to_list(before).unwrap());
+            assert!(mv.promotion.is_none());
+            board.pieces[mv.to] = board.pieces[mv.from];
+            board.pieces[mv.from] = ' ';
+            assert_eq!(
+                board.pieces,
+                fen_to_list(analysis.updated_fen.as_deref().unwrap()).unwrap()
+            );
+        }
+        unsafe {
+            InvalidateRect(self.hwnd, null(), 1);
+            UpdateWindow(self.hwnd);
+        }
+    }
+    fn wait_auto_move(&self, id: u64, expected_moves: usize) -> Value {
+        let deadline = Instant::now() + Duration::from_secs(45);
+        loop {
+            self.pump();
+            let state = request(json!({"command":"status","session":id})).unwrap()["state"].clone();
+            assert!(state["error"].is_null(), "Auto failed: {state}");
+            assert_eq!(state["auto_mode"], true, "{state}");
+            let (pieces, moves) = {
+                let guard = BOARD.lock().unwrap();
+                let board = guard.as_ref().unwrap();
+                (board.pieces, board.moves.len())
+            };
+            assert!(moves <= expected_moves, "Auto replayed a move");
+            if moves == expected_moves
+                && state["confirmed_fen"]
+                    .as_str()
+                    .is_some_and(|fen| fen_to_list(fen).unwrap() == pieces)
+            {
+                return state;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "Auto did not confirm a response: {state}"
+            );
+            std::thread::sleep(Duration::from_millis(5));
+        }
+    }
 }
 impl Drop for Target {
     fn drop(&mut self) {
@@ -363,7 +422,7 @@ fn controlled_renderer_is_readable_by_the_real_model() {
 }
 #[test]
 #[ignore = "Requires CHESSPILOT_DESKTOP_TEST=1, native engine/model/runtime and interactive Windows; owns a temporary full-screen board"]
-fn real_session_plays_and_visually_confirms_one_move_in_drag_and_click_modes() {
+fn real_session_manual_and_auto_moves_are_visually_confirmed_in_both_colors_and_modes() {
     assert_eq!(std::env::var("CHESSPILOT_DESKTOP_TEST").as_deref(), Ok("1"));
     assert!(unsafe { GetAsyncKeyState(VK_LBUTTON as i32) } >= 0);
     let target = Target::new();
@@ -371,6 +430,15 @@ fn real_session_plays_and_visually_confirms_one_move_in_drag_and_click_modes() {
         .as_u64()
         .unwrap();
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut opponent = EngineService::new(
+            Command::new(std::env::var_os("CHESSPILOT_STOCKFISH").unwrap()),
+            vec![
+                "setoption name Hash value 16".into(),
+                "setoption name Threads value 1".into(),
+            ],
+            Timeouts::default(),
+        )
+        .unwrap();
         request(json!({"command":"initialize","session":id,"engine_path":std::env::var("CHESSPILOT_STOCKFISH").unwrap(),"model_path":std::env::var("CHESSPILOT_MODEL").unwrap(),"runtime_path":std::env::var("CHESSPILOT_ORT").unwrap()})).unwrap();
         let ready = target.wait_idle(id);
         assert!(ready["error"].is_null(), "{ready}");
@@ -405,6 +473,17 @@ fn real_session_plays_and_visually_confirms_one_move_in_drag_and_click_modes() {
                 let confirmed = played["confirmed_fen"]
                     .as_str()
                     .expect("Visual confirmation missing");
+                let rights = confirmed.split_whitespace().nth(2).unwrap();
+                assert!(
+                    (if color == Color::White {
+                        ['K', 'Q']
+                    } else {
+                        ['k', 'q']
+                    })
+                    .iter()
+                    .all(|c| rights.contains(*c)),
+                    "Disabling analysis castling must preserve still-legal history rights"
+                );
                 let (pieces, moves) = {
                     let guard = BOARD.lock().unwrap();
                     let board = guard.as_ref().unwrap();
@@ -417,6 +496,36 @@ fn real_session_plays_and_visually_confirms_one_move_in_drag_and_click_modes() {
                     "Predicted FEN must match received pointer events and actual rendered board"
                 );
                 assert!(played["status"].as_str().unwrap().contains("Move Played:"));
+                assert_eq!(played["auto_available"], true);
+                let mut confirmed = confirmed.to_owned();
+                request(json!({"command":"set_auto","session":id,"enabled":true})).unwrap();
+                target.pump_for(Duration::from_millis(500));
+                assert_eq!(
+                    BOARD.lock().unwrap().as_ref().unwrap().moves.len(),
+                    1,
+                    "Unchanged board must not cause an automatic move"
+                );
+                for round in 0..2 {
+                    let reply = opponent
+                        .get_best_move(1, &confirmed, &AtomicBool::new(false), |_, _| {})
+                        .unwrap();
+                    target.opponent_reply(&confirmed, &reply);
+                    let state = target.wait_auto_move(id, round + 2);
+                    confirmed = state["confirmed_fen"].as_str().unwrap().to_owned();
+                }
+                request(json!({"command":"set_auto","session":id,"enabled":false})).unwrap();
+                let stopped = target.wait_idle(id);
+                assert_eq!(stopped["auto_mode"], false);
+                assert_eq!(
+                    stopped["auto_available"], true,
+                    "Stopping while waiting preserves confirmed history"
+                );
+                target.pump_for(Duration::from_millis(150));
+                assert_eq!(
+                    BOARD.lock().unwrap().as_ref().unwrap().moves.len(),
+                    3,
+                    "Stop must not schedule another move"
+                );
             }
         }
     }));

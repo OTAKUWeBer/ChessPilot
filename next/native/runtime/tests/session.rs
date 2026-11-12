@@ -16,6 +16,8 @@ fn settings_are_transactional_and_sessions_are_isolated() {
         .unwrap();
     assert_eq!(first["state"]["depth"], 15);
     assert!(request(json!({"command":"play","session":a})).is_err());
+    assert!(request(json!({"command":"set_auto","session":a,"enabled":true})).is_err());
+    assert!(request(json!({"command":"set_auto","session":a,"enabled":"yes"})).is_err());
     assert!(request(json!({"command":"configure","session":a,"depth":18,"delay":2})).is_err());
     assert_eq!(
         request(json!({"command":"status","session":a})).unwrap()["state"]["depth"],

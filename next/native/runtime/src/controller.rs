@@ -1,6 +1,6 @@
 //! Serialized capture/analyze/execute/verify port of game/move_processor.py and move_execution.py.
 use crate::{
-    desktop::{self, input::InputError, Capture, Observation, RawObservation},
+    desktop::{self, input::InputError, Capture, CaptureBounds, Observation, RawObservation},
     engine::{Analysis, EngineService, Score},
     vision::{BoardReader, Predictor},
 };
@@ -8,7 +8,7 @@ use chesspilot_core::{
     board::{fen_to_list, BoardGeometry, Point},
     config::{self, MoveMode, Settings},
     detection::get_fen_from_position,
-    fen::{is_two_square_king_move, update_fen_castling_rights, CastleSide},
+    fen::{is_two_square_king_move, rook_move, update_fen_castling_rights, CastleSide},
     notation::Move,
     promotion::detect_promotion_pieces,
     validation::{did_castling_move, did_my_piece_move},
@@ -83,8 +83,24 @@ pub trait Analyzer {
         cancelled: &AtomicBool,
         progress: &mut dyn FnMut(u32, Option<Score>),
     ) -> Result<Analysis, String>;
+    fn reconcile_reply(
+        &mut self,
+        _before: &str,
+        _observed: &str,
+        _cancelled: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        Ok(None)
+    }
 }
 impl Analyzer for EngineService {
+    fn reconcile_reply(
+        &mut self,
+        before: &str,
+        observed: &str,
+        cancelled: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        EngineService::reconcile_reply(self, before, observed, cancelled).map_err(|e| e.to_string())
+    }
     fn analyze(
         &mut self,
         depth: u32,
@@ -93,6 +109,16 @@ impl Analyzer for EngineService {
         progress: &mut dyn FnMut(u32, Option<Score>),
     ) -> Result<Analysis, String> {
         self.get_best_move(depth, fen, cancelled, progress)
+            .map_err(|e| e.to_string())
+    }
+}
+pub trait History: Analyzer {
+    fn has_legal_moves(&mut self, fen: &str, cancelled: &AtomicBool) -> Result<bool, String>;
+}
+impl History for EngineService {
+    fn has_legal_moves(&mut self, fen: &str, cancelled: &AtomicBool) -> Result<bool, String> {
+        self.legal_moves(fen, cancelled)
+            .map(|moves| !moves.is_empty())
             .map_err(|e| e.to_string())
     }
 }
@@ -106,6 +132,7 @@ pub enum PlayError {
     Engine(String),
     Input(InputError),
     VerificationFailed,
+    HistoryMismatch,
 }
 impl fmt::Display for PlayError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -126,6 +153,10 @@ impl fmt::Display for PlayError {
                 f,
                 "Move could not be verified; check the board before retrying"
             ),
+            Self::HistoryMismatch => write!(
+                f,
+                "Board does not match one legal reply; resynchronize before Auto"
+            ),
         }
     }
 }
@@ -143,11 +174,42 @@ pub enum Progress {
     Status(&'static str),
     Analysis(u32, Option<Score>),
     Candidate(Analysis),
+    Observed(KnownPosition),
+    Played(MoveOutcome),
+    Terminal,
+    Dispatching,
 }
+#[derive(Clone)]
+pub struct KnownPosition {
+    pub fen: String,
+    pub geometry: BoardGeometry,
+    pub source: CaptureBounds,
+}
+#[derive(Clone)]
 pub struct MoveOutcome {
     pub analysis: Analysis,
     pub confirmed_fen: Option<String>,
     pub geometry: BoardGeometry,
+    pub source: CaptureBounds,
+}
+impl MoveOutcome {
+    pub fn position(&self) -> Option<KnownPosition> {
+        self.confirmed_fen.as_ref().map(|fen| KnownPosition {
+            fen: fen.clone(),
+            geometry: self.geometry,
+            source: self.source,
+        })
+    }
+}
+pub struct PlayRequest<'a> {
+    pub settings: &'a Settings,
+    pub color: Color,
+    pub known_position: Option<&'a KnownPosition>,
+}
+pub struct AutoRequest<'a> {
+    pub settings: &'a Settings,
+    pub color: Color,
+    pub position: KnownPosition,
 }
 fn check(cancelled: &AtomicBool) -> Result<(), PlayError> {
     if cancelled.load(Ordering::Acquire) {
@@ -236,15 +298,24 @@ fn settle(
     )?;
     Ok(())
 }
+struct Verification<'a> {
+    color: Color,
+    expected: &'a str,
+    promotion: bool,
+}
 fn verify(
     source: &mut impl BoardSource,
     input: &mut impl Automation,
+    engine: &mut impl Analyzer,
     reference: &Observation,
-    color: Color,
-    expected: &str,
-    promotion: bool,
+    request: Verification<'_>,
     cancelled: &AtomicBool,
-) -> Result<(), PlayError> {
+) -> Result<String, PlayError> {
+    let Verification {
+        color,
+        expected,
+        promotion,
+    } = request;
     for _ in 0..if promotion { 4 } else { 2 } {
         input.wait(
             Duration::from_millis(if promotion { 300 } else { 200 }),
@@ -256,7 +327,16 @@ fn verify(
             fresh(current.captured_at)?;
             if placement(&current.board.fen) == placement(expected) {
                 check(cancelled)?;
-                return Ok(());
+                return Ok(expected.into());
+            }
+            if placement(&current.board.fen) != placement(&reference.board.fen) {
+                if let Some(fen) = engine
+                    .reconcile_reply(expected, &current.board.fen, cancelled)
+                    .map_err(PlayError::Engine)?
+                {
+                    check(cancelled)?;
+                    return Ok(fen);
+                }
             }
         }
     }
@@ -267,14 +347,6 @@ struct CastleMove<'a> {
     king: &'a str,
     side: CastleSide,
     expected: &'a str,
-}
-fn rook_for(color: Color, side: CastleSide) -> &'static str {
-    match (color, side) {
-        (Color::White, CastleSide::Kingside) => "h1f1",
-        (Color::White, CastleSide::Queenside) => "a1d1",
-        (Color::Black, CastleSide::Kingside) => "h8f8",
-        (Color::Black, CastleSide::Queenside) => "a8d8",
-    }
 }
 fn castle(
     source: &mut impl BoardSource,
@@ -290,7 +362,7 @@ fn castle(
         side,
         expected,
     } = plan;
-    let rook = rook_for(color, side);
+    let rook = rook_move(color, side);
     let rook_move = Move::parse(rook).map_err(PlayError::Engine)?;
     input.wait(Duration::from_millis(250), cancelled)?;
     for _ in 0..2 {
@@ -438,17 +510,64 @@ pub fn play(
     settings: &Settings,
     color: Color,
     cancelled: &AtomicBool,
+    progress: impl FnMut(Progress),
+) -> Result<MoveOutcome, PlayError> {
+    play_position(
+        source,
+        input,
+        engine,
+        PlayRequest {
+            settings,
+            color,
+            known_position: None,
+        },
+        cancelled,
+        progress,
+    )
+}
+pub fn play_position(
+    source: &mut impl BoardSource,
+    input: &mut impl Automation,
+    engine: &mut impl Analyzer,
+    request: PlayRequest<'_>,
+    cancelled: &AtomicBool,
     mut progress: impl FnMut(Progress),
 ) -> Result<MoveOutcome, PlayError> {
+    let PlayRequest {
+        settings,
+        color,
+        known_position,
+    } = request;
     progress(Progress::Status("Analyzing board..."));
     let original = observe(source, input, color, cancelled)?;
-    let fen = update_fen_castling_rights(
-        color,
-        settings.kingside,
-        settings.queenside,
-        &original.board.fen,
-    )
-    .map_err(PlayError::Detection)?;
+    let canonical_fen = if let Some(known) = known_position {
+        validate_known(known, &original)?;
+        if placement(&known.fen) != placement(&original.board.fen) {
+            return Err(PlayError::PositionChanged);
+        }
+        let fields: Vec<_> = known.fen.split_whitespace().collect();
+        if fields.len() != 6 || fields[1] != color.fen() {
+            return Err(PlayError::HistoryMismatch);
+        }
+        known.fen.clone()
+    } else {
+        update_fen_castling_rights(color, true, true, &original.board.fen)
+            .map_err(PlayError::Detection)?
+    };
+    let fen = {
+        let mut fields: Vec<_> = canonical_fen.split_whitespace().collect();
+        // Preferences restrict analysis; the confirmed position keeps its actual rights.
+        let rights: String = fields[2]
+            .chars()
+            .filter(|ch| match (color, *ch) {
+                (Color::White, 'K') | (Color::Black, 'k') => settings.kingside,
+                (Color::White, 'Q') | (Color::Black, 'q') => settings.queenside,
+                _ => true,
+            })
+            .collect();
+        fields[2] = if rights.is_empty() { "-" } else { &rights };
+        fields.join(" ")
+    };
     check(cancelled)?;
     let analysis = engine
         .analyze(settings.depth, &fen, cancelled, &mut |depth, score| {
@@ -462,13 +581,26 @@ pub fn play(
             analysis,
             confirmed_fen: None,
             geometry: original.board.geometry,
+            source: original.source,
         });
     };
     let mv = Move::parse(value).map_err(PlayError::Engine)?;
-    let expected = analysis
+    let predicted = analysis
         .updated_fen
         .as_deref()
         .ok_or_else(|| PlayError::Engine("Missing updated position".into()))?;
+    let canonical_expected = if canonical_fen != fen {
+        engine
+            .reconcile_reply(&canonical_fen, predicted, cancelled)
+            .map_err(PlayError::Engine)?
+            .ok_or_else(|| {
+                PlayError::Engine("Best move could not be applied to the canonical position".into())
+            })?
+    } else {
+        predicted.to_owned()
+    };
+    check(cancelled)?;
+    let expected = canonical_expected.as_str();
     let side = is_two_square_king_move(value, &fen, color).map_err(PlayError::Engine)?;
     let valid = if let Some(side) = side {
         if !(if side == CastleSide::Kingside {
@@ -480,7 +612,7 @@ pub fn play(
                 "Engine requested disabled castling".into(),
             ));
         }
-        let rook = rook_for(color, side);
+        let rook = rook_move(color, side);
         did_castling_move(color, &fen, expected, value, rook)
     } else {
         did_my_piece_move(color, &fen, expected, value)
@@ -497,11 +629,11 @@ pub fn play(
     if placement(&original.board.fen) != placement(&current.board.fen) {
         return Err(PlayError::PositionChanged);
     }
-    progress(Progress::Status("Playing move..."));
+    progress(Progress::Dispatching);
     dispatch(input, &current, color, mv, settings.move_mode, cancelled)?;
     let mut confirmed = false;
     if let Some(side) = side {
-        confirmed = castle(
+        confirmed = match castle(
             source,
             input,
             &current,
@@ -513,7 +645,11 @@ pub fn play(
             },
             settings.move_mode,
             cancelled,
-        )?;
+        ) {
+            Ok(value) => value,
+            Err(PlayError::VerificationFailed) => false,
+            Err(error) => return Err(error),
+        };
     } else {
         settle(input, settings.move_mode, cancelled)?;
     }
@@ -521,22 +657,158 @@ pub fn play(
         progress(Progress::Status("Checking promotion..."));
         confirmed = promote(source, input, &current, color, mv, expected, cancelled)?;
     }
-    if !confirmed {
+    let confirmed_fen = if !confirmed {
         progress(Progress::Status("Verifying move..."));
         verify(
             source,
             input,
+            engine,
             &current,
-            color,
-            expected,
-            mv.promotion.is_some(),
+            Verification {
+                color,
+                expected,
+                promotion: mv.promotion.is_some(),
+            },
+            cancelled,
+        )?
+    } else {
+        expected.to_owned()
+    };
+    check(cancelled)?;
+    Ok(MoveOutcome {
+        confirmed_fen: Some(confirmed_fen),
+        geometry: current.board.geometry,
+        source: current.source,
+        analysis,
+    })
+}
+fn validate_known(known: &KnownPosition, current: &Observation) -> Result<(), PlayError> {
+    if known.source != current.source || !same_geometry(known.geometry, current.board.geometry) {
+        return Err(PlayError::GeometryChanged);
+    }
+    fresh(current.captured_at)
+}
+fn wait_for_reply(
+    source: &mut impl BoardSource,
+    input: &mut impl Automation,
+    engine: &mut impl History,
+    request: &AutoRequest<'_>,
+    cancelled: &AtomicBool,
+) -> Result<KnownPosition, PlayError> {
+    let mut failures = 0;
+    loop {
+        check(cancelled)?;
+        let observation = (|| {
+            let current = observe(source, input, request.color, cancelled)?;
+            validate_known(&request.position, &current)?;
+            if placement(&current.board.fen) == placement(&request.position.fen) {
+                return Ok(None);
+            }
+            input.wait(
+                Duration::from_secs_f64(
+                    config::OPPONENT_MOVE_SETTLE_DELAY + request.settings.screenshot_delay,
+                ),
+                cancelled,
+            )?;
+            let stable = observe(source, input, request.color, cancelled)?;
+            validate_known(&request.position, &stable)?;
+            if placement(&current.board.fen) != placement(&stable.board.fen) {
+                return Err(PlayError::PositionChanged);
+            }
+            let fen = engine
+                .reconcile_reply(&request.position.fen, &stable.board.fen, cancelled)
+                .map_err(PlayError::Engine)?
+                .ok_or(PlayError::HistoryMismatch)?;
+            if fen.split_whitespace().nth(1) != Some(request.color.fen()) {
+                return Err(PlayError::HistoryMismatch);
+            }
+            Ok(Some(KnownPosition {
+                fen,
+                geometry: stable.board.geometry,
+                source: stable.source,
+            }))
+        })();
+        match observation {
+            Ok(Some(position)) => return Ok(position),
+            Ok(None) => {
+                failures = 0;
+                input.wait(
+                    Duration::from_secs_f64(config::AUTO_MODE_POLL_INTERVAL),
+                    cancelled,
+                )?;
+            }
+            Err(error)
+                if matches!(
+                    error,
+                    PlayError::Detection(_)
+                        | PlayError::HistoryMismatch
+                        | PlayError::PositionChanged
+                ) =>
+            {
+                failures += 1;
+                if failures >= config::MAX_CONSECUTIVE_FAILURES {
+                    return Err(error);
+                }
+                input.wait(Duration::from_millis(200), cancelled)?;
+            }
+            Err(error) => return Err(error),
+        }
+    }
+}
+pub fn auto_play(
+    source: &mut impl BoardSource,
+    input: &mut impl Automation,
+    engine: &mut impl History,
+    mut request: AutoRequest<'_>,
+    cancelled: &AtomicBool,
+    mut progress: impl FnMut(Progress),
+) -> Result<(), PlayError> {
+    loop {
+        check(cancelled)?;
+        let active = Color::parse(
+            request
+                .position
+                .fen
+                .split_whitespace()
+                .nth(1)
+                .ok_or(PlayError::HistoryMismatch)?,
+        )
+        .map_err(|_| PlayError::HistoryMismatch)?;
+        if active != request.color {
+            if !engine
+                .has_legal_moves(&request.position.fen, cancelled)
+                .map_err(PlayError::Engine)?
+            {
+                progress(Progress::Terminal);
+                return Ok(());
+            }
+            progress(Progress::Status("Waiting for opponent..."));
+            request.position = wait_for_reply(source, input, engine, &request, cancelled)?;
+            check(cancelled)?;
+            progress(Progress::Observed(request.position.clone()));
+        }
+        let outcome = play_position(
+            source,
+            input,
+            engine,
+            PlayRequest {
+                settings: request.settings,
+                color: request.color,
+                known_position: Some(&request.position),
+            },
+            cancelled,
+            &mut progress,
+        )?;
+        let position = outcome.position();
+        progress(Progress::Played(outcome));
+        let Some(position) = position else {
+            progress(Progress::Terminal);
+            return Ok(());
+        };
+        request.position = position;
+        input.wait(
+            Duration::from_secs_f64(config::MIN_MOVE_INTERVAL),
             cancelled,
         )?;
     }
-    check(cancelled)?;
-    Ok(MoveOutcome {
-        confirmed_fen: Some(expected.into()),
-        geometry: current.board.geometry,
-        analysis,
-    })
 }

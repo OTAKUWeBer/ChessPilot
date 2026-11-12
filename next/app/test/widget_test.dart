@@ -6,21 +6,31 @@ import 'package:chesspilot/pilot_controller.dart';
 
 class ActionController extends PilotController {
   int plays = 0;
+  final List<bool> autoRequests = [];
   @override
   void command(String name, [Map<String, dynamic> values = const {}]) {
     if (name == 'play') {
       plays++;
       return;
     }
+    if (name == 'set_auto') {
+      final enabled = values['enabled'] as bool;
+      autoRequests.add(enabled);
+      state!.addAll({'auto_mode': enabled, 'busy': enabled});
+      notifyListeners();
+      return;
+    }
     super.command(name, values);
   }
 
-  void presentCapabilities({required bool busy}) {
+  void presentCapabilities({required bool busy, bool canAuto = false}) {
     state!.addAll({
       'engine_ready': true,
       'capture_ready': true,
       'automation_ready': true,
       'busy': busy,
+      'auto_mode': false,
+      'auto_available': canAuto,
     });
     notifyListeners();
   }
@@ -94,6 +104,17 @@ void main() {
       await tester.sendKeyEvent(LogicalKeyboardKey.keyQ);
       expect(controller.state!['kingside'], true);
       expect(controller.state!['queenside'], true);
+      controller.presentCapabilities(busy: false, canAuto: true);
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+      await tester.pump();
+      expect(controller.state!['auto_mode'], true);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyP);
+      expect(controller.plays, 2);
+      await tester.sendKeyEvent(LogicalKeyboardKey.keyA);
+      await tester.pump();
+      expect(controller.autoRequests, [true, false]);
+      expect(controller.state!['auto_mode'], false);
       controller.presentCapabilities(busy: true);
       await tester.pump();
       await tester.sendKeyEvent(LogicalKeyboardKey.keyP);

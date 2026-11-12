@@ -47,6 +47,17 @@ pub fn request(value: Value) -> Result<Value, String> {
         "initialize" => session.initialize(&value, true)?,
         "initialize_capture" => session.initialize_capture(&value)?,
         "play" => session.play()?,
+        "set_auto" => {
+            if value
+                .get("enabled")
+                .and_then(Value::as_bool)
+                .ok_or("Expected enabled boolean")?
+            {
+                session.start_auto()?;
+            } else {
+                session.stop();
+            }
+        }
         "analyze" => session.analyze(
             value
                 .get("fen")

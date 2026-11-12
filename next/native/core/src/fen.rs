@@ -6,6 +6,14 @@ pub enum CastleSide {
     Kingside,
     Queenside,
 }
+pub fn rook_move(color: Color, side: CastleSide) -> &'static str {
+    match (color, side) {
+        (Color::White, CastleSide::Kingside) => "h1f1",
+        (Color::White, CastleSide::Queenside) => "a1d1",
+        (Color::Black, CastleSide::Kingside) => "h8f8",
+        (Color::Black, CastleSide::Queenside) => "a8d8",
+    }
+}
 
 pub fn flip_board(fen: &str) -> Result<String, String> {
     fen_to_list(fen)?;

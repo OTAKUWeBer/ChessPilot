@@ -1,5 +1,9 @@
 //! Session ownership behind the Flutter/native boundary. Heavy work stays off Dart's UI isolate.
+#[cfg(windows)]
+use crate::controller::{MoveOutcome, Progress};
 use crate::{
+    controller::KnownPosition,
+    desktop::CaptureBounds,
     engine::{Analysis, EngineService, Score, Timeouts},
     resources,
     vision::{BoardReader, OnnxPredictor},
@@ -32,6 +36,10 @@ struct State {
     capture_ready: bool,
     analysis: Option<Analysis>,
     error: Option<String>,
+    auto_mode: bool,
+    history_valid: bool,
+    input_in_flight: bool,
+    confirmed_source: Option<CaptureBounds>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -45,6 +53,10 @@ impl Default for State {
             capture_ready: false,
             analysis: None,
             error: None,
+            auto_mode: false,
+            history_valid: false,
+            input_in_flight: false,
+            confirmed_source: None,
         }
     }
 }
@@ -80,6 +92,39 @@ fn score(value: Option<Score>) -> Value {
         None => Value::Null,
     }
 }
+fn known_position(state: &State) -> Option<KnownPosition> {
+    if !state.history_valid || state.game.last_fen.is_empty() {
+        return None;
+    }
+    Some(KnownPosition {
+        fen: state.game.last_fen.clone(),
+        geometry: state.game.geometry?,
+        source: state.confirmed_source?,
+    })
+}
+#[cfg(windows)]
+fn confirm(state: &mut State, position: KnownPosition) -> Result<(), String> {
+    state.game.update_last_fen_for_color(&position.fen)?;
+    state.game.last_fen = position.fen;
+    state.game.geometry = Some(position.geometry);
+    state.confirmed_source = Some(position.source);
+    state.history_valid = true;
+    state.input_in_flight = false;
+    Ok(())
+}
+#[cfg(windows)]
+fn played(state: &mut State, outcome: MoveOutcome) -> Result<(), String> {
+    if let Some(position) = outcome.position() {
+        confirm(state, position)?;
+        let value = outcome.analysis.best_move.as_deref().unwrap_or("");
+        state.status = format!("Best Move: {value}\nMove Played: {value}");
+    } else {
+        state.history_valid = false;
+        state.status = "No legal moves".into();
+    }
+    state.analysis = Some(outcome.analysis);
+    Ok(())
+}
 impl Session {
     pub fn snapshot(&self) -> Value {
         let s = lock(&self.state);
@@ -89,6 +134,7 @@ impl Session {
             "color":s.game.color_indicator.map(Color::fen),"busy":s.busy,"operation":s.operation,"status":s.status,
             "engine_ready":s.engine_ready,"capture_ready":s.capture_ready,"automation_ready":s.capture_ready && cfg!(windows),
             "confirmed_fen":if s.game.last_fen.is_empty(){None}else{Some(&s.game.last_fen)},
+            "auto_mode":s.auto_mode,"auto_available":s.engine_ready && s.capture_ready && s.game.color_indicator.is_some() && known_position(&s).is_some(),
             "generation":self.generation.load(Ordering::Acquire),"error":s.error,
             "analysis":s.analysis.as_ref().map(|a|json!({"best_move":a.best_move,"updated_fen":a.updated_fen,"depth":a.depth,"score":score(a.score),"stopped":a.stopped}))})
     }
@@ -134,6 +180,10 @@ impl Session {
             };
         }
         if color != s.game.color_indicator || settings != s.settings {
+            s.auto_mode = false;
+            if s.input_in_flight {
+                s.history_valid = false;
+            }
             // Startup services are independent of the selected side/settings.
             if !s
                 .operation
@@ -148,6 +198,8 @@ impl Session {
             s.game.last_fen.clear();
             s.game.last_fen_by_color = [None, None];
             s.game.geometry = None;
+            s.history_valid = false;
+            s.confirmed_source = None;
         }
         s.settings = settings;
         s.error = None;
@@ -167,6 +219,10 @@ impl Session {
         let mut s = lock(&self.state);
         self.cancelled.store(true, Ordering::Release);
         self.generation.fetch_add(1, Ordering::AcqRel);
+        s.auto_mode = false;
+        if s.input_in_flight {
+            s.history_valid = false;
+        }
         s.status = if s.busy { "Stopping..." } else { "Stopped" }.into();
     }
     fn launch(
@@ -185,6 +241,8 @@ impl Session {
                 return Err("A native operation is already running".into());
             }
             state.busy = true;
+            state.auto_mode = operation == "auto";
+            state.input_in_flight = false;
             state.operation = Some(operation);
             state.error = None;
             self.cancelled.store(false, Ordering::Release);
@@ -210,6 +268,11 @@ impl Session {
                     state.status = "Stopped".into();
                 }
                 state.busy = false;
+                state.auto_mode = false;
+                if state.input_in_flight {
+                    state.history_valid = false;
+                    state.input_in_flight = false;
+                }
                 state.operation = None;
             }) {
             Ok(worker) => {
@@ -219,6 +282,7 @@ impl Session {
             Err(error) => {
                 let mut state = lock(&self.state);
                 state.busy = false;
+                state.auto_mode = false;
                 state.operation = None;
                 Err(error.to_string())
             }
@@ -323,8 +387,47 @@ impl Session {
         })
     }
     pub fn play(self: &Arc<Self>) -> Result<(), String> {
+        self.run_moves(false)
+    }
+    pub fn start_auto(self: &Arc<Self>) -> Result<(), String> {
+        self.run_moves(true)
+    }
+    #[cfg(windows)]
+    fn progress(&self, id: u64, target_depth: u32, progress: Progress) -> Result<(), String> {
+        let mut state = lock(&self.state);
+        if self.generation.load(Ordering::Acquire) != id {
+            return Ok(());
+        }
+        match progress {
+            Progress::Status(status) => state.status = status.into(),
+            Progress::Dispatching => {
+                state.input_in_flight = true;
+                state.status = "Playing move...".into();
+            }
+            Progress::Analysis(depth, score) => {
+                state.status = format!("Processing... Depth {depth}/{target_depth}");
+                state.analysis = Some(Analysis {
+                    best_move: None,
+                    updated_fen: None,
+                    depth,
+                    score,
+                    stopped: false,
+                });
+            }
+            Progress::Candidate(analysis) => state.analysis = Some(analysis),
+            Progress::Observed(position) => confirm(&mut state, position)?,
+            Progress::Played(outcome) => played(&mut state, outcome)?,
+            Progress::Terminal => {
+                state.history_valid = false;
+                state.status = "Game over: no legal moves".into();
+            }
+        }
+        Ok(())
+    }
+    fn run_moves(self: &Arc<Self>, automatic: bool) -> Result<(), String> {
         #[cfg(not(windows))]
         {
+            let _ = automatic;
             Err("Native capture/input for this platform is not connected yet".into())
         }
         #[cfg(windows)]
@@ -337,100 +440,109 @@ impl Session {
                 if state.game.color_indicator.is_none() {
                     return Err("Choose your color first".into());
                 }
+                if automatic && known_position(&state).is_none() {
+                    return Err("Play one move before enabling Auto to establish the turn".into());
+                }
             }
-            self.launch("play", move |session, id| {
-                let _owner = match DESKTOP_INPUT_OWNER.try_lock() {
-                    Ok(owner) => owner,
-                    Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
-                    Err(std::sync::TryLockError::WouldBlock) => {
-                        return Err(
-                            "Another session is controlling the desktop; wait for it to finish"
-                                .into(),
+            self.launch(
+                if automatic { "auto" } else { "play" },
+                move |session, id| {
+                    let _owner =
+                        match DESKTOP_INPUT_OWNER.try_lock() {
+                            Ok(owner) => owner,
+                            Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
+                            Err(std::sync::TryLockError::WouldBlock) => return Err(
+                                "Another session is controlling the desktop; wait for it to finish"
+                                    .into(),
+                            ),
+                        };
+                    use crate::{
+                        controller::{self, Perception, PlayError},
+                        desktop::windows::{WindowsCapture, WindowsPointer},
+                    };
+                    let (settings, color, position) = {
+                        let state = lock(&session.state);
+                        if session.generation.load(Ordering::Acquire) != id {
+                            return Ok(());
+                        }
+                        (
+                            state.settings.clone(),
+                            state
+                                .game
+                                .color_indicator
+                                .ok_or("Choose your color first")?,
+                            known_position(&state),
                         )
-                    }
-                };
-                use crate::{
-                    controller::{self, Perception, PlayError, Progress},
-                    desktop::windows::{WindowsCapture, WindowsPointer},
-                };
-                let (settings, color) = {
-                    let state = lock(&session.state);
+                    };
+                    let mut vision = lock(&session.vision);
+                    let mut source = Perception {
+                        capture: WindowsCapture,
+                        reader: vision.as_mut().ok_or("Board detector is unavailable")?,
+                    };
+                    let mut input = WindowsPointer::new()?;
+                    let mut engine = lock(&session.engine);
+                    let mut progress_error = None;
+                    let mut progress = |event| {
+                        if let Err(error) = session.progress(id, settings.depth, event) {
+                            progress_error = Some(error);
+                            session.cancelled.store(true, Ordering::Release);
+                        }
+                    };
+                    let engine = engine.as_mut().ok_or("Engine is unavailable")?;
+                    let result = if automatic {
+                        controller::auto_play(
+                            &mut source,
+                            &mut input,
+                            engine,
+                            controller::AutoRequest {
+                                settings: &settings,
+                                color,
+                                position: position.ok_or("Play one move before enabling Auto")?,
+                            },
+                            &session.cancelled,
+                            &mut progress,
+                        )
+                        .map(|_| None)
+                    } else {
+                        controller::play_position(
+                            &mut source,
+                            &mut input,
+                            engine,
+                            controller::PlayRequest {
+                                settings: &settings,
+                                color,
+                                known_position: position.as_ref().filter(|p| {
+                                    p.fen.split_whitespace().nth(1) == Some(color.fen())
+                                }),
+                            },
+                            &session.cancelled,
+                            &mut progress,
+                        )
+                        .map(Some)
+                    };
+                    let mut state = lock(&session.state);
                     if session.generation.load(Ordering::Acquire) != id {
                         return Ok(());
                     }
-                    (
-                        state.settings.clone(),
-                        state
-                            .game
-                            .color_indicator
-                            .ok_or("Choose your color first")?,
-                    )
-                };
-                let mut vision = lock(&session.vision);
-                let mut source = Perception {
-                    capture: WindowsCapture,
-                    reader: vision.as_mut().ok_or("Board detector is unavailable")?,
-                };
-                let mut input = WindowsPointer::new()?;
-                let mut engine = lock(&session.engine);
-                let result = controller::play(
-                    &mut source,
-                    &mut input,
-                    engine.as_mut().ok_or("Engine is unavailable")?,
-                    &settings,
-                    color,
-                    &session.cancelled,
-                    |progress| {
-                        let mut state = lock(&session.state);
-                        if session.generation.load(Ordering::Acquire) != id {
-                            return;
-                        }
-                        match progress {
-                            Progress::Status(status) => state.status = status.into(),
-                            Progress::Analysis(depth, score) => {
-                                state.status =
-                                    format!("Processing... Depth {depth}/{}", settings.depth);
-                                state.analysis = Some(Analysis {
-                                    best_move: None,
-                                    updated_fen: None,
-                                    depth,
-                                    score,
-                                    stopped: false,
-                                });
+                    if let Some(error) = progress_error {
+                        return Err(error);
+                    }
+                    match result {
+                        Ok(Some(outcome)) => played(&mut state, outcome),
+                        Ok(None) => Ok(()),
+                        Err(error) => {
+                            if matches!(error, PlayError::Engine(_)) {
+                                state.engine_ready = false;
                             }
-                            Progress::Candidate(analysis) => state.analysis = Some(analysis),
+                            if state.input_in_flight || matches!(error, PlayError::GeometryChanged)
+                            {
+                                state.history_valid = false;
+                            }
+                            Err(error.to_string())
                         }
-                    },
-                );
-                let mut state = lock(&session.state);
-                if session.generation.load(Ordering::Acquire) != id {
-                    return Ok(());
-                }
-                match result {
-                    Ok(outcome) => {
-                        state.game.geometry = Some(outcome.geometry);
-                        if let Some(fen) = outcome.confirmed_fen {
-                            state.game.update_last_fen_for_color(&fen)?;
-                            state.game.last_fen = fen;
-                            state.status = format!(
-                                "Best Move: {}\nMove Played: {}",
-                                outcome.analysis.best_move.as_deref().unwrap_or(""),
-                                outcome.analysis.best_move.as_deref().unwrap_or("")
-                            );
-                        } else {
-                            state.status = "No legal moves".into();
-                        }
-                        state.analysis = Some(outcome.analysis);
-                        Ok(())
                     }
-                    Err(error) => {
-                        if matches!(error, PlayError::Engine(_)) {
-                            state.engine_ready = false;
-                        }
-                        Err(error.to_string())
-                    }
-                }
-            })
+                },
+            )
         }
     }
     pub fn analyze(self: &Arc<Self>, fen: String) -> Result<(), String> {
@@ -496,6 +608,48 @@ impl Session {
 mod tests {
     use super::*;
     use std::time::{Duration, Instant};
+    #[test]
+    fn stop_preserves_waiting_history_but_invalidates_uncertain_input_and_ignores_late_events() {
+        for dispatched in [false, true] {
+            let session = Session::default();
+            let position = KnownPosition {
+                fen: "4k3/8/8/8/4P3/8/8/4K3 b - e3 0 1".into(),
+                geometry: chesspilot_core::board::BoardGeometry::new(0., 0., 80.).unwrap(),
+                source: CaptureBounds {
+                    x: 0,
+                    y: 0,
+                    width: 800,
+                    height: 800,
+                },
+            };
+            {
+                let mut state = lock(&session.state);
+                state.engine_ready = true;
+                state.capture_ready = true;
+                state.game.color_indicator = Some(Color::White);
+                confirm(&mut state, position.clone()).unwrap();
+                state.auto_mode = true;
+            }
+            assert_eq!(session.snapshot()["auto_available"], true);
+            if dispatched {
+                session.progress(0, 15, Progress::Dispatching).unwrap();
+            }
+            session.stop();
+            assert_eq!(session.snapshot()["auto_mode"], false);
+            assert_eq!(session.snapshot()["auto_available"], !dispatched);
+            session
+                .progress(
+                    0,
+                    15,
+                    Progress::Observed(KnownPosition {
+                        fen: "4k3/8/8/8/4P3/8/8/4K3 w - - 0 2".into(),
+                        ..position.clone()
+                    }),
+                )
+                .unwrap();
+            assert_eq!(session.snapshot()["confirmed_fen"], position.fen);
+        }
+    }
     #[test]
     fn another_session_cannot_start_desktop_work_while_a_move_owns_input() {
         let owner = lock(&DESKTOP_INPUT_OWNER);

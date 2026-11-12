@@ -5,7 +5,10 @@ use chesspilot_core::{
     Color,
 };
 use chesspilot_runtime::{
-    controller::{self, Analyzer, Automation, BoardSource, PlayError},
+    controller::{
+        self, Analyzer, AutoRequest, Automation, BoardSource, History, KnownPosition, PlayError,
+        Progress,
+    },
     desktop::{input::InputError, CaptureBounds, Observation, RawObservation},
     engine::{Analysis, Score},
 };
@@ -83,6 +86,20 @@ impl Engine {
     }
 }
 impl Analyzer for Engine {
+    fn reconcile_reply(
+        &mut self,
+        _: &str,
+        observed: &str,
+        _: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        Ok(self
+            .result
+            .as_ref()
+            .ok()
+            .and_then(|a| a.updated_fen.as_ref())
+            .filter(|fen| fen.split_whitespace().next() == observed.split_whitespace().next())
+            .cloned())
+    }
     fn analyze(
         &mut self,
         depth: u32,
@@ -109,6 +126,7 @@ struct Input {
     fail: Option<InputError>,
     stop: bool,
     waits: Vec<Duration>,
+    stop_after_wait: Option<usize>,
 }
 impl Automation for Input {
     fn move_piece(
@@ -130,12 +148,328 @@ impl Automation for Input {
     }
     fn wait(&mut self, duration: Duration, cancelled: &AtomicBool) -> Result<(), InputError> {
         self.waits.push(duration);
+        if self.stop_after_wait == Some(self.waits.len()) {
+            cancelled.store(true, Ordering::Release);
+        }
         if cancelled.load(Ordering::Acquire) {
             Err(InputError::Cancelled { dispatched: false })
         } else {
             Ok(())
         }
     }
+}
+
+const E5: &str = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2";
+const NF3: &str = "rnbqkbnr/pppp1ppp/8/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R b KQkq - 1 2";
+fn rights(fen: &str, value: &str) -> String {
+    let mut parts: Vec<_> = fen.split_whitespace().collect();
+    parts[2] = value;
+    parts.join(" ")
+}
+fn known(fen: &str) -> KnownPosition {
+    let o = observation(fen);
+    KnownPosition {
+        fen: fen.into(),
+        geometry: o.board.geometry,
+        source: o.source,
+    }
+}
+struct HistoryEngine {
+    analysis: Analysis,
+    expected_input: String,
+    replies: Vec<(String, String, String)>,
+    analyzed: usize,
+    reconciled: usize,
+    has_moves: bool,
+}
+impl HistoryEngine {
+    fn new(fen: &str, mv: &str, after: &str) -> Self {
+        Self {
+            analysis: Engine::new(mv, after).result.unwrap(),
+            expected_input: fen.into(),
+            replies: vec![],
+            analyzed: 0,
+            reconciled: 0,
+            has_moves: true,
+        }
+    }
+}
+impl Analyzer for HistoryEngine {
+    fn analyze(
+        &mut self,
+        _: u32,
+        fen: &str,
+        _: &AtomicBool,
+        _: &mut dyn FnMut(u32, Option<Score>),
+    ) -> Result<Analysis, String> {
+        assert_eq!(fen, self.expected_input);
+        self.analyzed += 1;
+        Ok(self.analysis.clone())
+    }
+    fn reconcile_reply(
+        &mut self,
+        before: &str,
+        observed: &str,
+        _: &AtomicBool,
+    ) -> Result<Option<String>, String> {
+        self.reconciled += 1;
+        Ok(self
+            .replies
+            .iter()
+            .find(|(a, b, _)| {
+                a == before && b.split_whitespace().next() == observed.split_whitespace().next()
+            })
+            .map(|(_, _, fen)| fen.clone()))
+    }
+}
+impl History for HistoryEngine {
+    fn has_legal_moves(&mut self, _: &str, _: &AtomicBool) -> Result<bool, String> {
+        Ok(self.has_moves)
+    }
+}
+#[test]
+fn auto_waits_for_a_stable_legal_reply_and_preserves_lost_rights_and_en_passant_metadata() {
+    for flags in ["KQkq", "q"] {
+        let seed = rights(E4, flags);
+        let reply = rights(E5, flags);
+        let after = rights(NF3, flags);
+        let mut source = Source::new(&[&seed, &reply, &reply, &reply, &reply, &after]);
+        let mut input = Input::default();
+        let mut engine = HistoryEngine::new(&reply, "g1f3", &after);
+        engine
+            .replies
+            .push((seed.clone(), reply.clone(), reply.clone()));
+        let settings = Settings {
+            kingside: true,
+            queenside: true,
+            ..Settings::default()
+        };
+        let flag = AtomicBool::new(false);
+        let mut observed = vec![];
+        let mut played = vec![];
+        let result = controller::auto_play(
+            &mut source,
+            &mut input,
+            &mut engine,
+            AutoRequest {
+                settings: &settings,
+                color: Color::White,
+                position: known(&seed),
+            },
+            &flag,
+            |event| match event {
+                Progress::Observed(p) => observed.push(p.fen),
+                Progress::Played(outcome) => {
+                    played.push(outcome.confirmed_fen.unwrap());
+                    flag.store(true, Ordering::Release);
+                }
+                _ => {}
+            },
+        );
+        assert!(matches!(result, Err(PlayError::Stopped)));
+        assert_eq!(observed, [reply]);
+        assert_eq!(played, [after]);
+        assert_eq!(engine.analyzed, 1);
+        assert_eq!(engine.reconciled, 1);
+        assert_eq!(input.events.len(), 1);
+        assert!(input.waits.contains(&Duration::from_millis(900)));
+        assert_eq!(source.reads, 6);
+    }
+}
+
+#[test]
+fn disabling_castling_for_analysis_does_not_erase_still_legal_history_rights() {
+    let filtered_before = rights(E5, "kq");
+    let filtered_after = rights(NF3, "kq");
+    let mut source = Source::new(&[E5, E5, NF3]);
+    let mut input = Input::default();
+    let mut engine = HistoryEngine::new(&filtered_before, "g1f3", &filtered_after);
+    engine
+        .replies
+        .push((E5.into(), filtered_after.clone(), NF3.into()));
+    let position = known(E5);
+    let outcome = controller::play_position(
+        &mut source,
+        &mut input,
+        &mut engine,
+        controller::PlayRequest {
+            settings: &Settings::default(),
+            color: Color::White,
+            known_position: Some(&position),
+        },
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
+    assert_eq!(
+        outcome.analysis.updated_fen.as_deref(),
+        Some(filtered_after.as_str())
+    );
+    assert_eq!(outcome.confirmed_fen.as_deref(), Some(NF3));
+    assert_eq!(input.events.len(), 1);
+}
+#[test]
+fn unchanged_auto_frames_and_stop_do_not_search_or_move() {
+    let mut source = Source::new(&[E4, E4]);
+    let mut input = Input {
+        stop_after_wait: Some(2),
+        ..Input::default()
+    };
+    let mut engine = HistoryEngine::new(E5, "g1f3", NF3);
+    let result = controller::auto_play(
+        &mut source,
+        &mut input,
+        &mut engine,
+        AutoRequest {
+            settings: &Settings::default(),
+            color: Color::White,
+            position: known(E4),
+        },
+        &AtomicBool::new(false),
+        |_| {},
+    );
+    assert!(matches!(result, Err(PlayError::Stopped)));
+    assert!(input.events.is_empty());
+    assert_eq!(engine.analyzed, 0);
+    assert_eq!(engine.reconciled, 0);
+}
+
+#[test]
+fn auto_rejects_changed_source_geometry_or_stale_frames_before_input() {
+    for case in 0..3 {
+        let mut source = Source::new(&[E4]);
+        let current = source.positions[0].as_mut().unwrap();
+        match case {
+            0 => current.source.x += 1,
+            1 => current.board.geometry.x += 8.,
+            _ => current.captured_at = Instant::now() - Duration::from_secs(4),
+        }
+        let mut input = Input::default();
+        let mut engine = HistoryEngine::new(E5, "g1f3", NF3);
+        let result = controller::auto_play(
+            &mut source,
+            &mut input,
+            &mut engine,
+            AutoRequest {
+                settings: &Settings::default(),
+                color: Color::White,
+                position: known(E4),
+            },
+            &AtomicBool::new(false),
+            |_| {},
+        );
+        assert!(if case == 2 {
+            matches!(result, Err(PlayError::StaleCapture))
+        } else {
+            matches!(result, Err(PlayError::GeometryChanged))
+        });
+        assert!(input.events.is_empty());
+        assert_eq!(engine.analyzed, 0);
+    }
+}
+#[test]
+fn auto_bounds_capture_failures_and_unmatched_changes_without_sending_input() {
+    for missing in [false, true] {
+        let mut source = if missing {
+            Source::new(&[])
+        } else {
+            Source::new(&[NF3; 6])
+        };
+        let mut input = Input::default();
+        let mut engine = HistoryEngine::new(E5, "g1f3", NF3);
+        let result = controller::auto_play(
+            &mut source,
+            &mut input,
+            &mut engine,
+            AutoRequest {
+                settings: &Settings::default(),
+                color: Color::White,
+                position: known(E4),
+            },
+            &AtomicBool::new(false),
+            |_| {},
+        );
+        assert!(if missing {
+            matches!(result, Err(PlayError::Detection(_)))
+        } else {
+            matches!(result, Err(PlayError::HistoryMismatch))
+        });
+        assert!(input.events.is_empty());
+        assert_eq!(engine.analyzed, 0);
+        assert_eq!(source.reads, if missing { 9 } else { 6 });
+    }
+}
+#[test]
+fn auto_terminal_and_uncertain_dispatch_stop_without_a_replay() {
+    for terminal in [false, true] {
+        let mut source = Source::new(&[E5, E5]);
+        let mut input = Input {
+            fail: Some(InputError::Uncertain("unknown delivery".into())),
+            ..Input::default()
+        };
+        let mut engine = HistoryEngine::new(E5, "g1f3", NF3);
+        engine.has_moves = !terminal;
+        let settings = Settings {
+            kingside: true,
+            queenside: true,
+            ..Settings::default()
+        };
+        let mut ended = false;
+        let result = controller::auto_play(
+            &mut source,
+            &mut input,
+            &mut engine,
+            AutoRequest {
+                settings: &settings,
+                color: Color::White,
+                position: known(if terminal { E4 } else { E5 }),
+            },
+            &AtomicBool::new(false),
+            |event| {
+                if matches!(event, Progress::Terminal) {
+                    ended = true;
+                }
+            },
+        );
+        if terminal {
+            result.unwrap();
+            assert!(ended);
+            assert!(input.events.is_empty());
+            assert_eq!(source.reads, 0);
+        } else {
+            assert!(matches!(
+                result,
+                Err(PlayError::Input(InputError::Uncertain(_)))
+            ));
+            assert_eq!(input.events.len(), 1);
+        }
+    }
+}
+#[test]
+fn a_legal_immediate_opponent_reply_confirms_the_latest_board_without_replaying() {
+    let seed = rights(E4, "KQkq");
+    let start = rights(START, "KQkq");
+    let mut source = Source::new(&[START, START, E5]);
+    let mut input = Input::default();
+    let mut engine = HistoryEngine::new(&start, "e2e4", &seed);
+    engine.replies.push((seed.clone(), E5.into(), E5.into()));
+    let result = controller::play(
+        &mut source,
+        &mut input,
+        &mut engine,
+        &Settings {
+            kingside: true,
+            queenside: true,
+            ..Settings::default()
+        },
+        Color::White,
+        &AtomicBool::new(false),
+        |_| {},
+    )
+    .unwrap();
+    assert_eq!(result.confirmed_fen.as_deref(), Some(E5));
+    assert_eq!(result.analysis.updated_fen.as_deref(), Some(seed.as_str()));
+    assert_eq!(input.events.len(), 1);
 }
 #[test]
 fn normal_moves_in_both_orientations_commit_only_visual_confirmation() {

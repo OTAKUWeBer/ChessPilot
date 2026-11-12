@@ -1,5 +1,11 @@
 //! Persistent Stockfish UCI service. Source: services/engine_service.py.
-use chesspilot_core::{board::fen_to_list, notation::Move};
+use chesspilot_core::{
+    board::fen_to_list,
+    fen::{is_two_square_king_move, rook_move},
+    notation::Move,
+    validation::{did_castling_move, did_my_piece_move},
+    Color,
+};
 use std::{
     collections::VecDeque,
     io::{self, BufRead, BufReader, Read, Write},
@@ -142,6 +148,76 @@ impl EngineService {
         }
         result
     }
+    /// Stockfish's depth-one perft lists legal moves without running an evaluation search.
+    pub fn legal_moves(&mut self, fen: &str, cancelled: &AtomicBool) -> io::Result<Vec<String>> {
+        validate_fen(fen)?;
+        if cancelled.load(Ordering::Acquire) {
+            return Err(interrupted());
+        }
+        self.initialize()?;
+        let result = self
+            .process
+            .as_mut()
+            .expect("Initialized above")
+            .legal_moves(fen, cancelled, self.timeouts.handshake);
+        if result.is_err() {
+            self.cleanup();
+        }
+        result
+    }
+    /// Return full metadata only for one legal ply whose complete placement matches the observation.
+    pub fn reconcile_reply(
+        &mut self,
+        before: &str,
+        observed: &str,
+        cancelled: &AtomicBool,
+    ) -> io::Result<Option<String>> {
+        validate_fen(before)?;
+        validate_fen(observed)?;
+        if cancelled.load(Ordering::Acquire) {
+            return Err(interrupted());
+        }
+        if placement(before) == placement(observed) {
+            return Ok(None);
+        }
+        let moves = self.legal_moves(before, cancelled)?;
+        let color =
+            Color::parse(before.split_whitespace().nth(1).unwrap()).map_err(|e| invalid(&e))?;
+        let result = (|| {
+            let mut matched = None;
+            for value in moves {
+                let side =
+                    is_two_square_king_move(&value, before, color).map_err(|e| invalid(&e))?;
+                let fits = if let Some(side) = side {
+                    did_castling_move(color, before, observed, &value, rook_move(color, side))
+                } else {
+                    did_my_piece_move(color, before, observed, &value)
+                }
+                .map_err(|e| invalid(&e))?;
+                if !fits {
+                    continue;
+                }
+                let process = self.process.as_mut().expect("Initialized above");
+                let fen =
+                    process.position_after(before, &value, cancelled, self.timeouts.handshake)?;
+                process.ready(self.timeouts.handshake)?;
+                if placement(&fen) == placement(observed) {
+                    if matched.is_some() {
+                        return Ok(None);
+                    }
+                    matched = Some(fen);
+                }
+            }
+            if cancelled.load(Ordering::Acquire) {
+                return Err(interrupted());
+            }
+            Ok(matched)
+        })();
+        if result.is_err() {
+            self.cleanup();
+        }
+        result
+    }
 }
 
 struct EngineProcess {
@@ -250,6 +326,81 @@ impl EngineProcess {
         self.send("isready")?;
         self.wait_for("readyok", duration)
     }
+    fn receive_cancellable(&self, deadline: Instant, cancelled: &AtomicBool) -> io::Result<String> {
+        loop {
+            if cancelled.load(Ordering::Acquire) {
+                return Err(interrupted());
+            }
+            match self.receive(deadline.min(Instant::now() + Duration::from_millis(25))) {
+                Err(error)
+                    if error.kind() == io::ErrorKind::TimedOut && Instant::now() < deadline =>
+                {
+                    continue
+                }
+                result => return result,
+            }
+        }
+    }
+    fn legal_moves(
+        &mut self,
+        fen: &str,
+        cancelled: &AtomicBool,
+        duration: Duration,
+    ) -> io::Result<Vec<String>> {
+        if cancelled.load(Ordering::Acquire) {
+            return Err(interrupted());
+        }
+        self.send(&format!("position fen {fen}"))?;
+        self.send("go perft 1")?;
+        let deadline = Instant::now() + duration;
+        let mut moves = Vec::new();
+        loop {
+            let line = self.receive_cancellable(deadline, cancelled)?;
+            if let Some(count) = line.strip_prefix("Nodes searched:") {
+                if count.trim().parse::<usize>().ok() != Some(moves.len()) {
+                    return Err(invalid("Legal move count disagrees with perft output"));
+                }
+                self.ready(duration)?;
+                return Ok(moves);
+            }
+            if line.is_empty() || line.starts_with("info ") {
+                continue;
+            }
+            let (value, count) = line
+                .split_once(':')
+                .ok_or_else(|| invalid("Expected Stockfish legal move output"))?;
+            Move::parse(value).map_err(|e| invalid(&e))?;
+            if count.trim() != "1" || moves.len() >= 256 || moves.iter().any(|m| m == value) {
+                return Err(invalid("Invalid or duplicated legal move output"));
+            }
+            moves.push(value.to_owned());
+        }
+    }
+    fn position_after(
+        &mut self,
+        fen: &str,
+        value: &str,
+        cancelled: &AtomicBool,
+        duration: Duration,
+    ) -> io::Result<String> {
+        if cancelled.load(Ordering::Acquire) {
+            return Err(interrupted());
+        }
+        self.send(&format!("position fen {fen} moves {value}"))?;
+        self.send("d")?;
+        let deadline = Instant::now() + duration;
+        let mut updated = None;
+        loop {
+            let line = self.receive_cancellable(deadline, cancelled)?;
+            if let Some(fen) = line.strip_prefix("Fen:") {
+                validate_fen(fen.trim())?;
+                updated = Some(fen.trim().to_owned());
+            }
+            if line.starts_with("Checkers:") {
+                return updated.ok_or_else(|| invalid("Engine omitted updated FEN"));
+            }
+        }
+    }
     fn analyze(
         &mut self,
         depth: u32,
@@ -319,22 +470,8 @@ impl EngineProcess {
             return Err(interrupted());
         }
         if let Some(value) = &analysis.best_move {
-            self.send(&format!("position fen {fen} moves {value}"))?;
-            self.send("d")?;
-            let deadline = Instant::now() + timeouts.handshake;
-            loop {
-                let line = self.receive(deadline)?;
-                if let Some(fen) = line.strip_prefix("Fen:") {
-                    validate_fen(fen.trim())?;
-                    analysis.updated_fen = Some(fen.trim().into());
-                }
-                if line.starts_with("Checkers:") {
-                    break;
-                }
-            }
-            if analysis.updated_fen.is_none() {
-                return Err(invalid("Engine omitted updated FEN"));
-            }
+            analysis.updated_fen =
+                Some(self.position_after(fen, value, cancelled, timeouts.handshake)?);
         }
         self.ready(timeouts.handshake)?;
         Ok(analysis)
@@ -361,6 +498,9 @@ impl Drop for EngineProcess {
             let _ = reader.join();
         }
     }
+}
+fn placement(fen: &str) -> &str {
+    fen.split_whitespace().next().unwrap_or("")
 }
 fn read_line(reader: &mut impl BufRead) -> io::Result<String> {
     let mut line = String::new();

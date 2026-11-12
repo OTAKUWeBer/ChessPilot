@@ -49,6 +49,15 @@ class _PilotControlsState extends State<PilotControls> {
       controller.state!['busy'] != true &&
       controller.state!['engine_ready'] == true &&
       controller.state!['automation_ready'] == true;
+  bool get autoMode => controller.state!['auto_mode'] == true;
+  bool get canStartAuto =>
+      canPlay && controller.state!['auto_available'] == true;
+  void toggleAuto() {
+    if (autoMode || canStartAuto) {
+      controller.command('set_auto', {'enabled': !autoMode});
+    }
+  }
+
   void selectColor(String value) =>
       controller.configure({'color': value == 'White' ? 'w' : 'b'});
   void refresh() {
@@ -94,6 +103,7 @@ class _PilotControlsState extends State<PilotControls> {
             const SingleActivator(LogicalKeyboardKey.keyP): () {
               if (canPlay) controller.command('play');
             },
+            const SingleActivator(LogicalKeyboardKey.keyA): toggleAuto,
             const SingleActivator(LogicalKeyboardKey.keyD): () {
               if (color == null) controller.configure({'mode': 'drag'});
             },
@@ -150,7 +160,7 @@ class _PilotControlsState extends State<PilotControls> {
                             builder: (_) => const AlertDialog(
                               title: Text('Keyboard shortcuts'),
                               content: Text(
-                                'W / B — choose color\n← / → — analysis depth\n↑ / ↓ — screenshot delay before choosing color\nD / C — drag / click before choosing color\nP — play next move\nK / Q — castling rights\nEsc — stop and return to color selection',
+                                'W / B — choose color\n← / → — analysis depth\n↑ / ↓ — screenshot delay before choosing color\nD / C — drag / click before choosing color\nP — play next move\nA — toggle Auto after a verified move\nK / Q — castling rights\nEsc — stop and return to color selection',
                               ),
                             ),
                           ),
@@ -238,11 +248,21 @@ class _PilotControlsState extends State<PilotControls> {
                                 onChanged: (v) =>
                                     controller.configure({'queenside': v!}),
                               ),
-                              const CheckboxListTile(
+                              CheckboxListTile(
                                 contentPadding: EdgeInsets.zero,
-                                title: Text('Auto Next Moves'),
-                                value: false,
-                                onChanged: null,
+                                title: const Text('Auto Next Moves'),
+                                subtitle: canPlay && !canStartAuto
+                                    ? const Text(
+                                        'Play one verified move to enable Auto',
+                                      )
+                                    : null,
+                                value: autoMode,
+                                onChanged: autoMode || canStartAuto
+                                    ? (enabled) => controller.command(
+                                        'set_auto',
+                                        {'enabled': enabled!},
+                                      )
+                                    : null,
                               ),
                               Text(
                                 controller.error ??

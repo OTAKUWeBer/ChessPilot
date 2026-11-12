@@ -61,6 +61,13 @@ fn fake_engine() {
                 println!("Checkers:");
             }
             "quit" => break,
+            "go perft 1" => match mode.as_str() {
+                "no_perft" => {}
+                "bad_perft" => println!("e2e4: 1\nNodes searched: 2"),
+                "duplicate_perft" => println!("e2e4: 1\ne2e4: 1\nNodes searched: 2"),
+                "invalid_perft" => println!("not-a-move: 1\nNodes searched: 1"),
+                _ => println!("e2e4: 1\nNodes searched: 1"),
+            },
             _ if line.starts_with("go depth") => match mode.as_str() {
                 "stop" | "ignore_stop" => {}
                 "eof" => std::process::exit(7),
@@ -76,6 +83,116 @@ fn fake_engine() {
         }
         io::stdout().flush().unwrap();
     }
+}
+
+#[test]
+fn legal_reply_reconciliation_retains_metadata_and_rejects_invalid_changes() {
+    let mut engine = service("normal");
+    let flag = AtomicBool::new(false);
+    assert_eq!(engine.legal_moves(START, &flag).unwrap(), ["e2e4"]);
+    let pid = engine.process_id();
+    assert_eq!(
+        engine
+            .reconcile_reply(START, AFTER, &flag)
+            .unwrap()
+            .as_deref(),
+        Some(AFTER)
+    );
+    assert_eq!(engine.process_id(), pid);
+    assert!(engine
+        .reconcile_reply(START, START, &flag)
+        .unwrap()
+        .is_none());
+    assert!(engine
+        .reconcile_reply(
+            START,
+            "rnbqkbnr/pppppppp/8/4P3/8/8/PPPP1PPP/RNBQKBNR b - - 0 1",
+            &flag
+        )
+        .unwrap()
+        .is_none());
+}
+#[test]
+fn malformed_silent_and_cancelled_legal_move_output_cleans_up_the_engine() {
+    for mode in ["bad_perft", "duplicate_perft", "invalid_perft", "no_perft"] {
+        let mut engine = EngineService::new(
+            engine_command(mode),
+            vec![],
+            Timeouts {
+                handshake: Duration::from_millis(150),
+                ..timeouts()
+            },
+        )
+        .unwrap();
+        assert!(
+            engine.legal_moves(START, &AtomicBool::new(false)).is_err(),
+            "{mode}"
+        );
+        assert!(engine.process_id().is_none());
+    }
+    let mut engine = service("no_perft");
+    engine.initialize().unwrap();
+    let flag = Arc::new(AtomicBool::new(false));
+    let cancelled = flag.clone();
+    let worker = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(40));
+        cancelled.store(true, Ordering::Release);
+    });
+    assert_eq!(
+        engine.legal_moves(START, &flag).unwrap_err().kind(),
+        io::ErrorKind::Interrupted
+    );
+    worker.join().unwrap();
+    assert!(engine.process_id().is_none());
+}
+
+#[test]
+#[ignore = "Requires CHESSPILOT_STOCKFISH for real legal move and history reconciliation"]
+fn real_stockfish_reconciles_special_moves_and_preserves_history() {
+    let mut engine = EngineService::new(
+        Command::new(std::env::var_os("CHESSPILOT_STOCKFISH").unwrap()),
+        vec!["setoption name Hash value 16".into()],
+        Timeouts::default(),
+    )
+    .unwrap();
+    let flag = AtomicBool::new(false);
+    let moves = engine.legal_moves(START, &flag).unwrap();
+    assert_eq!(moves.len(), 20);
+    assert!(moves.contains(&"e2e4".into()));
+    for (before, after) in [
+        (
+            "4k3/8/8/3pP3/8/8/8/4K3 w - d6 0 10",
+            "4k3/8/3P4/8/8/8/8/4K3 b - - 0 10",
+        ),
+        (
+            "4k3/8/8/8/8/8/8/4K2R w K - 4 20",
+            "4k3/8/8/8/8/8/8/5RK1 b - - 5 20",
+        ),
+        (
+            "r3k3/8/8/8/8/8/8/4K3 b q - 4 20",
+            "2kr4/8/8/8/8/8/8/4K3 w - - 5 21",
+        ),
+        (
+            "4k3/P7/8/8/8/8/8/4K3 w - - 0 10",
+            "N3k3/8/8/8/8/8/8/4K3 b - - 0 10",
+        ),
+        (
+            "4k2r/6B1/8/8/8/8/8/4K3 w k - 3 4",
+            "4k2B/8/8/8/8/8/8/4K3 b - - 0 4",
+        ),
+    ] {
+        assert_eq!(
+            engine
+                .reconcile_reply(before, after, &flag)
+                .unwrap()
+                .as_deref(),
+            Some(after)
+        );
+    }
+    assert!(engine
+        .legal_moves("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1", &flag)
+        .unwrap()
+        .is_empty());
 }
 
 #[test]
