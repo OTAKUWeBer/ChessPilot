@@ -14,6 +14,10 @@ object PilotRuntime {
 
     @Synchronized fun connect(context: Context): String {
         if (session == null) {
+            // App-private storage is provided explicitly; Android has no desktop HOME/XDG root.
+            val logging=JSONObject(PlatformBridge.request(JSONObject().put("command","configure_diagnostics")
+                .put("log_dir",File(context.filesDir,"logs").absolutePath).toString()))
+            if(!logging.optBoolean("ok")) platformError="File logging unavailable: ${logging.optString("error") }"
             session = envelope(JSONObject().put("command", "open")).getLong("session")
             val directory = File(context.filesDir, "native").apply { mkdirs() }
             val model = File(directory, "chess_detection.onnx")

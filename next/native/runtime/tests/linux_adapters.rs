@@ -147,6 +147,36 @@ fn capture_helper_returns_binary_errors_and_real_deadlines() {
     );
     assert!(start.elapsed() < Duration::from_secs(2));
 }
+#[test]
+fn native_helper_limits_and_cancellation_apply_before_and_during_execution() {
+    let flag = AtomicBool::new(false);
+    assert!(
+        helper::run(command("ok"), Duration::from_secs(2), 4, &flag, || Ok(()))
+            .unwrap_err()
+            .contains("limit")
+    );
+    let stopped = AtomicBool::new(true);
+    assert!(helper::run(
+        Command::new("a-helper-that-must-not-start"),
+        Duration::from_secs(2),
+        100,
+        &stopped,
+        || Ok(())
+    )
+    .unwrap_err()
+    .contains("cancelled"));
+    let start = Instant::now();
+    assert!(helper::run(
+        command("silent"),
+        Duration::from_secs(5),
+        100,
+        &flag,
+        || Err("download exceeded expected size".into())
+    )
+    .unwrap_err()
+    .contains("exceeded expected size"));
+    assert!(start.elapsed() < Duration::from_secs(1));
+}
 type Trace = Arc<Mutex<Vec<(u32, u16, Vec<u8>)>>>;
 fn words(values: &[u32]) -> Vec<u8> {
     values.iter().flat_map(|n| n.to_ne_bytes()).collect()

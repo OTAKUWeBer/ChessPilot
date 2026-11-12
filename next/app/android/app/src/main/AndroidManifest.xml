@@ -6,6 +6,10 @@
         android:label="ChessPilot"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <provider android:name=".DiagnosticsProvider"
+            android:authorities="${applicationId}.diagnostics" android:exported="false" android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/diagnostic_paths" />
+        </provider>
         <service android:name=".ProjectionService" android:exported="false"
             android:foregroundServiceType="mediaProjection" />
         <service android:name=".PilotTouchService" android:exported="true"

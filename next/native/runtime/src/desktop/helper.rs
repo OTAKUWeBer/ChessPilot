@@ -1,7 +1,8 @@
-//! Bounded capture-helper execution; no shell and no desktop image written to disk.
+//! Bounded native-helper execution; no shell, with output limits and process cleanup.
 use std::{
     io::Read,
     process::{Child, Command, Stdio},
+    sync::atomic::{AtomicBool, Ordering},
     sync::mpsc,
     thread,
     time::{Duration, Instant},
@@ -17,7 +18,26 @@ impl Drop for Process {
         let _ = self.0.wait();
     }
 }
-pub fn capture(mut command: Command, timeout: Duration) -> Result<Vec<u8>, String> {
+pub fn capture(command: Command, timeout: Duration) -> Result<Vec<u8>, String> {
+    run(
+        command,
+        timeout,
+        super::ppm::MAX_CAPTURE_BYTES,
+        &AtomicBool::new(false),
+        || Ok(()),
+    )
+    .map_err(|e| format!("Capture {e}"))
+}
+pub fn run(
+    mut command: Command,
+    timeout: Duration,
+    limit: usize,
+    cancelled: &AtomicBool,
+    mut tick: impl FnMut() -> Result<(), String>,
+) -> Result<Vec<u8>, String> {
+    if cancelled.load(Ordering::Acquire) {
+        return Err("Helper cancelled".into());
+    }
     command
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -35,7 +55,7 @@ pub fn capture(mut command: Command, timeout: Duration) -> Result<Vec<u8>, Strin
     let mut process = Process(
         command
             .spawn()
-            .map_err(|e| format!("Capture helper could not start: {e}"))?,
+            .map_err(|e| format!("Helper could not start: {e}"))?,
     );
     let stdout = process.0.stdout.take().ok_or("Missing helper output")?;
     let stderr = process
@@ -47,7 +67,7 @@ pub fn capture(mut command: Command, timeout: Duration) -> Result<Vec<u8>, Strin
     let output = thread::spawn(move || {
         let mut bytes = Vec::new();
         let result = stdout
-            .take(super::ppm::MAX_CAPTURE_BYTES as u64 + 1)
+            .take(limit as u64 + 1)
             .read_to_end(&mut bytes)
             .map(|_| bytes);
         let _ = tx.send(result);
@@ -68,10 +88,14 @@ pub fn capture(mut command: Command, timeout: Duration) -> Result<Vec<u8>, Strin
     let deadline = Instant::now() + timeout;
     let mut data = None;
     let result = (|| loop {
+        if cancelled.load(Ordering::Acquire) {
+            return Err("Helper cancelled".into());
+        }
+        tick()?;
         if let Ok(value) = rx.try_recv() {
             let bytes = value.map_err(|e| e.to_string())?;
-            if bytes.len() > super::ppm::MAX_CAPTURE_BYTES {
-                return Err("Capture output exceeded frame limit".into());
+            if bytes.len() > limit {
+                return Err("Helper output exceeded limit".into());
             }
             data = Some(bytes);
         }
@@ -79,10 +103,10 @@ pub fn capture(mut command: Command, timeout: Duration) -> Result<Vec<u8>, Strin
             if status.success() {
                 return Ok(());
             }
-            return Err(format!("Capture helper exited with {status}"));
+            return Err(format!("Helper exited with {status}"));
         }
         if Instant::now() >= deadline {
-            return Err("Capture helper timed out".into());
+            return Err("Helper timed out".into());
         }
         thread::sleep(Duration::from_millis(5));
     })();
@@ -92,9 +116,9 @@ pub fn capture(mut command: Command, timeout: Duration) -> Result<Vec<u8>, Strin
     result.map_err(|e| format!("{e}: {}", String::from_utf8_lossy(&diagnostics).trim()))?;
     let bytes = data
         .or_else(|| rx.try_recv().ok().and_then(Result::ok))
-        .ok_or("Capture helper produced no image")?;
-    if bytes.len() > super::ppm::MAX_CAPTURE_BYTES {
-        return Err("Capture output exceeded frame limit".into());
+        .ok_or("Helper produced no output")?;
+    if bytes.len() > limit {
+        return Err("Helper output exceeded limit".into());
     }
     Ok(bytes)
 }

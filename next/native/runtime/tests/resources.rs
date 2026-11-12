@@ -48,6 +48,12 @@ fn defaults_and_portable_config_preserve_user_content() {
     fs::write(&path, "# user\nsetoption name Hash value 32\n").unwrap();
     assert!(!ensure_config_exists(&path).unwrap());
     assert!(fs::read_to_string(&path).unwrap().contains("value 32"));
+    assert_eq!(
+        load_options(&path).unwrap(),
+        ["setoption name Hash value 32"]
+    );
+    fs::write(&path, vec![b'#'; 1024 * 1024 + 1]).unwrap();
+    assert!(load_options(&path).is_err());
     let blocked = temp.0.join("file");
     fs::write(&blocked, "not a directory").unwrap();
     assert_eq!(

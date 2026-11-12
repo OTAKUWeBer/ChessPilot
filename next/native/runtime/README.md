@@ -16,7 +16,7 @@ Allocate input in Rust, copy initialized UTF-8 JSON bytes, call synchronously, a
 Responses are `{"ok":true,"result":...}` or `{"ok":false,"error":"..."}`. `open` returns a session ID and initial state. Other commands include `session`:
 
 * `configure`: optional `color` (`w`, `b`, null), `depth` (10-30), `delay` (0-1), `mode` (`drag`, `click`), and castling booleans. All fields validate before committing.
-* `initialize_engine`: optional explicit `engine_path` and `config_path`. Returns quickly; a native worker owns engine initialization. Default engine lookup uses installed/development resource locations and PATH. Android library-based engine integration is not implemented yet.
+* `initialize_engine`: optional explicit `engine_path` and `config_path`. Returns quickly; a native worker owns engine initialization. Default desktop lookup uses installed/development resource locations and PATH, then the cancellable CPU-selected downloader. Existing config options are loaded and validated. Android supplies its packaged PIE engine path.
 * `initialize`: engine initialization followed by persistent ONNX/model initialization and a primary-monitor capture probe. Accepts the engine arguments plus optional `model_path` and `runtime_path`. This is Flutter's startup command. Capture failure preserves a successfully initialized engine.
 * `initialize_capture`: retries only model/runtime/capture setup; accepts `model_path` and `runtime_path`.
 * `play`: after color selection and initialization, launches the native capture/analyze/dispatch/verify controller. No pixels, FEN or input points are supplied by Dart. Duplicate work is rejected. The selected player color supplies the active side, matching the current Python manual behavior.
@@ -30,7 +30,9 @@ Capture/automation flags become true only after the model and Windows/Linux back
 
 Within one native process, a desktop input owner also excludes overlapping Play transactions from different sessions, matching Python's global processing lock. A competing session reports an error before capture/analysis/input; it does not wait and later send an obsolete move.
 
-The UI polls status while a native operation is busy, including Auto's wait loop; capture frames and model tensors never cross this JSON UI boundary. Logging installation/download, Wayland portals, desktop shutdown and Android service ownership remain migration work.
+The UI polls status while a native operation is busy, including Auto's wait loop; capture frames and model tensors never cross this JSON UI boundary. Setup includes a `download` snapshot with stage, CPU, selected asset, byte progress and speed. Android's process owner retains the session across Activity recreation. Wayland portals and desktop shutdown remain migration work.
+
+Global commands `configure_diagnostics`, `diagnostics`, `report_error` and `open_log_folder` do not require a session. Diagnostics uses a bounded asynchronous channel, rotating UTF-8 logs and a bounded recent tail; control characters cannot inject records. File failures are reported in diagnostics. Android supplies an app-private log directory and shares recent diagnostics through FileProvider; desktop opens the native folder on request. Neither capture pixels nor model tensors enter logs.
 
 ## Perception module
 

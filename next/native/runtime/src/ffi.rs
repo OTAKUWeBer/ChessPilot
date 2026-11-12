@@ -20,7 +20,42 @@ pub fn request(value: Value) -> Result<Value, String> {
         .get("command")
         .and_then(Value::as_str)
         .ok_or("Missing command")?;
+    match command {
+        "configure_diagnostics" => {
+            let directory = value
+                .get("log_dir")
+                .map(|v| v.as_str().ok_or("Expected log directory string"))
+                .transpose()?;
+            crate::diagnostics::configure(directory.map(std::path::Path::new))
+                .map_err(|e| e.to_string())?;
+            return Ok(crate::diagnostics::snapshot(false));
+        }
+        "diagnostics" => {
+            crate::diagnostics::ensure();
+            return Ok(crate::diagnostics::snapshot(
+                value
+                    .get("include_tail")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false),
+            ));
+        }
+        "report_error" => {
+            crate::diagnostics::ensure();
+            let message = value
+                .get("message")
+                .and_then(Value::as_str)
+                .ok_or("Expected diagnostic message")?;
+            log::error!(target:"frontend","{message}");
+            return Ok(json!({"recorded":true}));
+        }
+        "open_log_folder" => {
+            crate::diagnostics::open_folder()?;
+            return Ok(json!({"opened":true}));
+        }
+        _ => {}
+    }
     if command == "open" {
+        crate::diagnostics::ensure();
         let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
         let session = Arc::new(Session::default());
         let snapshot = session.snapshot();
@@ -28,6 +63,7 @@ pub fn request(value: Value) -> Result<Value, String> {
             .lock()
             .map_err(|_| "Session registry unavailable")?
             .insert(id, session);
+        log::info!(target:"session","Opened session {id}");
         return Ok(json!({"session":id,"state":snapshot}));
     }
     let id = value
@@ -40,6 +76,9 @@ pub fn request(value: Value) -> Result<Value, String> {
         .get(&id)
         .cloned()
         .ok_or("Session is closed or unknown")?;
+    if command != "status" {
+        log::debug!(target:"session","Session {id}: {command}");
+    }
     match command {
         "status" => {}
         "configure" => session.configure(&value)?,
@@ -78,6 +117,8 @@ pub fn request(value: Value) -> Result<Value, String> {
                 .map_err(|_| "Session registry unavailable")?
                 .remove(&id);
             session.close();
+            log::info!(target:"session","Closed session {id}");
+            crate::diagnostics::flush();
             return Ok(json!({"closed":true}));
         }
         _ => return Err("Unknown native command".into()),
@@ -111,7 +152,10 @@ pub unsafe extern "C" fn chesspilot_request(input: *const u8, length: usize) -> 
             .and_then(request);
         match result {
             Ok(result) => json!({"ok":true,"result":result}),
-            Err(error) => json!({"ok":false,"error":error}),
+            Err(error) => {
+                log::error!(target:"ffi","Native request failed: {error}");
+                json!({"ok":false,"error":error})
+            }
         }
     })
     .unwrap_or_else(|_| json!({"ok":false,"error":"Native request panicked"}));

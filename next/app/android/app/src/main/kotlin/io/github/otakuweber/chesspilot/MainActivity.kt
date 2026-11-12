@@ -23,6 +23,20 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "connect" -> result.success(PilotRuntime.connect(applicationContext))
                     "status" -> result.success(PilotRuntime.status())
+                    "shareLogs" -> {
+                        val reply=org.json.JSONObject(PlatformBridge.request(org.json.JSONObject().put("command","diagnostics").put("include_tail",true).toString()))
+                        check(reply.optBoolean("ok")) {reply.optString("error")}
+                        val details=reply.getJSONObject("result")
+                        val folder=java.io.File(cacheDir,"diagnostics").apply{mkdirs()}
+                        val file=java.io.File(folder,"chesspilot-diagnostics.txt")
+                        file.writeText("ChessPilot diagnostics\n${details.getJSONObject("system").toString(2)}\nFile logging: ${details.optString("write_error")}\nDropped file records: ${details.optLong("dropped_records")}\n\n${details.optString("tail")}")
+                        val uri=androidx.core.content.FileProvider.getUriForFile(this,"$packageName.diagnostics",file)
+                        val send=Intent(Intent.ACTION_SEND).setType("text/plain")
+                            .putExtra(Intent.EXTRA_STREAM,uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        send.clipData=android.content.ClipData.newRawUri("ChessPilot recent logs",uri)
+                        startActivity(Intent.createChooser(send,"Share recent ChessPilot logs"))
+                        result.success(null)
+                    }
                     "enableTouch" -> {
                         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                         result.success(null)

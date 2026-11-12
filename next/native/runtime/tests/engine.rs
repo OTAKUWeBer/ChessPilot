@@ -84,6 +84,17 @@ fn fake_engine() {
         io::stdout().flush().unwrap();
     }
 }
+#[test]
+fn file_logging_does_not_block_a_flooded_stderr_pipe() {
+    let directory = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("../target/engine-log-test-{}", std::process::id()));
+    chesspilot_runtime::diagnostics::configure(Some(&directory)).unwrap();
+    let mut engine = service("stderr");
+    engine.initialize().unwrap();
+    assert!(engine.process_id().is_some());
+    assert!(engine.diagnostics().len() <= 64);
+    chesspilot_runtime::diagnostics::flush();
+}
 
 #[test]
 fn legal_reply_reconciliation_retains_metadata_and_rejects_invalid_changes() {

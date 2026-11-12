@@ -14,6 +14,9 @@ Branch: `rust`. Python v2.3.1 remains the runnable reference in `src/`.
 * Flutter tests check the 380×520 layout, color selection, mode/delay/depth/castling shortcuts, Play readiness, Auto start/stop and Escape. Windows Play and Auto are connected to the native controller. Auto is available after a verified manual move establishes the turn/history baseline.
 * Persistent Rust Stockfish service: UCI handshake, config options, depth/evaluation progress, best move, updated FEN, stop/cancel deadlines, stderr draining, process cleanup and restart on the next request after failure.
 * Resource lookup and portable/user config creation preserve existing user files. Engine options and FEN input are validated before entering the UCI protocol.
+* Missing desktop Stockfish starts the integrated cancellable downloader. Native CPU detection selects a compatible official build, checks archive size/SHA256, extracts only the engine, checks executable architecture and completes a real UCI handshake before installing without replacing existing files. Verified downloads are cached; existing bundled/PATH engines and offline setup still work. Stockfish uses the CPU.
+* Native diagnostics records engine, capture, controller and frontend errors through a bounded asynchronous logger. Logs rotate at 5 MiB with five backups, preserve the Python log and escape control characters. Help opens diagnostics/system information and the desktop log folder; Android can share recent logs through its system chooser.
+* The timing ledger in [Python timing parity](../docs/python-timing-parity.md) accounts for all 76 Python sleep/single-shot calls, including explicit differences and remaining work.
 * Subprocess fixtures cover silent/crashed/unresponsive engines, invalid output, stderr flooding, cancellation, and persistence. The local real Stockfish passed opening/checkmate analysis and persistent-process reuse.
 * Flutter now uses the real Rust runtime DLL through a length-delimited C ABI. Rust owns settings, color/session state, engine work and progress; Dart renders snapshots. Engine operations run on a native worker, and changing color/Stop invalidates old results.
 * Native buffer ownership, invalid requests, transactional settings and isolated sessions have tests. Dart integration tests exercise the compiled library and local Stockfish, not a mocked backend.
@@ -66,6 +69,10 @@ $env:CHESSPILOT_DESKTOP_TEST = '1'
 cargo test --manifest-path next/native/Cargo.toml --workspace -- --include-ignored
 ```
 
+Exclude the separately enabled network installer test from that command with `--skip real_https_download_and_cpu_install_pass_uci`. To exercise its isolated HTTPS/download/cache/UCI path, set `CHESSPILOT_DOWNLOAD_TEST=1` and run `cargo test --manifest-path next/native/Cargo.toml --test installer real_https_download_and_cpu_install_pass_uci -- --ignored`.
+
+For isolated checks set `CHESSPILOT_LOG_DIR` and `CHESSPILOT_DATA_HOME` to absolute temporary directories. Normal use retains portable configuration or the OS user directory. Windows logs use `%LOCALAPPDATA%/ChessPilot/logs`; Linux prefers `$XDG_STATE_HOME/chesspilot/logs`, then `$XDG_DATA_HOME/chesspilot/logs`, then `~/.local/share/chesspilot/logs`. Android uses app-private `files/logs`. A logging failure remains visible in diagnostics and does not prevent Stop.
+
 On Linux set these paths to the native `stockfish`, model and ONNX Runtime shared library. The local Windows test reuses ONNX Runtime 1.20's DLL from the existing environment; the Rust runtime never starts Python. Release bundles must ship a compatible native library. On this workstation use the GNU linker settings below for both commands.
 
 `CHESSPILOT_DESKTOP_TEST=1` explicitly enables real interactive Windows tests: an owned colored window for adapter checks and an owned temporary full-screen chessboard for complete native pipeline checks. They refuse input if another window covers their target and restore the cursor afterward. Run on an unlocked desktop with the mouse released; sandbox desktop restrictions may require running the tests outside the sandbox. No desktop image is saved. Unit tests do not need desktop access, the model or an engine.
@@ -83,12 +90,12 @@ Flutter desktop compilation still needs Visual C++ Build Tools. Android compilat
 ## Next work, in order
 
 1. Extend differential fixtures for remaining domain/detection behavior, preserving current valid-input contracts. Record intentional deviations individually.
-2. Finish resource installation/download and rotating file logging; the persistent desktop Stockfish service and resource/config resolution are ported and tested.
+2. Finish Android CPU-optimized engine packaging; desktop download/config installation and rotating file diagnostics are implemented. Optional ONNX acceleration follows CPU parity and must prove equivalent results and lower end-to-end latency before activation.
 3. Complete native-library build/bundling and window-close lifecycle integration. Flutter is connected to the Rust session/engine; settings/session ownership is native, not duplicated in Dart. Desktop application exit and Android service teardown still need real platform verification.
 4. Finish recovery/calibration and sustained-play acceptance for the connected Windows manual/Auto pipeline. It now reconciles a legal immediate opponent reply during visual verification; complete history before the initial manual baseline is still unavailable from pixels alone.
 5. Add portal capture/control for Wayland compositors without wlroots protocols, then calibrate actual platform castling/promotion menus. X11 and the existing wlroots path are implemented and await your real Linux test. Move offsets/humanization and pointer relocation remain to be ported; current dispatch uses square centers.
 6. Validate the implemented Android capture service, AccessibilityService/JNI gestures and floating controls on the user's phone once ADB is connected; finish device calibration and distribution/signing.
-7. Finish log-folder shortcuts, UI lifecycle/stop/recovery, offline packages and platform acceptance.
+7. Finish UI lifecycle/stop/recovery, offline packages and platform acceptance; log-folder/share shortcuts are connected.
 
 See `../docs/automation-plan.md` and `../docs/android-pc-migration-plan.md` for the full scope and release gates. This is not yet a complete replacement. The Windows Rust runtime DLL and manual/Auto pipeline are built and exercised. An ARM64 Android debug APK assembles, but its phone behavior is unverified. A complete Flutter desktop executable and its actual window behavior still require validation.
 

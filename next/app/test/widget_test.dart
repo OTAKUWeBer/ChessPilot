@@ -6,6 +6,25 @@ import 'package:chesspilot/pilot_controller.dart';
 
 class ActionController extends PilotController {
   int plays = 0;
+  int logsOpened = 0;
+  @override
+  Future<Map<String, dynamic>> diagnostics() async => {
+    'system': {
+      'os': 'fixture',
+      'architecture': 'x86_64',
+      'cpu_brand': 'Fixture CPU',
+      'cpu_cores': 4,
+    },
+    'log_path': '/fixture/chesspilot-native.log',
+    'write_error': null,
+    'dropped_records': 0,
+    'tail': 'Diagnostic fixture',
+  };
+  @override
+  Future<void> openLogs() async {
+    logsOpened++;
+  }
+
   final List<bool> autoRequests = [];
   @override
   void command(String name, [Map<String, dynamic> values = const {}]) {
@@ -37,6 +56,71 @@ class ActionController extends PilotController {
 }
 
 void main() {
+  testWidgets(
+    'diagnostics opens from help without launching the file manager in tests',
+    (tester) async {
+      tester.view.physicalSize = const Size(380, 520);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final controller = ActionController()
+        ..initialize(initializeEngine: false);
+      addTearDown(() async {
+        await controller.close();
+        controller.dispose();
+      });
+      await tester.pumpWidget(ChessPilotApp(controller: controller));
+      await tester.tap(find.byTooltip('Shortcuts'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Diagnostics / logs'));
+      await tester.pumpAndSettle();
+      expect(find.text('Diagnostic fixture'), findsOneWidget);
+      await tester.tap(find.text('Open logs folder'));
+      await tester.pumpAndSettle();
+      expect(controller.logsOpened, 1);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+    },
+  );
+  testWidgets('download progress exposes Stop before choosing a color', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(380, 520);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final controller = ActionController()..initialize(initializeEngine: false);
+    addTearDown(() async {
+      await controller.close();
+      controller.dispose();
+    });
+    controller.state!.addAll({
+      'busy': true,
+      'download': {
+        'stage': 'Downloading Stockfish',
+        'asset': 'fixture-avx2.zip',
+        'cpu': 'Fixture CPU',
+        'bytes_per_second': 2097152,
+        'downloaded': 5000,
+        'total': 10000,
+      },
+    });
+    await tester.pumpWidget(ChessPilotApp(controller: controller));
+    expect(find.text('Fixture CPU'), findsOneWidget);
+    expect(find.text('2.0 MB/s'), findsOneWidget);
+    expect(
+      tester
+          .widget<LinearProgressIndicator>(find.byType(LinearProgressIndicator))
+          .value,
+      .5,
+    );
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Stop'));
+    await tester.pump();
+    expect(controller.state!['busy'], false);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox());
+  });
   testWidgets('380x520 controls retain depth across color selection', (
     tester,
   ) async {

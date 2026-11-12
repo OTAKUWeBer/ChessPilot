@@ -109,6 +109,26 @@ class PilotController extends ChangeNotifier {
   }
 
   void configure(Map<String, dynamic> values) => command('configure', values);
+  Future<Map<String, dynamic>> diagnostics() async {
+    final path = _client?.path ?? NativeClient.discover().path;
+    return Isolate.run(
+      () => NativeClient(
+        path,
+      ).request({'command': 'diagnostics', 'include_tail': true}),
+    );
+  }
+
+  Future<void> openLogs() async {
+    if (android != null) {
+      await android!.action('shareLogs');
+      return;
+    }
+    final path = _client?.path ?? NativeClient.discover().path;
+    await Isolate.run(
+      () => NativeClient(path).request({'command': 'open_log_folder'}),
+    );
+  }
+
   void command(String name, [Map<String, dynamic> values = const {}]) {
     if (_disposed || _session == null) return;
     try {

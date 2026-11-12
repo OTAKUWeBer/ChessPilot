@@ -1,0 +1,90 @@
+{
+  "source": "src/utils/downloader.py",
+  "sha256": "c81f74c15abdae0377c780416a8adee213bda42b3309c46354beed229c154d1d",
+  "assets": [
+    {
+      "name": "stockfish-windows-x86-64-avx512.zip"
+    },
+    {
+      "name": "stockfish-windows-x86-64-bmi2.zip"
+    },
+    {
+      "name": "stockfish-windows-x86-64-avx2.zip"
+    },
+    {
+      "name": "stockfish-windows-x86-64-sse41-popcnt.zip"
+    },
+    {
+      "name": "stockfish-windows-x86-64.zip"
+    },
+    {
+      "name": "stockfish-linux-x86-64-avx2.tar"
+    },
+    {
+      "name": "stockfish-linux-x86-64.tar"
+    }
+  ],
+  "cases": [
+    {
+      "os": "windows",
+      "arch": "x86_64",
+      "vendor": "intel",
+      "flags": [
+        "avx2",
+        "bmi2",
+        "sse4_1",
+        "popcnt"
+      ],
+      "expected": "stockfish-windows-x86-64-bmi2.zip"
+    },
+    {
+      "os": "windows",
+      "arch": "x86_64",
+      "vendor": "intel",
+      "flags": [
+        "sse4_1",
+        "popcnt"
+      ],
+      "expected": "stockfish-windows-x86-64-sse41-popcnt.zip"
+    },
+    {
+      "os": "windows",
+      "arch": "x86_64",
+      "vendor": "amd",
+      "flags": [
+        "avx2",
+        "bmi2",
+        "sse4_1",
+        "popcnt"
+      ],
+      "expected": "stockfish-windows-x86-64-bmi2.zip"
+    },
+    {
+      "os": "windows",
+      "arch": "x86_64",
+      "vendor": "unknown",
+      "flags": [],
+      "expected": "stockfish-windows-x86-64-sse41-popcnt.zip",
+      "native_expected": "stockfish-windows-x86-64.zip",
+      "difference": "The Python scorer can select SSE4.1/POPCNT without detected flags; Rust rejects unsupported instructions."
+    },
+    {
+      "os": "linux",
+      "arch": "x86_64",
+      "vendor": "intel",
+      "flags": [
+        "avx2",
+        "sse4_1",
+        "popcnt"
+      ],
+      "expected": "stockfish-linux-x86-64-avx2.tar"
+    },
+    {
+      "os": "linux",
+      "arch": "x86_64",
+      "vendor": "unknown",
+      "flags": [],
+      "expected": "stockfish-linux-x86-64.tar"
+    }
+  ]
+}

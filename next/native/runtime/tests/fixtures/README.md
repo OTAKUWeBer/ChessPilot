@@ -5,3 +5,6 @@
 Vision fixtures and their provenance are described separately in `vision/README.md`. No desktop images were captured to create these reference files.
 
 `wayland.json` records pointer requests from the unchanged `wayland_capture/wayland.py` methods, with screenshot extents fixed at 1920×1080 and sleep calls recorded instead of delayed. It covers the 20-step 1 ms drag and two-click path from `(100,200)` to `(300,400)`. Only pointer-object requests are compared: Rust deliberately uses fresh callback IDs, exact stream reads, bounded replies, v1 negotiation and explicit resource destruction instead of the Python callback-ID reuse/unbounded socket reads. The fixture includes the source hash; Python is not used by the runtime.
+# Download selection
+
+`downloads.json` freezes the original Python scorer, source hash, asset ordering and six CPU cases. Native behavior matches compatible cases. The explicit `native_expected` entry records the Python unknown-feature case that could choose SSE4.1/POPCNT without detected support; Rust selects the baseline build instead. Separate tests cover architecture rejection, Ubuntu names and Android ARMv8/dot-product selection.

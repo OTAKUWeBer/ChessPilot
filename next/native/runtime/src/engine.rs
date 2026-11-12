@@ -81,6 +81,7 @@ impl EngineService {
         }
         self.cleanup();
         let mut process = EngineProcess::spawn(&mut self.command)?;
+        log::info!(target:"engine","Stockfish started (PID {})",process.child.id());
         process.send("uci")?;
         process.wait_for("uciok", self.timeouts.handshake)?;
         for option in &self.options {
@@ -88,10 +89,12 @@ impl EngineService {
         }
         process.ready(self.timeouts.handshake)?;
         self.process = Some(process);
+        log::info!(target:"engine","Stockfish UCI/config handshake ready");
         Ok(())
     }
     pub fn cleanup(&mut self) {
         if let Some(process) = self.process.take() {
+            log::debug!(target:"engine","Stopping Stockfish PID {}",process.child.id());
             let diagnostics = process.diagnostics.clone();
             drop(process);
             self.last_diagnostics = diagnostics
@@ -258,6 +261,9 @@ impl EngineProcess {
                     let mut reader = BufReader::new(stdout);
                     loop {
                         let line = read_line(&mut reader);
+                        if let Ok(text) = &line {
+                            log::debug!(target:"stockfish.stdout","{text}");
+                        }
                         let done = line.is_err();
                         if tx.send(line).is_err() || done {
                             break;
@@ -271,6 +277,7 @@ impl EngineProcess {
                 .spawn(move || {
                     let mut reader = BufReader::new(stderr);
                     while let Ok(line) = read_line(&mut reader) {
+                        log::warn!(target:"stockfish.stderr","{line}");
                         let mut log = diagnostics.lock().unwrap_or_else(|e| e.into_inner());
                         if log.len() == 64 {
                             log.pop_front();
@@ -282,6 +289,7 @@ impl EngineProcess {
         Ok(process)
     }
     fn send(&mut self, command: &str) -> io::Result<()> {
+        log::debug!(target:"stockfish.stdin","{command}");
         let input = self
             .input
             .as_mut()

@@ -40,6 +40,7 @@ struct State {
     history_valid: bool,
     input_in_flight: bool,
     confirmed_source: Option<CaptureBounds>,
+    download: Option<Value>,
 }
 impl Default for State {
     fn default() -> Self {
@@ -57,6 +58,7 @@ impl Default for State {
             history_valid: false,
             input_in_flight: false,
             confirmed_source: None,
+            download: None,
         }
     }
 }
@@ -136,6 +138,7 @@ impl Session {
             "confirmed_fen":if s.game.last_fen.is_empty(){None}else{Some(&s.game.last_fen)},
             "auto_mode":s.auto_mode,"auto_available":s.engine_ready && s.capture_ready && s.game.color_indicator.is_some() && known_position(&s).is_some(),
             "generation":self.generation.load(Ordering::Acquire),"error":s.error,
+            "download":s.download,
             "analysis":s.analysis.as_ref().map(|a|json!({"best_move":a.best_move,"updated_fen":a.updated_fen,"depth":a.depth,"score":score(a.score),"stopped":a.stopped}))})
     }
     pub fn configure(&self, args: &Value) -> Result<(), String> {
@@ -231,6 +234,7 @@ impl Session {
         s.status = if s.busy { "Stopping..." } else { "Stopped" }.into();
     }
     pub fn capture_lost(&self, reason: &str) {
+        log::warn!(target:"capture","Capture lost: {reason}");
         self.stop();
         let mut s = lock(&self.state);
         s.capture_ready = false;
@@ -258,6 +262,7 @@ impl Session {
             state.input_in_flight = false;
             state.operation = Some(operation);
             state.error = None;
+            state.download = None;
             self.cancelled.store(false, Ordering::Release);
             id = self.generation.fetch_add(1, Ordering::AcqRel) + 1;
         }
@@ -265,15 +270,18 @@ impl Session {
             let _ = old.join();
         }
         let session = self.clone();
+        log::info!(target:"session","Starting {operation} generation {id}");
         match thread::Builder::new()
             .name("chesspilot-session".into())
             .spawn(move || {
+                let started=std::time::Instant::now();
                 let result =
                     std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| task(&session, id)))
                         .unwrap_or_else(|_| Err("Native operation panicked".into()));
                 let mut state = lock(&session.state);
                 if session.generation.load(Ordering::Acquire) == id {
                     if let Err(error) = result {
+                        log::error!(target:"session","{operation} generation {id} failed: {error}");
                         state.status = error.clone();
                         state.error = Some(error);
                     }
@@ -281,6 +289,7 @@ impl Session {
                     state.status = "Stopped".into();
                 }
                 state.busy = false;
+                log::info!(target:"session","{operation} generation {id} ended after {:?}: {}",started.elapsed(),state.status);
                 state.auto_mode = false;
                 if state.input_in_flight {
                     state.history_valid = false;
@@ -305,21 +314,14 @@ impl Session {
         self.initialize(args, false)
     }
     pub fn initialize(self: &Arc<Self>, args: &Value, with_capture: bool) -> Result<(), String> {
-        let path = if let Some(path) = args.get("engine_path") {
-            PathBuf::from(path.as_str().ok_or("Expected engine path")?)
-        } else {
-            let directories = resources::native_asset_directories().map_err(|e| e.to_string())?;
-            resources::stockfish_path(&directories).map_err(|e| e.to_string())?
-        };
-        let options = if let Some(path) = args.get("config_path") {
-            resources::engine_options(
-                &std::fs::read_to_string(path.as_str().ok_or("Expected config path")?)
-                    .map_err(|e| e.to_string())?,
-            )
-            .map_err(|e| e.to_string())?
-        } else {
-            resources::engine_options(resources::DEFAULT_CONFIG).map_err(|e| e.to_string())?
-        };
+        let path = args
+            .get("engine_path")
+            .map(|v| v.as_str().map(PathBuf::from).ok_or("Expected engine path"))
+            .transpose()?;
+        let config = args
+            .get("config_path")
+            .map(|v| v.as_str().map(PathBuf::from).ok_or("Expected config path"))
+            .transpose()?;
         let args = args.clone();
         self.launch(
             if with_capture {
@@ -328,6 +330,27 @@ impl Session {
                 "initialize_engine"
             },
             move |session, id| {
+                let config = config
+                    .map(Ok)
+                    .unwrap_or_else(resources::default_config_path)
+                    .map_err(|e| e.to_string())?;
+                let options = resources::load_options(&config).map_err(|e| e.to_string())?;
+                let path = match path {
+                    Some(path) => path,
+                    None => crate::installer::ensure_stockfish(&session.cancelled, |progress| {
+                        let mut state = lock(&session.state);
+                        if session.generation.load(Ordering::Acquire) == id {
+                            state.status = progress["stage"]
+                                .as_str()
+                                .unwrap_or("Preparing engine")
+                                .into();
+                            state.download = Some(progress);
+                        }
+                    })?,
+                };
+                if session.cancelled.load(Ordering::Acquire) {
+                    return Err("Engine setup cancelled".into());
+                }
                 {
                     let mut state = lock(&session.state);
                     if session.generation.load(Ordering::Acquire) != id {
@@ -350,6 +373,7 @@ impl Session {
                     *lock(&session.engine) = Some(engine);
                     state.engine_ready = true;
                     state.status = "Stockfish ready".into();
+                    state.download = None;
                 }
                 if with_capture {
                     session.load_capture(id, &args)?;

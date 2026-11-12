@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'pilot_controller.dart';
+import 'diagnostics.dart';
 
-void main() => runApp(const ChessPilotApp());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  installErrorReporting();
+  runApp(const ChessPilotApp());
+}
 
 class ChessPilotApp extends StatelessWidget {
   final PilotController? controller;
@@ -157,11 +162,27 @@ class _PilotControlsState extends State<PilotControls> {
                           icon: const Icon(Icons.keyboard),
                           onPressed: () => showDialog<void>(
                             context: context,
-                            builder: (_) => const AlertDialog(
+                            builder: (_) => AlertDialog(
+                              scrollable: true,
                               title: Text('Keyboard shortcuts'),
                               content: Text(
                                 'W / B — choose color\n← / → — analysis depth\n↑ / ↓ — screenshot delay before choosing color\nD / C — drag / click before choosing color\nP — play next move\nA — toggle Auto after a verified move\nK / Q — castling rights\nEsc — stop and return to color selection',
                               ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => showDialog<void>(
+                                    context: context,
+                                    builder: (_) => DiagnosticsDialog(
+                                      controller: controller,
+                                    ),
+                                  ),
+                                  child: const Text('Diagnostics / logs'),
+                                ),
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('Close'),
+                                ),
+                              ],
                             ),
                           ),
                         ),
@@ -203,6 +224,37 @@ class _PilotControlsState extends State<PilotControls> {
                       Text(
                         controller.error!,
                         style: const TextStyle(color: Colors.orangeAccent),
+                      ),
+                    if (controller.state!['download']
+                        case final Map download) ...[
+                      Text(
+                        download['stage'] as String? ?? 'Preparing Stockfish',
+                      ),
+                      if (download['asset'] != null)
+                        Text(download['asset'] as String),
+                      if (download['cpu'] != null)
+                        Text(download['cpu'] as String),
+                      LinearProgressIndicator(
+                        value:
+                            download['total'] is num &&
+                                (download['total'] as num) > 0
+                            ? ((download['downloaded'] as num? ?? 0) /
+                                      (download['total'] as num))
+                                  .clamp(0, 1)
+                                  .toDouble()
+                            : null,
+                      ),
+                      if (download['total'] != null)
+                        Text(
+                          '${((download['downloaded'] as num? ?? 0) / 1048576).toStringAsFixed(1)} / ${((download['total'] as num) / 1048576).toStringAsFixed(1)} MB',
+                        ),
+                      if (download['bytes_per_second'] case final num speed)
+                        Text('${(speed / 1048576).toStringAsFixed(1)} MB/s'),
+                    ],
+                    if (controller.state!['busy'] == true)
+                      OutlinedButton(
+                        onPressed: () => controller.command('stop'),
+                        child: const Text('Stop'),
                       ),
                     if (controller.state!['engine_ready'] != true &&
                         controller.state!['busy'] != true)
@@ -301,11 +353,6 @@ class _PilotControlsState extends State<PilotControls> {
                                 textAlign: TextAlign.center,
                                 style: const TextStyle(color: Colors.white70),
                               ),
-                              if (controller.state!['busy'] == true)
-                                OutlinedButton(
-                                  onPressed: () => controller.command('stop'),
-                                  child: const Text('Stop'),
-                                ),
                             ],
                             const SizedBox(height: 16),
                             Text('Stockfish Depth: $depth'),

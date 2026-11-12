@@ -129,6 +129,7 @@ pub fn observe(
         "Chessboard detection failed after refined search; check board size and visibility",
     )?;
     capture.validate_board(board.geometry)?;
+    log::debug!(target:"vision","Observed {} at ({:.2},{:.2}), square {:.2}; {} inferences",board.fen,board.geometry.x,board.geometry.y,board.geometry.square_size,raw.inference_count);
     Ok(Observation {
         board,
         source: raw.source,
