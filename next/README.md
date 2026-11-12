@@ -17,6 +17,9 @@ Branch: `rust`. Python v2.3.1 remains the runnable reference in `src/`.
 * Subprocess fixtures cover silent/crashed/unresponsive engines, invalid output, stderr flooding, cancellation, and persistence. The local real Stockfish passed opening/checkmate analysis and persistent-process reuse.
 * Flutter now uses the real Rust runtime DLL through a length-delimited C ABI. Rust owns settings, color/session state, engine work and progress; Dart renders snapshots. Engine operations run on a native worker, and changing color/Stop invalidates old results.
 * Native buffer ownership, invalid requests, transactional settings and isolated sessions have tests. Dart integration tests exercise the compiled library and local Stockfish, not a mocked backend.
+* Native Windows primary-monitor GDI capture and `SetCursorPos`/`SendInput` mouse delivery. Per-thread physical-pixel DPI context is restored after each operation; capture retains its signed monitor origin and timestamp.
+* Windows click/drag sequencing preserves Python's rounding, intermediate point and timing. Stop/failure attempts button release, and delivery errors distinguish a move not dispatched from uncertain delivery. Recording tests inject cancellation/failure throughout each sequence.
+* A real Windows integration test creates its own temporary window, checks captured RGB colors/top-down rows, repeated-capture GDI resource cleanup, and received click/drag events. It restores the cursor afterward. This proves adapter delivery, not chess move verification or full-app operation.
 
 ## Commands
 
@@ -45,10 +48,13 @@ The real-engine and ONNX integration tests are explicit, so they cannot silently
 $env:CHESSPILOT_STOCKFISH = (Resolve-Path src/stockfish.exe).Path
 $env:CHESSPILOT_MODEL = (Resolve-Path src/chess_detection.onnx).Path
 $env:CHESSPILOT_ORT = (Resolve-Path venv/Lib/site-packages/onnxruntime/capi/onnxruntime.dll).Path
+$env:CHESSPILOT_DESKTOP_TEST = '1'
 cargo test --manifest-path next/native/Cargo.toml --workspace -- --include-ignored
 ```
 
 On Linux set these paths to the native `stockfish`, model and ONNX Runtime shared library. The local Windows test reuses ONNX Runtime 1.20's DLL from the existing environment; the Rust runtime never starts Python. Release bundles must ship a compatible native library. On this workstation use the GNU linker settings below for both commands.
+
+`CHESSPILOT_DESKTOP_TEST=1` explicitly enables a real interactive Windows test: it briefly creates a topmost colored target window and moves/clicks only inside that owned window. It refuses input if another window covers the target. Run it on an unlocked desktop with the mouse released; sandbox desktop restrictions may require running the test outside the sandbox. No desktop image is saved. Unit tests do not need desktop access, the model or an engine.
 
 This workstation lacks the Visual C++ desktop workload. Rust tests can currently run with its already-installed GNU toolchain and bundled LLVM linker:
 
@@ -65,8 +71,8 @@ Flutter desktop compilation still needs Visual C++ Build Tools; Android compilat
 1. Extend differential fixtures for remaining domain/detection behavior, preserving current valid-input contracts. Record intentional deviations individually.
 2. Finish resource installation/download and rotating file logging; the persistent desktop Stockfish service and resource/config resolution are ported and tested.
 3. Complete native-library build/bundling and window-close lifecycle integration. Flutter is connected to the Rust session/engine; settings/session ownership is native, not duplicated in Dart. Desktop application exit and Android service teardown still need real platform verification.
-4. Connect native desktop capture to the tested ONNX preprocessing/inference and normal/refined search. The vision module accepts packed RGB frames directly; capture and model lifecycle are not connected to the session/UI yet.
-5. Port native Windows automation and existing Wayland virtual-pointer behavior, add X11/portal adapters, then verify moves/castling/promotion through actual frames.
+4. Connect the native Windows capture/observation and ONNX lifecycle to the session/UI. The shared observation function already feeds a captured RGB frame into normal/refined search and keeps its coordinate metadata; lifecycle/controller integration is still pending.
+5. Connect tested Windows input to the move controller, port the existing Wayland virtual-pointer behavior and X11/portal adapters, then verify moves/castling/promotion through actual frames. Input offsets/humanization, cursor relocation and chess verification are not connected yet.
 6. Implement Android capture foreground service, AccessibilityService/JNI gestures and floating controls.
 7. Finish shortcuts, UI lifecycle/stop/recovery, offline packages and platform acceptance.
 
