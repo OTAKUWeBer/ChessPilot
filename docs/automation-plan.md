@@ -15,7 +15,7 @@ The current Windows path already uses `win32api.SetCursorPos` and `mouse_event` 
 | Linux Wayland | Portal RemoteDesktop session; prefer EIS input where available, otherwise portal pointer methods; explicit wlroots virtual-pointer fallback | Portal ScreenCast/PipeWire; tested `grim` fallback only on supported compositors | User-granted session, advertised pointer/capture capabilities, valid coordinate mapping |
 | Android | Rust request -> JNI -> Kotlin AccessibilityService -> tap/drag gesture | MediaProjection foreground service -> native frame buffers | User-enabled accessibility service, capture consent, and appropriate foreground-service setup; floating controls separately |
 
-These are implementation choices, not backends already compiled or tested in this repository. Windows bindings and X11/Wayland clients are native Rust dependencies; Kotlin is the Android lifecycle/API boundary. A single Rust input library cannot remove those OS restrictions.
+Implementation progress is tracked in [next/README.md](../next/README.md). Windows now has controlled-board integration coverage. X11 and the existing wlroots route are connected and Linux compile/lint checks pass; live Linux validation is left to the user's machine. Portal and Android services remain planned. Kotlin is the Android lifecycle/API boundary. A single Rust input library cannot remove those OS restrictions.
 
 ## 1. Windows backend
 
@@ -60,7 +60,7 @@ Separate the capture buffer's pixels from portal stream coordinates and EIS devi
 
 ### Retain the working wlroots route where needed
 
-The current code requests `zwlr_virtual_pointer_manager_v1`. Preserve that capability as an explicit fallback for a compositor that advertises it when the portal route is unavailable. Port the behavior using `wayland-client`/generated protocol bindings, not copied socket byte packing. Reuse a persistent connection and pointer, negotiate protocol version/output association, dispatch events correctly, and destroy resources on shutdown. The existing `grim` capture route can remain a transitional helper where supported; it is not a Python dependency. [wayland-rs](https://github.com/Smithay/wayland-rs), [wlroots protocol bindings](https://github.com/Smithay/wayland-rs/tree/master/wayland-protocols-wlr).
+The current code requests `zwlr_virtual_pointer_manager_v1`. Preserve that capability for a compositor that advertises it. The initial Rust port retains the small socket client to keep the existing behavior, with strict v1 messages, bounded stream handling, fresh callback IDs and persistent pointer cleanup. Frozen Python gesture traces plus a fragmented fake compositor check this restricted protocol surface. Capture uses `grim` at logical layout scale; it is not a Python dependency. If this backend expands to output/seat discovery or other protocols, replace the handwritten codec with [wayland-rs](https://github.com/Smithay/wayland-rs) and [generated wlroots bindings](https://github.com/Smithay/wayland-rs/tree/master/wayland-protocols-wlr). Real compositor validation and the portal path remain release gates; see [Linux checks](../next/linux-testing.md).
 
 Do not fall back to another route after the user explicitly denies access. If neither authorized path is available, report the missing capability and retain image/FEN analysis. This is an unsupported automation configuration, not successful platform parity.
 
@@ -170,7 +170,7 @@ The inventory lists every function. This table resolves the automation-specific 
 | All promotion discovery, wait, selection and retry helpers | Raw-menu observations, bounded menu acquisition, native tap, all-four-piece verification |
 | `MoveValidator` pure comparisons and live `verify_move` | Legal expected-transition checks in core; frame acquisition and deadlines in runtime |
 | `auto_play.py` seeding, polling, turn handlers, delays, thread/controller wrappers | One cancellable runtime session driven by stable observations and known legal history |
-| `WaylandInput` socket setup, encoding, event parsing, pointer creation, click/swipe methods | Portal session/EIS adapter or generated wlroots protocol client; persistent resources and negotiated coordinates |
+| `WaylandInput` socket setup, encoding, event parsing, pointer creation, click/swipe methods | Ported restricted wlroots v1 client with persistent resources/layout coordinates; portal session/EIS adapter still planned |
 | `wayland_capture/screen.py:get_resolution` | Capture/output metadata with typed dimensions and transform revision |
 | `capture_screenshot_in_memory`, `get_binary_path('grim')` | Native capture adapters; negotiated portal PipeWire source or supported transitional helper |
 | `move_cursor_platform_specific`, `calculate_button_center`, `move_cursor_to_button`, `get_button_info` | Optional desktop pointer relocation from UI-reported screen bounds; not part of executing a chess move |

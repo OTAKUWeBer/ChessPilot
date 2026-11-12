@@ -25,6 +25,8 @@ Branch: `rust`. Python v2.3.1 remains the runnable reference in `src/`.
 * A controlled native Windows board receives real mouse events and redraws its pieces. Through the actual session API, the complete capture → ONNX → Stockfish → input → visual verification path passes in drag/click modes and both orientations. This tests the native runtime; it does not establish a packaged Flutter desktop build or real target-site promotion/castling calibration.
 * One native Auto worker waits for stable board changes, matches one legal opponent reply using Stockfish, preserves full FEN metadata and runs the same verified move path. Unchanged frames do not trigger a search/move. Stop/settings/color changes cancel work; uncertain delivery invalidates the Auto history baseline.
 * The controlled Windows test now runs two Auto responses after each manual opening, in both colors and both input modes. It checks no move on an unchanged board, exactly one response per opponent move, visual confirmation and Stop without an extra move. Native unit tests cover lost castling rights, en passant metadata, illegal/unstable changes, terminal positions and late callbacks.
+* Linux X11 and wlroots adapters are now connected to the same Play/Auto controller. X11 uses Rust protocol bindings for capture, primary-monitor selection and XTEST input. Wayland preserves grim plus virtual-pointer input, with PPM capture, full-layout coordinates, exact fragmented reads, bounded replies, fresh callback IDs and held-button cleanup.
+* Linux code and tests compile-check cleanly for `x86_64-unknown-linux-gnu`; protocol, image-format, subprocess timeout and gesture tests run locally using synthetic inputs/a fake compositor. Per your instruction, real Linux desktop testing is left for your machine. See [Linux setup and checks](linux-testing.md). GNOME/KDE Wayland portal input is still pending; the existing wlroots path is ported.
 
 ## Commands
 
@@ -81,7 +83,7 @@ Flutter desktop compilation still needs Visual C++ Build Tools; Android compilat
 2. Finish resource installation/download and rotating file logging; the persistent desktop Stockfish service and resource/config resolution are ported and tested.
 3. Complete native-library build/bundling and window-close lifecycle integration. Flutter is connected to the Rust session/engine; settings/session ownership is native, not duplicated in Dart. Desktop application exit and Android service teardown still need real platform verification.
 4. Finish recovery/calibration and sustained-play acceptance for the connected Windows manual/Auto pipeline. It now reconciles a legal immediate opponent reply during visual verification; complete history before the initial manual baseline is still unavailable from pixels alone.
-5. Port the existing Wayland virtual-pointer behavior and X11/portal adapters, then calibrate actual platform castling/promotion menus. Move offsets/humanization and pointer relocation remain to be ported; current dispatch uses square centers.
+5. Add portal capture/control for Wayland compositors without wlroots protocols, then calibrate actual platform castling/promotion menus. X11 and the existing wlroots path are implemented and await your real Linux test. Move offsets/humanization and pointer relocation remain to be ported; current dispatch uses square centers.
 6. Implement Android capture foreground service, AccessibilityService/JNI gestures and floating controls.
 7. Finish log-folder shortcuts, UI lifecycle/stop/recovery, offline packages and platform acceptance.
 

@@ -51,6 +51,9 @@ impl TryFrom<Point> for PixelPoint {
 pub trait Pointer {
     fn move_to(&mut self, point: PixelPoint) -> Result<(), String>;
     fn left_button(&mut self, down: bool) -> Result<(), String>;
+    fn sequence_complete(&mut self) -> Result<(), String> {
+        Ok(())
+    }
     fn wait(&mut self, duration: Duration) {
         thread::sleep(duration);
     }
@@ -93,12 +96,22 @@ impl<P: Pointer> Gesture<'_, P> {
             .left_button(down)
             .map_err(|e| self.failure(e))?;
         self.held = down;
+        if !down {
+            self.pointer
+                .sequence_complete()
+                .map_err(|e| self.failure(e))?;
+        }
         Ok(())
     }
     fn wait(&mut self, milliseconds: u64) -> Result<(), InputError> {
-        for _ in 0..milliseconds / 5 {
+        self.wait_for(Duration::from_millis(milliseconds))
+    }
+    fn wait_for(&mut self, mut duration: Duration) -> Result<(), InputError> {
+        while !duration.is_zero() {
             self.check()?;
-            self.pointer.wait(Duration::from_millis(5));
+            let slice = duration.min(Duration::from_millis(5));
+            self.pointer.wait(slice);
+            duration -= slice;
         }
         self.check()
     }
@@ -108,9 +121,113 @@ impl<P: Pointer> Gesture<'_, P> {
                 .left_button(false)
                 .map_err(|e| self.failure(e))?;
             self.held = false;
+            self.pointer
+                .sequence_complete()
+                .map_err(|e| self.failure(e))?;
         }
         Ok(())
     }
+}
+
+pub fn wayland_move(
+    pointer: &mut impl Pointer,
+    start: Point,
+    end: Point,
+    mode: MoveMode,
+    cancelled: &AtomicBool,
+) -> Result<(), InputError> {
+    let first = PixelPoint::try_from(start).map_err(InputError::NotDispatched)?;
+    let last = PixelPoint::try_from(end).map_err(InputError::NotDispatched)?;
+    let mut gesture = Gesture {
+        pointer,
+        cancelled,
+        held: false,
+        dispatched: false,
+    };
+    let result = (|| {
+        gesture.move_to(first)?;
+        gesture.button(true)?;
+        if mode == MoveMode::Drag {
+            for step in 1..=20 {
+                let x = first.x as f64 + (last.x as f64 - first.x as f64) * step as f64 / 20.;
+                let y = first.y as f64 + (last.y as f64 - first.y as f64) * step as f64 / 20.;
+                gesture.move_to(PixelPoint {
+                    x: x as i32,
+                    y: y as i32,
+                })?;
+                gesture.wait_for(Duration::from_micros(50))?;
+            }
+            gesture.button(false)?;
+        } else {
+            gesture.button(false)?;
+            gesture.wait(20)?;
+            gesture.move_to(last)?;
+            gesture.button(true)?;
+            gesture.button(false)?;
+            gesture.wait(20)?;
+        }
+        gesture.check()
+    })();
+    gesture.release()?;
+    result
+}
+pub fn x11_move(
+    pointer: &mut impl Pointer,
+    start: Point,
+    end: Point,
+    mode: MoveMode,
+    cancelled: &AtomicBool,
+) -> Result<(), InputError> {
+    let first = PixelPoint::try_from(start).map_err(InputError::NotDispatched)?;
+    let last = PixelPoint::try_from(end).map_err(InputError::NotDispatched)?;
+    let mut gesture = Gesture {
+        pointer,
+        cancelled,
+        held: false,
+        dispatched: false,
+    };
+    let result = (|| {
+        gesture.move_to(first)?;
+        gesture.button(true)?;
+        if mode == MoveMode::Drag {
+            gesture.wait(100)?;
+            gesture.move_to(last)?;
+            gesture.wait(100)?;
+            gesture.button(false)?;
+            gesture.wait(100)?;
+        } else {
+            gesture.button(false)?;
+            gesture.wait(120)?;
+            gesture.move_to(last)?;
+            gesture.button(true)?;
+            gesture.button(false)?;
+            gesture.wait(120)?;
+        }
+        gesture.check()
+    })();
+    gesture.release()?;
+    result
+}
+pub fn linux_tap(
+    pointer: &mut impl Pointer,
+    point: Point,
+    cancelled: &AtomicBool,
+) -> Result<(), InputError> {
+    let point = PixelPoint::try_from(point).map_err(InputError::NotDispatched)?;
+    let mut gesture = Gesture {
+        pointer,
+        cancelled,
+        held: false,
+        dispatched: false,
+    };
+    let result = (|| {
+        gesture.move_to(point)?;
+        gesture.button(true)?;
+        gesture.button(false)?;
+        gesture.check()
+    })();
+    gesture.release()?;
+    result
 }
 impl<P: Pointer> Drop for Gesture<'_, P> {
     fn drop(&mut self) {

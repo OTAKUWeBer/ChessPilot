@@ -16,3 +16,7 @@ ort-sys = { version = "=2.0.0-rc.9", default-features = false }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Gdi", "Win32_UI_HiDpi", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_WindowsAndMessaging", "Win32_System_LibraryLoader", "Win32_System_Threading"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "=0.2.190"
+x11rb = { version = "=0.13.2", features = ["randr", "xtest"] }

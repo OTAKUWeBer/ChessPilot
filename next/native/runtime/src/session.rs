@@ -1,5 +1,5 @@
 //! Session ownership behind the Flutter/native boundary. Heavy work stays off Dart's UI isolate.
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 use crate::controller::{MoveOutcome, Progress};
 use crate::{
     controller::KnownPosition,
@@ -23,7 +23,7 @@ use std::{
     },
     thread::{self, JoinHandle},
 };
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 static DESKTOP_INPUT_OWNER: Mutex<()> = Mutex::new(());
 
 struct State {
@@ -102,7 +102,7 @@ fn known_position(state: &State) -> Option<KnownPosition> {
         source: state.confirmed_source?,
     })
 }
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn confirm(state: &mut State, position: KnownPosition) -> Result<(), String> {
     state.game.update_last_fen_for_color(&position.fen)?;
     state.game.last_fen = position.fen;
@@ -112,7 +112,7 @@ fn confirm(state: &mut State, position: KnownPosition) -> Result<(), String> {
     state.input_in_flight = false;
     Ok(())
 }
-#[cfg(windows)]
+#[cfg(any(windows, target_os = "linux"))]
 fn played(state: &mut State, outcome: MoveOutcome) -> Result<(), String> {
     if let Some(position) = outcome.position() {
         confirm(state, position)?;
@@ -132,7 +132,7 @@ impl Session {
             "mode":if s.settings.move_mode==MoveMode::Drag {"drag"} else {"click"},
             "kingside":s.settings.kingside,"queenside":s.settings.queenside,
             "color":s.game.color_indicator.map(Color::fen),"busy":s.busy,"operation":s.operation,"status":s.status,
-            "engine_ready":s.engine_ready,"capture_ready":s.capture_ready,"automation_ready":s.capture_ready && cfg!(windows),
+            "engine_ready":s.engine_ready,"capture_ready":s.capture_ready,"automation_ready":s.capture_ready && crate::desktop::SUPPORTED,
             "confirmed_fen":if s.game.last_fen.is_empty(){None}else{Some(&s.game.last_fen)},
             "auto_mode":s.auto_mode,"auto_available":s.engine_ready && s.capture_ready && s.game.color_indicator.is_some() && known_position(&s).is_some(),
             "generation":self.generation.load(Ordering::Acquire),"error":s.error,
@@ -363,12 +363,13 @@ impl Session {
         let (model, runtime) = resources::vision_paths(path("model_path")?, path("runtime_path")?)
             .map_err(|e| e.to_string())?;
         let reader = BoardReader::new(OnnxPredictor::load(&model, &runtime)?);
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         {
             use crate::desktop::Capture;
-            crate::desktop::windows::WindowsCapture.capture()?;
+            let (mut capture, _input) = crate::desktop::open()?;
+            capture.capture()?;
         }
-        if !cfg!(windows) {
+        if !crate::desktop::SUPPORTED {
             return Err("Native capture/input for this platform is not connected yet".into());
         }
         let mut state = lock(&self.state);
@@ -392,7 +393,7 @@ impl Session {
     pub fn start_auto(self: &Arc<Self>) -> Result<(), String> {
         self.run_moves(true)
     }
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "linux"))]
     fn progress(&self, id: u64, target_depth: u32, progress: Progress) -> Result<(), String> {
         let mut state = lock(&self.state);
         if self.generation.load(Ordering::Acquire) != id {
@@ -425,12 +426,12 @@ impl Session {
         Ok(())
     }
     fn run_moves(self: &Arc<Self>, automatic: bool) -> Result<(), String> {
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "linux")))]
         {
             let _ = automatic;
             Err("Native capture/input for this platform is not connected yet".into())
         }
-        #[cfg(windows)]
+        #[cfg(any(windows, target_os = "linux"))]
         {
             {
                 let state = lock(&self.state);
@@ -456,10 +457,7 @@ impl Session {
                                     .into(),
                             ),
                         };
-                    use crate::{
-                        controller::{self, Perception, PlayError},
-                        desktop::windows::{WindowsCapture, WindowsPointer},
-                    };
+                    use crate::controller::{self, Perception, PlayError};
                     let (settings, color, position) = {
                         let state = lock(&session.state);
                         if session.generation.load(Ordering::Acquire) != id {
@@ -475,11 +473,11 @@ impl Session {
                         )
                     };
                     let mut vision = lock(&session.vision);
+                    let (capture, mut input) = crate::desktop::open()?;
                     let mut source = Perception {
-                        capture: WindowsCapture,
+                        capture,
                         reader: vision.as_mut().ok_or("Board detector is unavailable")?,
                     };
-                    let mut input = WindowsPointer::new()?;
                     let mut engine = lock(&session.engine);
                     let mut progress_error = None;
                     let mut progress = |event| {
@@ -604,7 +602,7 @@ impl Session {
     }
 }
 
-#[cfg(all(test, windows))]
+#[cfg(all(test, any(windows, target_os = "linux")))]
 mod tests {
     use super::*;
     use std::time::{Duration, Instant};

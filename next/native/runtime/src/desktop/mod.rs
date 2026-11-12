@@ -1,7 +1,22 @@
-//! Capture pixels and input coordinates share physical desktop space.
+//! Pair frame coordinates with their native input adapter (physical or layout-normalized).
+pub mod helper;
 pub mod input;
+#[cfg(target_os = "linux")]
+pub mod linux;
+pub mod ppm;
+#[cfg(target_os = "linux")]
+mod unix_socket;
+pub mod wayland;
 #[cfg(windows)]
 pub mod windows;
+pub const SUPPORTED: bool = cfg!(any(windows, target_os = "linux"));
+#[cfg(windows)]
+pub fn open() -> Result<(windows::WindowsCapture, windows::WindowsPointer), String> {
+    Ok((windows::WindowsCapture, windows::WindowsPointer::new()?))
+}
+#[cfg(target_os = "linux")]
+pub use linux::open;
+pub mod x11_pixels;
 use crate::vision::{BoardReader, Predictor, RgbFrame};
 use chesspilot_core::{
     board::Point,

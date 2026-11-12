@@ -63,6 +63,15 @@ pub fn stockfish_path(directories: &[PathBuf]) -> io::Result<PathBuf> {
     } else {
         "stockfish"
     };
+    executable_path(name, directories)
+}
+pub fn executable_path(name: &str, directories: &[PathBuf]) -> io::Result<PathBuf> {
+    if Path::new(name).components().count() != 1 || name == "." || name == ".." {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "Expected an executable filename",
+        ));
+    }
     resource_path(name, directories).or_else(|error| {
         let paths = std::env::var_os("PATH").unwrap_or_default();
         std::env::split_paths(&paths)
