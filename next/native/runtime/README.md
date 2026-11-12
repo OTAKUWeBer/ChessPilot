@@ -2,6 +2,8 @@
 
 The `chesspilot-runtime` cdylib exports four C ABI functions. Dart's `native_client.dart` is the current caller; both sides are built from the same revision.
 
+Android also exports JNI methods on `PlatformBridge`. Its process owner opens one of these same sessions and Flutter adopts that handle; JNI does not create a parallel engine/controller.
+
 ```c
 uint8_t *chesspilot_alloc(size_t length);
 char *chesspilot_request(const uint8_t *input, size_t length);
@@ -73,3 +75,13 @@ Stop immediately clears Auto selection and invalidates the work generation. Hist
 The wlroots path calls `grim -t ppm -s 1 -` without a shell and decodes bounded RGB8 output in memory. The whole captured layout supplies virtual-pointer extents; it no longer combines a full-layout image with the first output's physical resolution. A dimension change aborts the current pairing and requires reconnecting. The client binds only the v1 requests it implements, handles fragmented stream reads and compositor errors/removal, gives sync callbacks fresh IDs, acknowledges released-button sequences, and attempts release/destruction during cleanup. Input preserves Python's 20-step drag and click/frame sequence; completion still requires visual board verification.
 
 This backend requires screencopy plus `zwlr_virtual_pointer_manager_v1`. GNOME/KDE Wayland portal sessions are not implemented yet. `tests/linux_adapters.rs` exercises codecs, helper failure/deadline handling, frozen Python gesture traces and a fake compositor, including denied/removed/unsupported cases. The Linux target compile/lint checks pass from Windows; actual compositor input, mixed-scale layout mapping and Flutter keep-above behavior are left for the user's later Linux test. `tests/linux_live.rs` supplies an explicit capture/capability probe with no gestures. See `next/linux-testing.md` for setup and commands.
+
+## Android adapters and controls
+
+`android::Bridge` accepts synchronous RGBA ImageReader copies with checked dimensions/strides and real timestamps, retains only the latest masked RGB frame and pairs capture/input by generation. A stale/static source requests a new buffer from the existing virtual display surface. No frame is marked fresh merely because it was read again. Frame copies include their conversion time in age. The shared controller sees the same `Capture` / `Automation` boundaries as desktop; rotation, revocation, lock and service loss invalidate capabilities/history.
+
+One gesture is queued/claimed at a time. Android callbacks acknowledge numeric generation/action IDs; completion never owns a raw Rust pointer. A rejected dispatch is distinct from uncertain delivery. Stop/settings changes abandon queued actions immediately, and Kotlin rechecks ownership immediately before `dispatchGesture`. An accepted action with a missing/late callback retains ownership until acknowledged or the source is torn down. Click mode waits for the first tap's completion before the second; cancellation or second-tap failure remains uncertain after the first tap. Current tap/drag durations are 50/200 ms and require phone calibration.
+
+The accessibility overlay reads native snapshots, exposes a movable 48 dp bubble/compact panel and keeps settings in Flutter. Actual measured screen bounds are masked in RGB frames; covered board observations and intersecting gesture paths are rejected. Changed bounds discard cached pixels and require a fresh frame. Layout/dragging blocks gesture claim; dragging/configuration changes and dashboard reopening pause automation. The small window is non-focusable and uses accessibility-overlay scope, with a notification Stop path too.
+
+`tests/android.rs` exercises stride validation, frame freshness, callback sequencing, cancellation/late results, source replacement, masks and overlay/input intersections on the host. Kotlin and JNI compile for Android ARM64, and Gradle packages Rust, Stockfish PIE, ONNX Runtime and the model. This does not prove OS permission behavior, actual touch/capture coordinates, static-surface refresh or phone UI placement. Those checks are deferred until the user connects ADB; see `next/android-testing.md` and `docs/phone-overlay-plan.md`.

@@ -1,8 +1,18 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <application
         android:label="ChessPilot"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <service android:name=".ProjectionService" android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+        <service android:name=".PilotTouchService" android:exported="true"
+            android:label="@string/touch_service" android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter><action android:name="android.accessibilityservice.AccessibilityService" /></intent-filter>
+            <meta-data android:name="android.accessibilityservice" android:resource="@xml/pilot_accessibility" />
+        </service>
         <activity
             android:name=".MainActivity"
             android:exported="true"

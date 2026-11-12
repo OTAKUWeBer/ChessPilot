@@ -33,6 +33,16 @@ impl RgbFrame {
     pub fn pixels(&self) -> &[u8] {
         &self.pixels
     }
+    pub fn mask(&mut self, rect: [usize; 4], value: u8) -> Result<(), String> {
+        let [left, top, right, bottom] = rect;
+        if left >= right || top >= bottom || right > self.width || bottom > self.height {
+            return Err("Mask is outside the frame".into());
+        }
+        for y in top..bottom {
+            self.pixels[(y * self.width + left) * 3..(y * self.width + right) * 3].fill(value);
+        }
+        Ok(())
+    }
     pub fn crop(&self, rect: [usize; 4]) -> Result<Self, String> {
         let [left, top, right, bottom] = rect;
         if left >= right || top >= bottom || right > self.width || bottom > self.height {

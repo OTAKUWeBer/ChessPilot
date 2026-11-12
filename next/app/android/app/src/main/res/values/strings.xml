@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="touch_service">ChessPilot touch control</string>
+    <string name="touch_description">Plays the move chosen by ChessPilot on the board you share. Enable this only when you want ChessPilot to tap or drag pieces. Stop is always available in the capture notification. ChessPilot does not read accessibility window content.</string>
+</resources>

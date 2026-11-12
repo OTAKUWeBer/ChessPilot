@@ -1,5 +1,5 @@
 //! Session ownership behind the Flutter/native boundary. Heavy work stays off Dart's UI isolate.
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "android"))]
 use crate::controller::{MoveOutcome, Progress};
 use crate::{
     controller::KnownPosition,
@@ -23,7 +23,7 @@ use std::{
     },
     thread::{self, JoinHandle},
 };
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "android"))]
 static DESKTOP_INPUT_OWNER: Mutex<()> = Mutex::new(());
 
 struct State {
@@ -102,7 +102,7 @@ fn known_position(state: &State) -> Option<KnownPosition> {
         source: state.confirmed_source?,
     })
 }
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "android"))]
 fn confirm(state: &mut State, position: KnownPosition) -> Result<(), String> {
     state.game.update_last_fen_for_color(&position.fen)?;
     state.game.last_fen = position.fen;
@@ -112,7 +112,7 @@ fn confirm(state: &mut State, position: KnownPosition) -> Result<(), String> {
     state.input_in_flight = false;
     Ok(())
 }
-#[cfg(any(windows, target_os = "linux"))]
+#[cfg(any(windows, target_os = "linux", target_os = "android"))]
 fn played(state: &mut State, outcome: MoveOutcome) -> Result<(), String> {
     if let Some(position) = outcome.position() {
         confirm(state, position)?;
@@ -190,7 +190,7 @@ impl Session {
                 .is_some_and(|name| name.starts_with("initialize"))
             {
                 self.generation.fetch_add(1, Ordering::AcqRel);
-                self.cancelled.store(true, Ordering::Release);
+                self.cancel();
             }
             s.analysis = None;
         }
@@ -215,15 +215,28 @@ impl Session {
         }
         Ok(())
     }
+    fn cancel(&self) {
+        self.cancelled.store(true, Ordering::Release);
+        #[cfg(target_os = "android")]
+        crate::android::bridge().cancel_pending();
+    }
     pub fn stop(&self) {
         let mut s = lock(&self.state);
-        self.cancelled.store(true, Ordering::Release);
+        self.cancel();
         self.generation.fetch_add(1, Ordering::AcqRel);
         s.auto_mode = false;
         if s.input_in_flight {
             s.history_valid = false;
         }
         s.status = if s.busy { "Stopping..." } else { "Stopped" }.into();
+    }
+    pub fn capture_lost(&self, reason: &str) {
+        self.stop();
+        let mut s = lock(&self.state);
+        s.capture_ready = false;
+        s.history_valid = false;
+        s.status = "Capture stopped; reconnect to continue".into();
+        s.error = Some(reason.chars().take(512).collect());
     }
     fn launch(
         self: &Arc<Self>,
@@ -363,7 +376,7 @@ impl Session {
         let (model, runtime) = resources::vision_paths(path("model_path")?, path("runtime_path")?)
             .map_err(|e| e.to_string())?;
         let reader = BoardReader::new(OnnxPredictor::load(&model, &runtime)?);
-        #[cfg(any(windows, target_os = "linux"))]
+        #[cfg(any(windows, target_os = "linux", target_os = "android"))]
         {
             use crate::desktop::Capture;
             let (mut capture, _input) = crate::desktop::open()?;
@@ -393,7 +406,7 @@ impl Session {
     pub fn start_auto(self: &Arc<Self>) -> Result<(), String> {
         self.run_moves(true)
     }
-    #[cfg(any(windows, target_os = "linux"))]
+    #[cfg(any(windows, target_os = "linux", target_os = "android"))]
     fn progress(&self, id: u64, target_depth: u32, progress: Progress) -> Result<(), String> {
         let mut state = lock(&self.state);
         if self.generation.load(Ordering::Acquire) != id {
@@ -426,12 +439,12 @@ impl Session {
         Ok(())
     }
     fn run_moves(self: &Arc<Self>, automatic: bool) -> Result<(), String> {
-        #[cfg(not(any(windows, target_os = "linux")))]
+        #[cfg(not(any(windows, target_os = "linux", target_os = "android")))]
         {
             let _ = automatic;
             Err("Native capture/input for this platform is not connected yet".into())
         }
-        #[cfg(any(windows, target_os = "linux"))]
+        #[cfg(any(windows, target_os = "linux", target_os = "android"))]
         {
             {
                 let state = lock(&self.state);
@@ -483,7 +496,7 @@ impl Session {
                     let mut progress = |event| {
                         if let Err(error) = session.progress(id, settings.depth, event) {
                             progress_error = Some(error);
-                            session.cancelled.store(true, Ordering::Release);
+                            session.cancel();
                         }
                     };
                     let engine = engine.as_mut().ok_or("Engine is unavailable")?;
@@ -602,10 +615,32 @@ impl Session {
     }
 }
 
-#[cfg(all(test, any(windows, target_os = "linux")))]
+#[cfg(all(test, any(windows, target_os = "linux", target_os = "android")))]
 mod tests {
     use super::*;
     use std::time::{Duration, Instant};
+    #[test]
+    fn capture_loss_stops_work_and_invalidates_auto_history() {
+        let session = Session::default();
+        {
+            let mut s = lock(&session.state);
+            s.engine_ready = true;
+            s.capture_ready = true;
+            s.auto_mode = true;
+            s.history_valid = true;
+            s.busy = true;
+            s.input_in_flight = true;
+        }
+        session.capture_lost("Display rotated");
+        let snapshot = session.snapshot();
+        assert_eq!(snapshot["engine_ready"], true);
+        assert_eq!(snapshot["capture_ready"], false);
+        assert_eq!(snapshot["auto_mode"], false);
+        assert_eq!(snapshot["auto_available"], false);
+        assert_eq!(snapshot["error"], "Display rotated");
+        assert!(!lock(&session.state).history_valid);
+        assert!(session.cancelled.load(Ordering::Acquire));
+    }
     #[test]
     fn stop_preserves_waiting_history_but_invalidates_uncertain_input_and_ignores_late_events() {
         for dispatched in [false, true] {

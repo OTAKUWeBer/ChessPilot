@@ -20,3 +20,6 @@ windows-sys = { version = "=0.61.2", features = ["Win32_Foundation", "Win32_Grap
 [target.'cfg(target_os = "linux")'.dependencies]
 libc = "=0.2.190"
 x11rb = { version = "=0.13.2", features = ["randr", "xtest"] }
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = { version = "=0.21.1", default-features = false }

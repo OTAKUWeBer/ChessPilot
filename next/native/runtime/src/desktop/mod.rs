@@ -9,7 +9,11 @@ mod unix_socket;
 pub mod wayland;
 #[cfg(windows)]
 pub mod windows;
-pub const SUPPORTED: bool = cfg!(any(windows, target_os = "linux"));
+pub const SUPPORTED: bool = cfg!(any(windows, target_os = "linux", target_os = "android"));
+#[cfg(target_os = "android")]
+pub fn open() -> Result<(crate::android::AndroidCapture, crate::android::AndroidInput), String> {
+    crate::android::bridge().open()
+}
 #[cfg(windows)]
 pub fn open() -> Result<(windows::WindowsCapture, windows::WindowsPointer), String> {
     Ok((windows::WindowsCapture, windows::WindowsPointer::new()?))
@@ -19,7 +23,7 @@ pub use linux::open;
 pub mod x11_pixels;
 use crate::vision::{BoardReader, Predictor, RgbFrame};
 use chesspilot_core::{
-    board::Point,
+    board::{BoardGeometry, Point},
     detection::{get_fen_from_position, DetectedBoard, Detection},
     Color,
 };
@@ -74,6 +78,9 @@ impl CapturedFrame {
 }
 pub trait Capture {
     fn capture(&mut self) -> Result<CapturedFrame, String>;
+    fn validate_board(&self, _geometry: BoardGeometry) -> Result<(), String> {
+        Ok(())
+    }
 }
 #[derive(Clone)]
 pub struct Observation {
@@ -121,6 +128,7 @@ pub fn observe(
     let board = get_fen_from_position(color, &raw.boxes)?.ok_or(
         "Chessboard detection failed after refined search; check board size and visibility",
     )?;
+    capture.validate_board(board.geometry)?;
     Ok(Observation {
         board,
         source: raw.source,

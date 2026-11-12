@@ -165,7 +165,21 @@ fn real_primary_capture_and_pointer_delivery_to_owned_window() {
     target.pump();
     let dpi = unsafe { GetThreadDpiAwarenessContext() };
     let mut capture = WindowsCapture;
-    let image = capture.capture().unwrap();
+    let mut image = capture.capture().unwrap();
+    // UpdateWindow paints synchronously, but desktop composition can present it later.
+    let presented = Instant::now() + Duration::from_secs(2);
+    while Instant::now() < presented {
+        let top = (120 * image.image.width() + 120) * 3;
+        let bottom = (370 * image.image.width() + 120) * 3;
+        if image.image.pixels().get(top..top + 3) == Some(&[0x11, 0x22, 0x33])
+            && image.image.pixels().get(bottom..bottom + 3) == Some(&[0xcc, 0xaa, 0x11])
+        {
+            break;
+        }
+        target.pump();
+        std::thread::sleep(Duration::from_millis(5));
+        image = capture.capture().unwrap();
+    }
     assert_eq!(
         unsafe { GetThreadDpiAwarenessContext() },
         dpi,

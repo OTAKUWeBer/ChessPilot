@@ -168,6 +168,37 @@ class _PilotControlsState extends State<PilotControls> {
                       ],
                     ),
                     const SizedBox(height: 12),
+                    if (controller.isAndroid) ...[
+                      const Text(
+                        'Share the entire display and enable touch control to play in another app.',
+                      ),
+                      OutlinedButton(
+                        onPressed: () =>
+                            controller.platformAction('enableTouch'),
+                        child: Text(
+                          controller.platformState?['touch'] == true
+                              ? 'Touch control enabled'
+                              : 'Enable touch control',
+                        ),
+                      ),
+                      OutlinedButton(
+                        onPressed: () => controller.platformAction(
+                          controller.platformState?['capture'] == true
+                              ? 'stopCapture'
+                              : 'startCapture',
+                        ),
+                        child: Text(
+                          controller.platformState?['capture'] == true
+                              ? 'Stop screen sharing'
+                              : 'Share entire display',
+                        ),
+                      ),
+                      if (controller.platformState?['error'] != null)
+                        Text(
+                          controller.platformState!['error'] as String,
+                          style: const TextStyle(color: Colors.orangeAccent),
+                        ),
+                    ],
                     if (controller.error != null)
                       Text(
                         controller.error!,

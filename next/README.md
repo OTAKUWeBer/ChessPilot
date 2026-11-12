@@ -27,6 +27,9 @@ Branch: `rust`. Python v2.3.1 remains the runnable reference in `src/`.
 * The controlled Windows test now runs two Auto responses after each manual opening, in both colors and both input modes. It checks no move on an unchanged board, exactly one response per opponent move, visual confirmation and Stop without an extra move. Native unit tests cover lost castling rights, en passant metadata, illegal/unstable changes, terminal positions and late callbacks.
 * Linux X11 and wlroots adapters are now connected to the same Play/Auto controller. X11 uses Rust protocol bindings for capture, primary-monitor selection and XTEST input. Wayland preserves grim plus virtual-pointer input, with PPM capture, full-layout coordinates, exact fragmented reads, bounded replies, fresh callback IDs and held-button cleanup.
 * Linux code and tests compile-check cleanly for `x86_64-unknown-linux-gnu`; protocol, image-format, subprocess timeout and gesture tests run locally using synthetic inputs/a fake compositor. Per your instruction, real Linux desktop testing is left for your machine. See [Linux setup and checks](linux-testing.md). GNOME/KDE Wayland portal input is still pending; the existing wlroots path is ported.
+* Android MediaProjection foreground service, callback-confirmed accessibility tap/drag and the shared Rust Play/Auto pipeline are connected. The process owns one session across Flutter activity recreation. Consent, lock, source rotation/resize and accessibility loss invalidate capture/history. Static frames request a new surface buffer; old pixels are not relabeled as fresh.
+* Phone controls use a draggable 48 dp bubble or compact 184 dp panel, with Play / Auto / Stop and saved edge docking. Large text stacks buttons; system-bar/cutout insets bound placement. Dragging/opening the dashboard pauses automation. Rust masks controls, rejects covered boards and rejects gesture paths through them; input waits for measured bounds. Desktop sizing stays unchanged. See [phone overlay design](../docs/phone-overlay-plan.md).
+* Android ARM64 debug packaging builds Rust and generic Stockfish 17.1 PIE from pinned sources/networks, includes the model and ONNX Runtime Android 1.23.2, and preserves private engine configuration. Broker tests and Flutter channel/session tests run here; live Android behavior is explicitly deferred until ADB is connected. See [Android setup and deferred checks](android-testing.md).
 
 ## Commands
 
@@ -41,7 +44,7 @@ flutter analyze
 flutter run -d windows
 ```
 
-In development the Dart loader finds `next/native/target/debug/chesspilot_runtime.dll` (or `libchesspilot_runtime.so` on Linux). `CHESSPILOT_LIBRARY_PATH` can select an explicit library for tests. Release app bundling of this library and Android native-library packaging are still pending; a missing native component is reported rather than replaced by simulated state. The real-engine Dart test requires `CHESSPILOT_STOCKFISH`, just like the native integration test below.
+In development the Dart loader finds `next/native/target/debug/chesspilot_runtime.dll` (or `libchesspilot_runtime.so` on Linux). `CHESSPILOT_LIBRARY_PATH` can select an explicit library for tests. Release desktop app bundling remains pending; Android Gradle packages its native components. A missing native component is reported rather than replaced by simulated state. The real-engine Dart test requires `CHESSPILOT_STOCKFISH`, just like the native integration test below.
 
 Flutter startup initializes the engine, model and capture on the Rust worker. In Windows development, model/runtime lookup includes `src/chess_detection.onnx` and the existing environment's ONNX Runtime DLL; release lookup expects native assets beside the executable. Play becomes available after initialization and color selection. Capture initialization can be retried independently of a ready engine. The runtime still uses the supplied player color as the active side, matching Python; the user must request a move on that side's turn.
 
@@ -75,7 +78,7 @@ $env:RUSTFLAGS = "-C linker=$($rustGnuRoot.Replace('\','/'))/lib/rustlib/x86_64-
 cargo +stable-x86_64-pc-windows-gnu test --manifest-path next/native/Cargo.toml --offline
 ```
 
-Flutter desktop compilation still needs Visual C++ Build Tools; Android compilation needs a working JDK and verified SDK license/setup. Neither has been installed or modified by this migration.
+Flutter desktop compilation still needs Visual C++ Build Tools. Android compilation now works with a local JDK 21 under ignored `native/target/android-tools/`; SDK/NDK dependencies are installed and the ARM64 debug APK builds. No machine-wide Java setting was changed.
 
 ## Next work, in order
 
@@ -84,10 +87,10 @@ Flutter desktop compilation still needs Visual C++ Build Tools; Android compilat
 3. Complete native-library build/bundling and window-close lifecycle integration. Flutter is connected to the Rust session/engine; settings/session ownership is native, not duplicated in Dart. Desktop application exit and Android service teardown still need real platform verification.
 4. Finish recovery/calibration and sustained-play acceptance for the connected Windows manual/Auto pipeline. It now reconciles a legal immediate opponent reply during visual verification; complete history before the initial manual baseline is still unavailable from pixels alone.
 5. Add portal capture/control for Wayland compositors without wlroots protocols, then calibrate actual platform castling/promotion menus. X11 and the existing wlroots path are implemented and await your real Linux test. Move offsets/humanization and pointer relocation remain to be ported; current dispatch uses square centers.
-6. Implement Android capture foreground service, AccessibilityService/JNI gestures and floating controls.
+6. Validate the implemented Android capture service, AccessibilityService/JNI gestures and floating controls on the user's phone once ADB is connected; finish device calibration and distribution/signing.
 7. Finish log-folder shortcuts, UI lifecycle/stop/recovery, offline packages and platform acceptance.
 
-See `../docs/automation-plan.md` and `../docs/android-pc-migration-plan.md` for the full scope and release gates. This is not yet a complete replacement. The Windows Rust runtime DLL and manual/Auto pipeline are built and exercised, but no complete phone or desktop app binary has been built, and the Flutter window behavior has not been observed on a real desktop.
+See `../docs/automation-plan.md` and `../docs/android-pc-migration-plan.md` for the full scope and release gates. This is not yet a complete replacement. The Windows Rust runtime DLL and manual/Auto pipeline are built and exercised. An ARM64 Android debug APK assembles, but its phone behavior is unverified. A complete Flutter desktop executable and its actual window behavior still require validation.
 
 ## Deliberate differences recorded during the port
 

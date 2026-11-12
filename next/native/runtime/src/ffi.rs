@@ -66,6 +66,12 @@ pub fn request(value: Value) -> Result<Value, String> {
                 .into(),
         )?,
         "stop" => session.stop(),
+        "capture_lost" => session.capture_lost(
+            value
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or("Capture permission lost"),
+        ),
         "close" => {
             registry()
                 .lock()

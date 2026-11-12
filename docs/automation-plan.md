@@ -15,7 +15,7 @@ The current Windows path already uses `win32api.SetCursorPos` and `mouse_event` 
 | Linux Wayland | Portal RemoteDesktop session; prefer EIS input where available, otherwise portal pointer methods; explicit wlroots virtual-pointer fallback | Portal ScreenCast/PipeWire; tested `grim` fallback only on supported compositors | User-granted session, advertised pointer/capture capabilities, valid coordinate mapping |
 | Android | Rust request -> JNI -> Kotlin AccessibilityService -> tap/drag gesture | MediaProjection foreground service -> native frame buffers | User-enabled accessibility service, capture consent, and appropriate foreground-service setup; floating controls separately |
 
-Implementation progress is tracked in [next/README.md](../next/README.md). Windows now has controlled-board integration coverage. X11 and the existing wlroots route are connected and Linux compile/lint checks pass; live Linux validation is left to the user's machine. Portal and Android services remain planned. Kotlin is the Android lifecycle/API boundary. A single Rust input library cannot remove those OS restrictions.
+Implementation progress is tracked in [next/README.md](../next/README.md). Windows now has controlled-board integration coverage. X11 and the existing wlroots route are connected and Linux compile/lint checks pass; live Linux validation is left to the user's machine. Android services, JNI/frame/gesture bridge and compact movable overlay are connected and build as an ARM64 debug APK; device checks are deferred until the user connects ADB. Portal support remains planned. Kotlin is the Android lifecycle/API boundary. A single Rust input library cannot remove those OS restrictions.
 
 ## 1. Windows backend
 
@@ -71,6 +71,8 @@ Enigo is a possible convenience library for some targets; its upstream documenta
 Required matrix: GNOME Wayland, KDE Plasma Wayland, and at least one wlroots compositor used by current users. Record compositor/portal versions and the backend actually selected. Exercise multi-output layout, scaling, rotation, denial/revocation and missing protocol. Release support only for configurations that pass; keep Python available while parity is incomplete.
 
 ## 4. Android backend
+
+Current implementation and deferred acceptance are recorded in [Android setup](../next/android-testing.md). The [phone overlay plan](phone-overlay-plan.md) specifies the 48 dp draggable bubble and compact panel; the PC window size does not apply to that surface.
 
 ### Rust owns decisions; native services perform Android operations
 

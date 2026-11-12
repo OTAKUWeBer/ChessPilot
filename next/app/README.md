@@ -1,16 +1,7 @@
-# chesspilot
+# ChessPilot Flutter interface
 
-A new Flutter project.
+Flutter renders state owned by the Rust runtime. Desktop controls retain the 380×520 layout and green/dark appearance. Android uses the full dashboard for setup/settings and a small native accessibility overlay while another app is visible.
 
-## Getting Started
+Build the native runtime before desktop tests. Android Gradle builds/packages its ARM64 native components; Stockfish assets must be prepared first. See [migration progress](../README.md), [Android setup](../android-testing.md), [Linux setup](../linux-testing.md) and [phone overlay design](../../docs/phone-overlay-plan.md).
 
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+`native_client.dart` owns C ABI buffers, `pilot_controller.dart` manages snapshots/polling and `android_platform.dart` connects Android setup/lifecycle. Android's process-owned session survives Activity recreation; desktop closes its session on controller disposal. Physical-platform acceptance remains separate from widget/channel tests.
