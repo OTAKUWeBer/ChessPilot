@@ -129,6 +129,9 @@ struct Input {
     stop_after_wait: Option<usize>,
 }
 impl Automation for Input {
+    fn humanize(&mut self, point: Point, _: f64, _: f64) -> Result<Point, String> {
+        Ok(point)
+    }
     fn move_piece(
         &mut self,
         start: Point,

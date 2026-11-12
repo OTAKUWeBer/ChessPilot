@@ -52,7 +52,7 @@ The adapter test uses only its own temporary target window. It verifies capture 
 
 ## Shared move controller
 
-`controller::play` owns one manual transaction. It obtains a board with bounded read-only retries, prepares the same placement-based castling flags as Python, analyzes it with the persistent engine, then rechecks placement, capture bounds, geometry and freshness before any input. It uses square centers and source origin mapping; jitter/humanization and cursor relocation remain pending.
+`controller::play` owns one manual transaction. It obtains a board with bounded read-only retries, prepares the same placement-based castling flags as Python, analyzes it with the persistent engine, then rechecks placement, capture bounds, geometry and freshness before any input. Square centers receive Python-compatible bounded random offsets before source-origin mapping; promotion choices use the smaller limit. Tiny targets cap offsets further to retain their interior. Cursor relocation remains pending.
 
 King castling is followed by a new observation. An automatic rook move needs no extra gesture. A rook fallback is permitted only for a fresh exact king-only change with the rook still at its source and its destination empty. Promotion observations bypass board-validity refinement, retain Python's pure candidate filter, and require four distinct aligned menu choices near the destination before one tap. Verification checks the full expected placement, including the chosen underpromotion.
 

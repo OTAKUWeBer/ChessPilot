@@ -15,6 +15,16 @@ fn settings_are_transactional_and_sessions_are_isolated() {
         .as_u64()
         .unwrap();
     assert_eq!(first["state"]["depth"], 15);
+    for args in [
+        json!({"fallback_engine_path":42}),
+        json!({"engine_working_directory":"relative"}),
+        json!({"engine_working_directory":false}),
+    ] {
+        let mut request_args = args;
+        request_args["command"] = json!("initialize_engine");
+        request_args["session"] = json!(a);
+        assert!(request(request_args).is_err());
+    }
     assert!(request(json!({"command":"play","session":a})).is_err());
     assert!(request(json!({"command":"set_auto","session":a,"enabled":true})).is_err());
     assert!(request(json!({"command":"set_auto","session":a,"enabled":"yes"})).is_err());
@@ -134,4 +144,27 @@ fn asynchronous_engine_and_stop_invalidate_analysis() {
     assert_eq!(stopped["status"], "Stopped");
     assert!(stopped["analysis"].is_null());
     request(json!({"command":"close","session":id})).unwrap();
+}
+
+#[test]
+#[ignore = "Requires CHESSPILOT_STOCKFISH for native optimized-engine fallback"]
+fn failed_optimized_engine_falls_back_without_replacing_config() {
+    let path = std::fs::canonicalize(std::env::var("CHESSPILOT_STOCKFISH").unwrap()).unwrap();
+    let directory =
+        std::env::temp_dir().join(format!("chesspilot-engine-fallback-{}", std::process::id()));
+    std::fs::create_dir(&directory).unwrap();
+    let config = directory.join("engine_config.txt");
+    let content = "# User config\nsetoption name Hash value 16\nsetoption name Threads value 1\n";
+    std::fs::write(&config, content).unwrap();
+    let id = request(json!({"command":"open"})).unwrap()["session"]
+        .as_u64()
+        .unwrap();
+    request(json!({"command":"initialize_engine","session":id,"engine_path":directory.join("missing-optimized-engine"),"fallback_engine_path":path,"engine_working_directory":directory,"config_path":config})).unwrap();
+    let ready = wait_idle(id);
+    request(json!({"command":"close","session":id})).unwrap();
+    assert_eq!(std::fs::read_to_string(&config).unwrap(), content);
+    std::fs::remove_file(config).unwrap();
+    std::fs::remove_dir(directory).unwrap();
+    assert!(ready["error"].is_null(), "{ready}");
+    assert_eq!(ready["engine_ready"], true);
 }

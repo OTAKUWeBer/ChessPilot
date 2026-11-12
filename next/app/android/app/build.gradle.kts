@@ -66,9 +66,10 @@ val packageNative by tasks.registering(Sync::class) {
     dependsOn(buildRust)
     from(rustLibrary) { into("arm64-v8a") }
     from("$engineAssets/arm64-v8a/libstockfish.so") { into("arm64-v8a") }
+    from("$engineAssets/arm64-v8a/libstockfish_dotprod.so") { into("arm64-v8a") }
     into(generatedNative)
     doFirst {
-        check(file("$engineAssets/arm64-v8a/libstockfish.so").isFile) {
+        check(listOf("libstockfish.so","libstockfish_dotprod.so").all { file("$engineAssets/arm64-v8a/$it").isFile }) {
             "Prepare Android Stockfish first; see next/android-testing.md"
         }
     }
@@ -76,8 +77,12 @@ val packageNative by tasks.registering(Sync::class) {
 val packageAssets by tasks.registering(Sync::class) {
     from("../../../../src/chess_detection.onnx")
     from("$engineAssets/licenses") { into("licenses") }
+    from("$engineAssets/networks") { into("networks") }
     into(generatedAssets)
-    doFirst { check(file("../../../../src/chess_detection.onnx").isFile) { "Missing src/chess_detection.onnx" } }
+    doFirst {
+        check(file("../../../../src/chess_detection.onnx").isFile) { "Missing src/chess_detection.onnx" }
+        check(listOf("nn-1c0000000000.nnue","nn-37f18f62d772.nnue").all { file("$engineAssets/networks/$it").isFile }) { "Prepare Android Stockfish networks first" }
+    }
 }
 android.sourceSets.getByName("main").apply {
     jniLibs.srcDir(generatedNative)

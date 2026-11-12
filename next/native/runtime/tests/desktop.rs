@@ -17,6 +17,38 @@ use std::{
 };
 
 #[test]
+fn humanize_preserves_python_offsets_and_stays_inside_small_square_targets() {
+    use chesspilot_runtime::desktop::input::offset_point;
+    let center = Point { x: 50., y: 50. };
+    for (size, limit, bound) in [
+        (80., 16., 16.),
+        (40., 16., 8.),
+        (20., 16., 4.),
+        (80., 8., 8.),
+        (4., 16., 0.88),
+    ] {
+        assert_eq!(
+            offset_point(center, size, limit, [0., 1.]).unwrap(),
+            Point {
+                x: 50. - bound,
+                y: 50. + bound
+            }
+        );
+        assert_eq!(
+            offset_point(center, size, limit, [0.5, 0.5]).unwrap(),
+            center
+        );
+        let sampled = offset_point(center, size, limit, [0.25, 0.75]).unwrap();
+        assert!((sampled.x - center.x).abs() <= bound && (sampled.y - center.y).abs() <= bound);
+    }
+    assert!(offset_point(center, 80., 16., [f64::NAN, 0.]).is_err());
+    assert!(offset_point(center, 0., 16., [0., 0.]).is_err());
+    for _ in 0..100 {
+        assert!((0. ..1.).contains(&chesspilot_runtime::desktop::input::random_unit()));
+    }
+}
+
+#[test]
 fn capture_points_keep_origin_and_python_rounding() {
     let source = CaptureBounds {
         x: -1920,

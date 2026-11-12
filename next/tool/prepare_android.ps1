@@ -6,7 +6,7 @@ $ErrorActionPreference = 'Stop'
 $native = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../native'))
 $cache = Join-Path $native 'target/android-tools'
 $assets = Join-Path $native 'target/android-assets'
-New-Item -ItemType Directory -Force -Path $cache, "$assets/arm64-v8a", "$assets/licenses" | Out-Null
+New-Item -ItemType Directory -Force -Path $cache, "$assets/arm64-v8a", "$assets/networks", "$assets/licenses" | Out-Null
 $archive = Join-Path $cache 'stockfish-android-armv8.tar'
 $url = 'https://github.com/official-stockfish/Stockfish/releases/download/sf_17.1/stockfish-android-armv8.tar'
 if (-not (Test-Path -LiteralPath $archive)) { Invoke-WebRequest -Uri $url -OutFile $archive }
@@ -30,6 +30,7 @@ foreach ($net in $networks.Keys) {
     if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $networks[$net]) {
         throw "Invalid Stockfish network: $net"
     }
+    Copy-Item -LiteralPath $path -Destination (Join-Path "$assets/networks" $net)
 }
 $ndk = Join-Path $AndroidSdk "ndk/$NdkVersion"
 $cmakeBin = Join-Path $AndroidSdk 'cmake/3.22.1/bin'
@@ -39,13 +40,15 @@ if ($LASTEXITCODE -ne 0) { throw 'Stockfish CMake configuration failed' }
 & "$cmakeBin/cmake.exe" --build $build --parallel 4
 if ($LASTEXITCODE -ne 0) { throw 'Stockfish compilation failed' }
 $readelf = Join-Path $ndk 'toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-readelf.exe'
-$headers = & $readelf -h -l (Join-Path $build 'libstockfish.so')
+foreach ($binary in @('libstockfish.so','libstockfish_dotprod.so')) {
+$headers = & $readelf -h -l (Join-Path $build $binary)
 if ($LASTEXITCODE -ne 0 -or -not ($headers -match 'Type:.*DYN')) { throw 'Stockfish must be a PIE executable' }
 foreach ($line in ($headers | Where-Object { $_ -match '^\s*LOAD\s' })) {
     $alignment = [Convert]::ToInt64(($line.Trim() -split '\s+')[-1].Substring(2),16)
     if ($alignment -lt 16384) { throw 'Stockfish needs 16 KB load-segment alignment' }
 }
-Copy-Item -LiteralPath (Join-Path $build 'libstockfish.so') -Destination "$assets/arm64-v8a/libstockfish.so"
+Copy-Item -LiteralPath (Join-Path $build $binary) -Destination (Join-Path "$assets/arm64-v8a" $binary)
+}
 Copy-Item -LiteralPath (Join-Path $source 'Copying.txt') -Destination "$assets/licenses/Stockfish-GPL-3.0.txt"
 @"
 Stockfish 17.1, GPL-3.0-or-later; Android ARM64 executable built without source changes.

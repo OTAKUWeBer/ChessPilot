@@ -1,11 +1,51 @@
 //! Windows gesture order/timing from game/move_execution.py; OS delivery is not board verification.
 use chesspilot_core::{board::Point, config::MoveMode};
 use std::{
+    collections::hash_map::RandomState,
     fmt,
-    sync::atomic::{AtomicBool, Ordering},
+    hash::BuildHasher,
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     thread,
     time::Duration,
 };
+
+pub fn random_unit() -> f64 {
+    thread_local! { static RANDOM: RandomState = RandomState::new(); }
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    RANDOM.with(|random| {
+        (random.hash_one(NEXT.fetch_add(1, Ordering::Relaxed)) >> 11) as f64 / (1u64 << 53) as f64
+    })
+}
+
+/// Python's symmetric uniform offsets, bounded further for tiny squares/menu choices.
+pub fn offset_point(
+    point: Point,
+    square_size: f64,
+    limit: f64,
+    sample: [f64; 2],
+) -> Result<Point, String> {
+    if !point.x.is_finite()
+        || !point.y.is_finite()
+        || !square_size.is_finite()
+        || square_size <= 0.
+        || !limit.is_finite()
+        || limit < 0.
+        || sample
+            .iter()
+            .any(|n| !n.is_finite() || !(0. ..=1.).contains(n))
+    {
+        return Err("Invalid humanized pointer coordinates".into());
+    }
+    let bound = (square_size * 0.22)
+        .floor()
+        .max(2.)
+        .min(limit)
+        .min(square_size * 0.22);
+    Ok(Point {
+        x: point.x + (sample[0] * 2. - 1.) * bound,
+        y: point.y + (sample[1] * 2. - 1.) * bound,
+    })
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputError {

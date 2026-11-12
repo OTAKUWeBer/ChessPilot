@@ -38,6 +38,14 @@ impl<C: Capture, P: Predictor> BoardSource for Perception<'_, C, P> {
     }
 }
 pub trait Automation {
+    fn humanize(&mut self, point: Point, square_size: f64, limit: f64) -> Result<Point, String> {
+        desktop::input::offset_point(
+            point,
+            square_size,
+            limit,
+            [desktop::input::random_unit(), desktop::input::random_unit()],
+        )
+    }
     fn move_piece(
         &mut self,
         start: Point,
@@ -276,15 +284,18 @@ fn dispatch(
     check(cancelled)?;
     fresh(observation.captured_at)?;
     let (from, to) = mv.indices(color);
-    let point = |square: (usize, usize)| {
+    let mut point = |square: (usize, usize)| {
         observation
             .board
             .geometry
             .center(square.0, square.1)
+            .and_then(|point| input.humanize(point, observation.board.geometry.square_size, 16.))
             .and_then(|p| observation.source.input_point(p))
             .map_err(PlayError::Detection)
     };
-    input.move_piece(point(from)?, point(to)?, mode, cancelled)?;
+    let start = point(from)?;
+    let end = point(to)?;
+    input.move_piece(start, end, mode, cancelled)?;
     check(cancelled)
 }
 fn settle(
@@ -489,6 +500,9 @@ fn promote(
             if let Some(point) = menu_choice(&raw, geometry, color, mv)? {
                 fresh(raw.captured_at)?;
                 check(cancelled)?;
+                let point = input
+                    .humanize(point, geometry.square_size, 8.)
+                    .map_err(PlayError::Detection)?;
                 input.tap(
                     raw.source
                         .input_point(point)

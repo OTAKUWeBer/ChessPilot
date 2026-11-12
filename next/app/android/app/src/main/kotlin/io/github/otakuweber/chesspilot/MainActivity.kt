@@ -21,7 +21,15 @@ class MainActivity : FlutterActivity() {
         MethodChannel(engine.dartExecutor.binaryMessenger, "chesspilot/android").setMethodCallHandler { call, result ->
             try {
                 when (call.method) {
-                    "connect" -> result.success(PilotRuntime.connect(applicationContext))
+                    "connect" -> {
+                        val context=applicationContext
+                        Thread({
+                            val connected=runCatching { PilotRuntime.connect(context) }
+                            runOnUiThread {
+                                connected.fold({ result.success(it) },{ result.error("android_setup",it.message,null) })
+                            }
+                        },"ChessPilot setup").start()
+                    }
                     "status" -> result.success(PilotRuntime.status())
                     "shareLogs" -> {
                         val reply=org.json.JSONObject(PlatformBridge.request(org.json.JSONObject().put("command","diagnostics").put("include_tail",true).toString()))

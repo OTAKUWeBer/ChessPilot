@@ -322,6 +322,25 @@ impl Session {
             .get("config_path")
             .map(|v| v.as_str().map(PathBuf::from).ok_or("Expected config path"))
             .transpose()?;
+        let fallback = args
+            .get("fallback_engine_path")
+            .map(|v| {
+                v.as_str()
+                    .map(PathBuf::from)
+                    .ok_or("Expected fallback engine path")
+            })
+            .transpose()?;
+        let working_directory = args
+            .get("engine_working_directory")
+            .map(|v| {
+                v.as_str()
+                    .map(PathBuf::from)
+                    .ok_or("Expected engine working directory")
+            })
+            .transpose()?;
+        if working_directory.as_ref().is_some_and(|p| !p.is_absolute()) {
+            return Err("Engine working directory must be absolute".into());
+        }
         let args = args.clone();
         self.launch(
             if with_capture {
@@ -361,10 +380,26 @@ impl Session {
                 }
                 let old = lock(&session.engine).take();
                 drop(old);
-                let mut engine =
-                    EngineService::new(Command::new(path), options, Timeouts::default())
-                        .map_err(|e| e.to_string())?;
-                engine.initialize().map_err(|e| e.to_string())?;
+                let start = |path: &std::path::Path| -> Result<EngineService, String> {
+                    let mut command=Command::new(path);
+                    if let Some(directory)=&working_directory { command.current_dir(directory); }
+                    let mut engine=EngineService::new(command,options.clone(),Timeouts::default()).map_err(|e|e.to_string())?;
+                    engine.initialize().map_err(|e|e.to_string())?;
+                    Ok(engine)
+                };
+                let engine=match start(&path) {
+                    Ok(engine)=>engine,
+                    Err(error)=> {
+                        if session.cancelled.load(Ordering::Acquire) { return Err("Engine setup cancelled".into()); }
+                        match fallback.filter(|p|p!=&path) {
+                            Some(fallback)=> {
+                                log::warn!(target:"setup","Optimized engine startup failed: {error}; trying {}",fallback.display());
+                                start(&fallback).map_err(|e|format!("Engine startup failed: {error}; baseline fallback: {e}"))?
+                            },
+                            None=>return Err(error),
+                        }
+                    }
+                };
                 {
                     let mut state = lock(&session.state);
                     if session.generation.load(Ordering::Acquire) != id {
