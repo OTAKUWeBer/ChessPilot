@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "chesspilot-core"
 version = "0.1.0"
+
+[[package]]
+name = "chesspilot-runtime"
+version = "0.1.0"
+dependencies = [
+ "chesspilot-core",
+]
