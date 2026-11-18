@@ -21,9 +21,9 @@ Installation, supported platforms and test evidence are documented below. Signin
 
 ## 🎬 Demo
 
-[![ChessPilot demo: first move, Auto endgame and confirmed checkmate](assets/demo-preview.gif)](assets/chesspilot-demo.mp4)
+[![Watch ChessPilot: first move, Auto endgame and confirmed checkmate](assets/demo-preview.png)](assets/chesspilot-demo.mp4)
 
-[Watch the 42-second demo](assets/chesspilot-demo.mp4). Real Windows computer-bot recordings show setup, an opening move, then the end of another game through confirmed checkmate. The middle is omitted and playback speed changes are labeled.
+[Watch the full-quality video — 42 seconds, 1080p MP4](assets/chesspilot-demo.mp4). Real Windows computer-bot recordings show setup, an opening move, then the end of another game through confirmed checkmate. The middle is omitted and playback speed changes are labeled.
 
 ## ⚡ Features
 
