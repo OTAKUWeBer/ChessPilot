@@ -13,7 +13,7 @@
 AppId={#AppId}
 AppName={#AppName}
 AppVersion={#AppVersion}
-AppPublisher=OTAKUWeBer
+AppPublisher=Weber
 AppPublisherURL=https://github.com/OTAKUWeBer/ChessPilot
 AppSupportURL=https://github.com/OTAKUWeBer/ChessPilot/issues
 DefaultDirName={localappdata}\Programs\{#AppName}

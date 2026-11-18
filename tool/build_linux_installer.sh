@@ -128,7 +128,7 @@ Section: games
 Priority: optional
 Architecture: amd64
 Installed-Size: $(du -sk "$debroot" | cut -f1)
-Maintainer: OTAKUWeBer <137557891+OTAKUWeBer@users.noreply.github.com>
+Maintainer: Weber <137557891+OTAKUWeBer@users.noreply.github.com>
 Homepage: https://github.com/OTAKUWeBer/ChessPilot
 Depends: bash, libc6 (>= $minimum_glibc), libstdc++6 (>= 12), libgcc-s1, libgl1, libegl1, libx11-6
 Description: Local chessboard detection and Stockfish analysis
