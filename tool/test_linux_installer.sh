@@ -131,7 +131,7 @@ if [ -n "${1:-}" ]; then
   [ -f "$installed/chess_detection.onnx" ] && [ -f "$installed/lib/libchesspilot_runtime.so" ]
   [ -f "$installed/usr/lib/libgtk-3.so.0" ]
   file "$installed/usr/share/icons/hicolor/512x512/apps/chesspilot.png" | grep -Fq '512 x 512'
-  xvfb-run -a "$installed/AppRun" --help
+  timeout 30s xvfb-run -a "$installed/AppRun" --help | grep -F 'Usage: chesspilot'
   CHESSPILOT_BUNDLE_TEST="$installed" cargo test --manifest-path "$repo/native/Cargo.toml" --test resources relocated_bundle_resolves_default_assets_without_checkout_paths -- --ignored
   XDG_DATA_HOME="$testroot/real" sh "$installer" -- --uninstall
   [ ! -e "$installed/chesspilot" ]
@@ -140,7 +140,7 @@ if [ -n "${2:-}" ]; then
   portable="$(realpath -e -- "$2")"
   sh "$portable" --check
   env -u CHESSPILOT_DATA_HOME -u CHESSPILOT_ENGINE_HOME XDG_DATA_HOME="$testroot/real-portable-profile" \
-    xvfb-run -a "$portable" -- --help
+    timeout 30s xvfb-run -a "$portable" -- --help | grep -F 'Usage: chesspilot'
   sh "$portable" --noexec --target "$testroot/portable-extracted"
   [ -f "$testroot/portable-extracted/.chesspilot-portable" ]
   CHESSPILOT_BUNDLE_TEST="$testroot/portable-extracted" cargo test --manifest-path "$repo/native/Cargo.toml" --test resources relocated_bundle_resolves_default_assets_without_checkout_paths -- --ignored

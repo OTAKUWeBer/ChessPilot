@@ -13,7 +13,7 @@ for artifact in "$appimage" "$deb"; do
 done
 # Exercise the real runtime without depending on FUSE or installing into the host.
 env -u CHESSPILOT_DATA_HOME -u CHESSPILOT_ENGINE_HOME XDG_DATA_HOME="$work/profile" \
-  xvfb-run -a "$appimage" --appimage-extract-and-run --help
+  timeout 30s xvfb-run -a "$appimage" --appimage-extract-and-run --help | grep -F 'Usage: chesspilot'
 mkdir "$work/image"
 (cd "$work/image" && "$appimage" --appimage-extract >/dev/null)
 image="$work/image/squashfs-root"
@@ -29,7 +29,7 @@ installed="$work/deb/opt/chesspilot"
 grep -Fqx 'exec /opt/chesspilot/AppRun "$@"' "$work/deb/usr/bin/chesspilot"
 desktop-file-validate "$work/deb/usr/share/applications/io.github.otakuweber.chesspilot.desktop"
 env -u CHESSPILOT_DATA_HOME -u CHESSPILOT_ENGINE_HOME XDG_DATA_HOME="$work/profile" \
-  xvfb-run -a "$installed/AppRun" --help
+  timeout 30s xvfb-run -a "$installed/AppRun" --help | grep -F 'Usage: chesspilot'
 CHESSPILOT_BUNDLE_TEST="$installed" cargo test --manifest-path "$repo/native/Cargo.toml" --test resources relocated_bundle_resolves_default_assets_without_checkout_paths -- --ignored
 for payload in "$image" "$installed"; do
   expected="$(cut -d' ' -f1 "$repo/assets/models/chess_detection.onnx.sha256")"

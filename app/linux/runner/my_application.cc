@@ -180,6 +180,13 @@ static gboolean my_application_local_command_line(GApplication* application,
                                                   gchar*** arguments,
                                                   int* exit_status) {
   MyApplication* self = MY_APPLICATION(application);
+  for (gchar** argument = *arguments + 1; *argument != nullptr; ++argument) {
+    if (g_strcmp0(*argument, "--help") == 0) {
+      g_print("Usage: chesspilot [--help]\nLocal chessboard detection and Stockfish analysis.\n");
+      *exit_status = 0;
+      return TRUE;
+    }
+  }
   // Strip out the first argument as it is the binary name.
   self->dart_entrypoint_arguments = g_strdupv(*arguments + 1);
 
