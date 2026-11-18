@@ -7,15 +7,23 @@
 **Chessboard detection, Stockfish analysis and move automation for Windows, Linux and Android.**
 
 <p align="center">
-  <a href="app/pubspec.yaml"><img src="https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2FOTAKUWeBer%2FChessPilot%2Fmain%2Fapp%2Fpubspec.yaml&amp;query=%24.version&amp;label=source&amp;color=4CAF50&amp;style=for-the-badge" alt="Source version from pubspec.yaml" /></a>
+  <a href="https://github.com/OTAKUWeBer/ChessPilot/releases/latest"><img src="https://img.shields.io/github/v/release/OTAKUWeBer/ChessPilot?style=for-the-badge&amp;color=0E80C0" alt="Latest stable release" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F48041?style=for-the-badge" alt="MIT license" /></a>
-  <img src="https://img.shields.io/badge/UI-Flutter-02569B?style=for-the-badge" alt="Flutter interface" />
-  <img src="https://img.shields.io/badge/core-Rust-CE422B?style=for-the-badge" alt="Rust core" />
+  <a href="https://github.com/OTAKUWeBer/ChessPilot/releases"><img src="https://img.shields.io/github/downloads/OTAKUWeBer/ChessPilot/total?label=downloads&amp;style=for-the-badge&amp;color=CAF979" alt="Download count across all published releases" /></a>
+  <a href="https://github.com/OTAKUWeBer/ChessPilot/issues"><img src="https://img.shields.io/github/issues/OTAKUWeBer/ChessPilot?style=for-the-badge&amp;color=CE5842" alt="Open GitHub issues" /></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/OTAKUWeBer/ChessPilot/releases"><img src="https://img.shields.io/github/downloads/OTAKUWeBer/ChessPilot/total?label=all%20release%20downloads&amp;style=for-the-badge&amp;color=CAF979" alt="Download count across all published releases" /></a>
-  <a href="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Amain"><img src="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml/badge.svg?branch=main" alt="Rust and Flutter quality checks and desktop builds" /></a>
+  <a href="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Amain"><img src="https://img.shields.io/github/actions/workflow/status/OTAKUWeBer/ChessPilot/native.yml?branch=main&amp;label=build%20%26%20tests&amp;style=for-the-badge" alt="Main branch builds, analysis and tests" /></a>
+  <a href="https://www.codefactor.io/repository/github/otakuweber/chesspilot/overview/main"><img src="https://www.codefactor.io/repository/github/otakuweber/chesspilot/badge/main?style=for-the-badge" alt="CodeFactor quality grade for main" /></a>
+  <a href="native/"><img src="https://img.shields.io/badge/core-Rust-CE422B?style=for-the-badge&amp;logo=rust&amp;logoColor=white" alt="Rust core" /></a>
+  <a href="app/lib/"><img src="https://img.shields.io/badge/UI-Flutter-02569B?style=for-the-badge&amp;logo=flutter&amp;logoColor=white" alt="Flutter interface" /></a>
+</p>
+
+<p align="center">
+  <a href="docs/INSTALLING.md#windows-x64"><img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge" alt="Windows installation" /></a>
+  <a href="docs/INSTALLING.md#linux-x64"><img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&amp;logo=linux&amp;logoColor=black" alt="Linux installation" /></a>
+  <a href="docs/INSTALLING.md#android"><img src="https://img.shields.io/badge/Android-3DDC84?style=for-the-badge&amp;logo=android&amp;logoColor=black" alt="Android installation" /></a>
 </p>
 
 ChessPilot reads a visible 2D board, evaluates the position locally, and optionally plays the best move. Capture, detection and analysis run on your device after initial setup. The interface uses Flutter; Rust owns the detector, engine and automation pipeline.
@@ -117,7 +125,7 @@ Logs are named `chesspilot-native.log`. Windows normally uses `%LOCALAPPDATA%/Ch
 
 Checks cover domain rules, reference fixtures, engine failure/recovery/shutdown, actual inference, controller transitions, native buffer ownership, configuration, diagnostics, installers and platform adapters. Integration checks needing an engine, display or network are explicit opt-ins.
 
-The live CI badge above covers Rust formatting, Clippy, native tests, Flutter analysis/tests, desktop builds and model inference checks on Windows/Linux. It reports the workflow result; no separate numerical quality grade or coverage percentage is currently published for this branch.
+The build-and-tests badge covers Rust formatting, Clippy, native tests, Flutter analysis/tests, desktop builds and model inference checks on Windows/Linux. CodeFactor shows its separate static-analysis grade for `main`; a dash means a grade is not available yet. Neither badge represents test coverage or certification of every device.
 
 Remaining release gates include production signing, clean-install/distribution review, longer memory/performance/security testing, additional monitor/phone coverage, physical phone castling/promotions/rotation/revocation cases and non-wlroots portal support. A successful build does not establish every device/runtime case. See [Android evidence](docs/TESTING.md#android-physical-device-evidence), [Linux checks](docs/TESTING.md#linux-capture-and-gameplay) and [desktop packaging](docs/BUILDING.md).
 

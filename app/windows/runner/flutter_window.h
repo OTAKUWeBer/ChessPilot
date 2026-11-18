@@ -25,6 +25,14 @@ class FlutterWindow : public Win32Window {
                          LPARAM const lparam) noexcept override;
 
  private:
+  void HandleDesktopMethod(
+      const flutter::MethodCall<flutter::EncodableValue>& call,
+      flutter::MethodResult<flutter::EncodableValue>& result);
+  void HandleSetupWindow(const flutter::EncodableValue* arguments,
+                         flutter::MethodResult<flutter::EncodableValue>& result);
+  void HandleReturnTarget(const flutter::EncodableValue* arguments,
+                          flutter::MethodResult<flutter::EncodableValue>& result);
+
   // The project to run.
   flutter::DartProject project_;
 

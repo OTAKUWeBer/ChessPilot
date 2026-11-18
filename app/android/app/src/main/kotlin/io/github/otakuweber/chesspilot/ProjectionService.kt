@@ -9,6 +9,7 @@ import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.Image
 import android.media.ImageReader
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -127,6 +128,26 @@ class ProjectionService : Service() {
         val token = if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra("token", Intent::class.java)
             else @Suppress("DEPRECATION") (intent.getParcelableExtra("token") as? Intent)
         checkNotNull(token) { "Screen-sharing consent is missing" }
+        startCaptureNotification()
+        dimensions = screenSize()
+        rotation = checkNotNull(displays.getDisplay(Display.DEFAULT_DISPLAY)).rotation
+        epoch = PlatformBridge.beginCapture(dimensions.first, dimensions.second)
+        PilotRuntime.captureEpoch = epoch
+        PilotRuntime.platformError = null
+        projection = getSystemService(MediaProjectionManager::class.java).getMediaProjection(Activity.RESULT_OK, token)
+        val sharing = checkNotNull(projection)
+        sharing.registerCallback(callback, frames)
+        val source = ImageReader.newInstance(dimensions.first, dimensions.second, PixelFormat.RGBA_8888, 3)
+        reader = source
+        source.setOnImageAvailableListener(::captureLatestFrame, frames)
+        display = sharing.createVirtualDisplay("ChessPilot shared display", dimensions.first, dimensions.second,
+            resources.displayMetrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+            source.surface, null, frames)
+        frames.post(refresh)
+        current = this
+        PilotTouchService.current?.captureStarted()
+    }
+    private fun startCaptureNotification() {
         val manager = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(
             NotificationChannel(CHANNEL, "Screen sharing", NotificationManager.IMPORTANCE_LOW)
@@ -142,43 +163,30 @@ class ProjectionService : Service() {
         }
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION, builder.build(), ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
         else startForeground(NOTIFICATION, builder.build())
-        dimensions = screenSize()
-        rotation = checkNotNull(displays.getDisplay(Display.DEFAULT_DISPLAY)).rotation
-        epoch = PlatformBridge.beginCapture(dimensions.first, dimensions.second)
-        PilotRuntime.captureEpoch = epoch
-        PilotRuntime.platformError = null
-        projection = getSystemService(MediaProjectionManager::class.java).getMediaProjection(Activity.RESULT_OK, token)
-        val sharing = checkNotNull(projection)
-        sharing.registerCallback(callback, frames)
-        val source = ImageReader.newInstance(dimensions.first, dimensions.second, PixelFormat.RGBA_8888, 3)
-        reader = source
-        source.setOnImageAvailableListener({ images ->
-            if (closing.get()) return@setOnImageAvailableListener
-            val image = images.acquireLatestImage() ?: return@setOnImageAvailableListener
-            image.use {
-                if (closing.get() || epoch != PilotRuntime.captureEpoch) return@use
-                try {
-                    val now = System.nanoTime()
-                    if (now - lastFrame < 100_000_000) return@use
-                    lastFrame = now
-                    check(geometryMatches()) { "Display geometry changed" }
-                    check(image.cropRect.left == 0 && image.cropRect.top == 0 &&
-                        image.cropRect.width() == dimensions.first && image.cropRect.height() == dimensions.second) {
-                        "Cropped capture cannot map to display touches"
-                    }
-                    val plane = image.planes.single()
-                    val age = (now - image.timestamp) / 1_000_000
-                    check(age in 0..3000) { "Capture timestamp is stale or incompatible" }
-                    PlatformBridge.frame(epoch, plane.buffer.slice(), image.width, image.height, plane.rowStride, plane.pixelStride, age)
-                } catch (error: Exception) { end("Screen capture failed: ${error.message}") }
-            }
-        }, frames)
-        display = sharing.createVirtualDisplay("ChessPilot shared display", dimensions.first, dimensions.second,
-            resources.displayMetrics.densityDpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            source.surface, null, frames)
-        frames.post(refresh)
-        current = this
-        PilotTouchService.current?.captureStarted()
+    }
+    private fun captureLatestFrame(images: ImageReader) {
+        if (closing.get()) return
+        val image = images.acquireLatestImage() ?: return
+        image.use {
+            if (closing.get() || epoch != PilotRuntime.captureEpoch) return@use
+            try {
+                forwardFrame(image)
+            } catch (error: Exception) { end("Screen capture failed: ${error.message}") }
+        }
+    }
+    private fun forwardFrame(image: Image) {
+        val now = System.nanoTime()
+        if (now - lastFrame < 100_000_000) return
+        lastFrame = now
+        check(geometryMatches()) { "Display geometry changed" }
+        check(image.cropRect.left == 0 && image.cropRect.top == 0 &&
+            image.cropRect.width() == dimensions.first && image.cropRect.height() == dimensions.second) {
+            "Cropped capture cannot map to display touches"
+        }
+        val plane = image.planes.single()
+        val age = (now - image.timestamp) / 1_000_000
+        check(age in 0..3000) { "Capture timestamp is stale or incompatible" }
+        PlatformBridge.frame(epoch, plane.buffer.slice(), image.width, image.height, plane.rowStride, plane.pixelStride, age)
     }
     private fun end(reason: String) {
         if (!closing.compareAndSet(false, true)) return

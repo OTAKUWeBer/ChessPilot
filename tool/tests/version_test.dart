@@ -22,6 +22,7 @@ void main() {
     assert(rejected, invalid);
   }
   final root = Directory.systemTemp.createTempSync('chesspilot-version-');
+  var cleanupRefused = false;
   try {
     File('${root.path}/app/pubspec.yaml')
       ..parent.createSync()
@@ -60,11 +61,13 @@ void main() {
     if (!root.resolveSymbolicLinksSync().startsWith(
       '${Directory.systemTemp.resolveSymbolicLinksSync()}${Platform.pathSeparator}',
     )) {
-      throw StateError(
-        'Temporary test directory escaped the system temp folder',
-      );
+      cleanupRefused = true;
+    } else {
+      root.deleteSync(recursive: true);
     }
-    root.deleteSync(recursive: true);
+  }
+  if (cleanupRefused) {
+    throw StateError('Temporary test directory escaped the system temp folder');
   }
   stdout.writeln('Version validation and update-plan checks passed.');
 }

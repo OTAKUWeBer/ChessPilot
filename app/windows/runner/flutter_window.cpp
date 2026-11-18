@@ -6,6 +6,16 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
+namespace {
+std::optional<double> Coordinate(const flutter::EncodableMap& arguments,
+                                 const char* key) {
+  const auto value = arguments.find(flutter::EncodableValue(key));
+  if (value == arguments.end()) return std::nullopt;
+  if (const auto* number = std::get_if<double>(&value->second)) return *number;
+  return std::nullopt;
+}
+}  // namespace
+
 FlutterWindow::FlutterWindow(const flutter::DartProject& project)
     : project_(project) {}
 
@@ -32,39 +42,7 @@ bool FlutterWindow::OnCreate() {
       flutter_controller_->engine()->messenger(), "chesspilot/desktop",
       &flutter::StandardMethodCodec::GetInstance());
   desktop_channel_->SetMethodCallHandler([this](const auto& call, auto result) {
-    if (call.method_name() == "setupWindow") {
-      const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
-      if (!args) { result->Error("setup", "Expected setup dimensions"); return; }
-      const auto enabled_arg = args->find(flutter::EncodableValue("enabled"));
-      const auto height_arg = args->find(flutter::EncodableValue("height"));
-      const auto* enabled = enabled_arg == args->end() ? nullptr : std::get_if<bool>(&enabled_arg->second);
-      const auto* height = height_arg == args->end() ? nullptr : std::get_if<int32_t>(&height_arg->second);
-      if (!enabled || !height || *height < 160 || *height > 600) { result->Error("setup", "Invalid setup dimensions"); return; }
-      if (!SetSetupMode(*enabled, static_cast<unsigned int>(*height))) { result->Error("setup", "Cannot resize setup window"); return; }
-      result->Success(); return;
-    }
-    if (call.method_name() != "returnTarget") { result->NotImplemented(); return; }
-    const auto* args = std::get_if<flutter::EncodableMap>(call.arguments());
-    if (!args) { result->Error("coordinates", "Expected a point"); return; }
-    auto coordinate = [&](const char* key) -> std::optional<double> {
-      const auto value = args->find(flutter::EncodableValue(key));
-      if (value == args->end()) return std::nullopt;
-      if (const auto* number = std::get_if<double>(&value->second)) return *number;
-      return std::nullopt;
-    };
-    const auto x = coordinate("x"), y = coordinate("y");
-    const HWND view = flutter_controller_->view()->GetNativeWindow();
-    RECT rect{};
-    const double scale = GetDpiForWindow(view) / 96.0;
-    if (!x || !y || !std::isfinite(*x) || !std::isfinite(*y) || scale <= 0 ||
-        !IsWindowVisible(view) || !GetClientRect(view, &rect) || *x < 0 || *y < 0 ||
-        *x * scale >= rect.right || *y * scale >= rect.bottom) {
-      result->Success(); return;
-    }
-    result->Success(flutter::EncodableValue(flutter::EncodableMap{
-      {flutter::EncodableValue("window"), flutter::EncodableValue(reinterpret_cast<int64_t>(view))},
-      {flutter::EncodableValue("x"), flutter::EncodableValue(static_cast<int32_t>(std::floor(*x * scale)))},
-      {flutter::EncodableValue("y"), flutter::EncodableValue(static_cast<int32_t>(std::floor(*y * scale)))}}));
+    HandleDesktopMethod(call, *result);
   });
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -77,6 +55,52 @@ bool FlutterWindow::OnCreate() {
   flutter_controller_->ForceRedraw();
 
   return true;
+}
+
+void FlutterWindow::HandleDesktopMethod(
+    const flutter::MethodCall<flutter::EncodableValue>& call,
+    flutter::MethodResult<flutter::EncodableValue>& result) {
+  if (call.method_name() == "setupWindow") {
+    HandleSetupWindow(call.arguments(), result);
+  } else if (call.method_name() == "returnTarget") {
+    HandleReturnTarget(call.arguments(), result);
+  } else {
+    result.NotImplemented();
+  }
+}
+
+void FlutterWindow::HandleSetupWindow(
+    const flutter::EncodableValue* arguments,
+    flutter::MethodResult<flutter::EncodableValue>& result) {
+  const auto* args = std::get_if<flutter::EncodableMap>(arguments);
+  if (!args) { result.Error("setup", "Expected setup dimensions"); return; }
+  const auto enabled_arg = args->find(flutter::EncodableValue("enabled"));
+  const auto height_arg = args->find(flutter::EncodableValue("height"));
+  const auto* enabled = enabled_arg == args->end() ? nullptr : std::get_if<bool>(&enabled_arg->second);
+  const auto* height = height_arg == args->end() ? nullptr : std::get_if<int32_t>(&height_arg->second);
+  if (!enabled || !height || *height < 160 || *height > 600) { result.Error("setup", "Invalid setup dimensions"); return; }
+  if (!SetSetupMode(*enabled, static_cast<unsigned int>(*height))) { result.Error("setup", "Cannot resize setup window"); return; }
+  result.Success();
+}
+
+void FlutterWindow::HandleReturnTarget(
+    const flutter::EncodableValue* arguments,
+    flutter::MethodResult<flutter::EncodableValue>& result) {
+  const auto* args = std::get_if<flutter::EncodableMap>(arguments);
+  if (!args) { result.Error("coordinates", "Expected a point"); return; }
+  const auto x = Coordinate(*args, "x"), y = Coordinate(*args, "y");
+  const HWND view = flutter_controller_->view()->GetNativeWindow();
+  RECT rect{};
+  const double scale = GetDpiForWindow(view) / 96.0;
+  if (!x || !y || !std::isfinite(*x) || !std::isfinite(*y) || scale <= 0 ||
+      !IsWindowVisible(view) || !GetClientRect(view, &rect) || *x < 0 || *y < 0 ||
+      *x * scale >= rect.right || *y * scale >= rect.bottom) {
+    result.Success(); return;
+  }
+  result.Success(flutter::EncodableValue(flutter::EncodableMap{
+    {flutter::EncodableValue("window"), flutter::EncodableValue(reinterpret_cast<int64_t>(view))},
+    {flutter::EncodableValue("x"), flutter::EncodableValue(static_cast<int32_t>(std::floor(*x * scale)))},
+    {flutter::EncodableValue("y"), flutter::EncodableValue(static_cast<int32_t>(std::floor(*y * scale)))}}));
 }
 
 void FlutterWindow::OnDestroy() {

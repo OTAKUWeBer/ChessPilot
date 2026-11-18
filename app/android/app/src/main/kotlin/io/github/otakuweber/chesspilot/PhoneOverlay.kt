@@ -198,97 +198,111 @@ class PhoneOverlay(private val service: AccessibilityService) {
     private fun render() {
         root.removeAllViews();bubble=null;identity=null;title=null;play=null;auto=null;stop=null
         (root.background as GradientDrawable).cornerRadius=dp(if(expanded)16 else 24).toFloat()
-        if (!expanded) {
-            root.setPadding(0,0,0,0)
-            val control=ImageButton(service).apply {
-                minimumWidth=dp(48);minimumHeight=dp(48);setPadding(dp(6),dp(6),dp(6),dp(6))
-                scaleType=ImageView.ScaleType.FIT_CENTER;imageTintList=ColorStateList.valueOf(Color.WHITE)
-                stateListAnimator=null;elevation=0f
-                background=RippleDrawable(ColorStateList.valueOf(0x28FFFFFF),GradientDrawable().apply {
-                    setColor(Color.WHITE);cornerRadius=dp(24).toFloat()
-                },null)
-            }
-            bubble=control
-            draggable(control) {if(state.optBoolean("busy"))command("stop") else toggle()}
-            root.addView(control,LinearLayout.LayoutParams(-1,dp(48)))
-        } else {
-            root.setPadding(dp(6),dp(2),dp(6),dp(6))
-            val largeText=service.resources.configuration.fontScale>1.3f
-            val header=LinearLayout(service)
-            val metadata=TextView(service).apply {
-                textSize=12f;setTextColor(Color.rgb(209,219,212));maxLines=if(largeText)2 else 1;ellipsize=TextUtils.TruncateAt.END
-                setTypeface(null,Typeface.BOLD);setPadding(dp(2),0,0,0)
-                gravity=Gravity.CENTER_VERTICAL;contentDescription="Drag controls or tap to open ChessPilot"
-            }
-            identity=metadata;draggable(metadata) { openApp() }
-            val status=TextView(service).apply {
-                textSize=12f;setTextColor(Color.rgb(171,192,177));maxLines=if(largeText)2 else 1;ellipsize=TextUtils.TruncateAt.END
-                minHeight=dp(20);setPadding(dp(2),0,dp(2),0)
-                contentDescription="Drag controls or tap for status details"
-            }
-            title=status;draggable(status) { openApp() }
-            val information=LinearLayout(service).apply {
-                orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_VERTICAL;minimumHeight=dp(48)
-                addView(metadata,LinearLayout.LayoutParams(-1,-2))
-                addView(status,LinearLayout.LayoutParams(-1,-2))
-            }
-            header.addView(information,LinearLayout.LayoutParams(0,-2,1f))
-            header.addView(button("−","Collapse controls") {toggle()}.apply {
-                textSize=22f;setTypeface(null,Typeface.NORMAL);backgroundTintList=ColorStateList.valueOf(Color.TRANSPARENT)
-            },LinearLayout.LayoutParams(dp(48),dp(48)))
-            root.addView(header)
-            root.addView(View(service).apply {setBackgroundColor(Color.rgb(63,76,66))},
-                LinearLayout.LayoutParams(-1,dp(1)).apply {topMargin=dp(2);bottomMargin=dp(4)})
-            val controls=LinearLayout(service).apply {
-                isBaselineAligned=false
-                orientation=if(largeText)LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
-            }
-            play=button("Play","Play next move") {command("play")}.apply {
-                backgroundTintList=buttonTint(Color.rgb(61,123,70))
-            }
-            auto=button("Auto","Toggle automatic moves") {command("set_auto",JSONObject().put("enabled",!state.optBoolean("auto_mode")))}
-            stop=button("Stop","Stop ChessPilot") {command("stop")}.apply {backgroundTintList=buttonTint(Color.rgb(132,56,53))}
-            val exit=button("×","Stop sharing and exit ChessPilot") {PilotRuntime.exit(service)}.apply {
-                textSize=22f;setTypeface(null,Typeface.NORMAL);setTextColor(Color.rgb(255,180,171))
-                backgroundTintList=buttonTint(Color.rgb(63,49,49))
-            }
-            for((index,control) in listOf(play,auto,stop,exit).withIndex()) {
-                val size=if(controls.orientation==LinearLayout.HORIZONTAL)LinearLayout.LayoutParams(0,dp(48),1f) else LinearLayout.LayoutParams(-1,dp(48))
-                if(index>0) {
-                    if(controls.orientation==LinearLayout.HORIZONTAL) size.marginStart=dp(4) else size.topMargin=dp(4)
-                }
-                controls.addView(control,size)
-            }
-            root.addView(controls)
-        }
+        if (expanded) renderPanel() else renderBubble()
         update(state)
+    }
+    private fun renderBubble() {
+        root.setPadding(0,0,0,0)
+        val control=ImageButton(service).apply {
+            minimumWidth=dp(48);minimumHeight=dp(48);setPadding(dp(6),dp(6),dp(6),dp(6))
+            scaleType=ImageView.ScaleType.FIT_CENTER;imageTintList=ColorStateList.valueOf(Color.WHITE)
+            stateListAnimator=null;elevation=0f
+            background=RippleDrawable(ColorStateList.valueOf(0x28FFFFFF),GradientDrawable().apply {
+                setColor(Color.WHITE);cornerRadius=dp(24).toFloat()
+            },null)
+        }
+        bubble=control
+        draggable(control) {if(state.optBoolean("busy"))command("stop") else toggle()}
+        root.addView(control,LinearLayout.LayoutParams(-1,dp(48)))
+    }
+    private fun renderPanel() {
+        root.setPadding(dp(6),dp(2),dp(6),dp(6))
+        val largeText=service.resources.configuration.fontScale>1.3f
+        root.addView(createHeader(largeText))
+        root.addView(View(service).apply {setBackgroundColor(Color.rgb(63,76,66))},
+            LinearLayout.LayoutParams(-1,dp(1)).apply {topMargin=dp(2);bottomMargin=dp(4)})
+        root.addView(createControls(largeText))
+    }
+    private fun createHeader(largeText: Boolean): LinearLayout {
+        val header=LinearLayout(service)
+        val metadata=TextView(service).apply {
+            textSize=12f;setTextColor(Color.rgb(209,219,212));maxLines=if(largeText)2 else 1;ellipsize=TextUtils.TruncateAt.END
+            setTypeface(null,Typeface.BOLD);setPadding(dp(2),0,0,0)
+            gravity=Gravity.CENTER_VERTICAL;contentDescription="Drag controls or tap to open ChessPilot"
+        }
+        identity=metadata;draggable(metadata) { openApp() }
+        val status=TextView(service).apply {
+            textSize=12f;setTextColor(Color.rgb(171,192,177));maxLines=if(largeText)2 else 1;ellipsize=TextUtils.TruncateAt.END
+            minHeight=dp(20);setPadding(dp(2),0,dp(2),0)
+            contentDescription="Drag controls or tap for status details"
+        }
+        title=status;draggable(status) { openApp() }
+        val information=LinearLayout(service).apply {
+            orientation=LinearLayout.VERTICAL;gravity=Gravity.CENTER_VERTICAL;minimumHeight=dp(48)
+            addView(metadata,LinearLayout.LayoutParams(-1,-2))
+            addView(status,LinearLayout.LayoutParams(-1,-2))
+        }
+        header.addView(information,LinearLayout.LayoutParams(0,-2,1f))
+        header.addView(button("−","Collapse controls") {toggle()}.apply {
+            textSize=22f;setTypeface(null,Typeface.NORMAL);backgroundTintList=ColorStateList.valueOf(Color.TRANSPARENT)
+        },LinearLayout.LayoutParams(dp(48),dp(48)))
+        return header
+    }
+    private fun createControls(largeText: Boolean): LinearLayout {
+        val controls=LinearLayout(service).apply {
+            isBaselineAligned=false
+            orientation=if(largeText)LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+        }
+        play=button("Play","Play next move") {command("play")}.apply {
+            backgroundTintList=buttonTint(Color.rgb(61,123,70))
+        }
+        auto=button("Auto","Toggle automatic moves") {command("set_auto",JSONObject().put("enabled",!state.optBoolean("auto_mode")))}
+        stop=button("Stop","Stop ChessPilot") {command("stop")}.apply {backgroundTintList=buttonTint(Color.rgb(132,56,53))}
+        val exit=button("×","Stop sharing and exit ChessPilot") {PilotRuntime.exit(service)}.apply {
+            textSize=22f;setTypeface(null,Typeface.NORMAL);setTextColor(Color.rgb(255,180,171))
+            backgroundTintList=buttonTint(Color.rgb(63,49,49))
+        }
+        for((index,control) in listOf(play,auto,stop,exit).withIndex()) {
+            val size=if(controls.orientation==LinearLayout.HORIZONTAL)LinearLayout.LayoutParams(0,dp(48),1f) else LinearLayout.LayoutParams(-1,dp(48))
+            if(index>0) {
+                if(controls.orientation==LinearLayout.HORIZONTAL) size.marginStart=dp(4) else size.topMargin=dp(4)
+            }
+            controls.addView(control,size)
+        }
+        return controls
     }
     fun update(snapshot: JSONObject) {
         if (closed) return
         state=snapshot
         val busy=state.optBoolean("busy")
+        updateBubble(busy)
+        val color=when(state.optString("color")){"w"->"White";"b"->"Black";else->"Choose color"}
+        identity?.text="$color · ${state.optInt("depth",10)}"
+        title?.text=statusText(busy)
+        title?.setTextColor(if(!state.isNull("error"))Color.rgb(255,180,171) else Color.rgb(171,192,177))
+        updateControls(busy)
+    }
+    private fun updateBubble(busy: Boolean) {
         bubble?.apply {
             setImageDrawable(if(busy)stopIcon else bubbleLogo)
             contentDescription=if(busy)"Stop ChessPilot" else "Expand ChessPilot controls"
             backgroundTintList=buttonTint(if(busy)Color.rgb(132,56,53) else Color.rgb(54,90,61))
         }
-        val color=when(state.optString("color")){"w"->"White";"b"->"Black";else->"Choose color"}
-        val status=when {
-            state.optString("game_result")=="checkmate"->"Checkmate!"
-            state.optString("game_result")=="stalemate"->"Draw · stalemate"
-            !state.isNull("game_result")->"Game over"
-            state.optString("status")=="Stopping..."->"Stopping…"
-            state.optString("operation")=="auto"->if(state.optString("status").startsWith("Waiting"))"Waiting" else "Auto running"
-            busy->"Working"
-            !state.isNull("error")->"Open app for details"
-            state.optString("color") !in listOf("w","b")->"Choose color in app"
-            !state.optBoolean("automation_ready")->"Restart screen sharing"
-            state.optString("status")=="Stopped"->"Stopped"
-            else->"Ready"
-        }
-        identity?.text="$color · ${state.optInt("depth",10)}"
-        title?.text=status
-        title?.setTextColor(if(!state.isNull("error"))Color.rgb(255,180,171) else Color.rgb(171,192,177))
+    }
+    private fun statusText(busy: Boolean) = when {
+        state.optString("game_result")=="checkmate"->"Checkmate!"
+        state.optString("game_result")=="stalemate"->"Draw · stalemate"
+        !state.isNull("game_result")->"Game over"
+        state.optString("status")=="Stopping..."->"Stopping…"
+        state.optString("operation")=="auto"->if(state.optString("status").startsWith("Waiting"))"Waiting" else "Auto running"
+        busy->"Working"
+        !state.isNull("error")->"Open app for details"
+        state.optString("color") !in listOf("w","b")->"Choose color in app"
+        !state.optBoolean("automation_ready")->"Restart screen sharing"
+        state.optString("status")=="Stopped"->"Stopped"
+        else->"Ready"
+    }
+    private fun updateControls(busy: Boolean) {
         val ready=!busy && state.isNull("game_result") && state.optBoolean("engine_ready") && state.optBoolean("automation_ready") && state.optString("color") in listOf("w","b")
         play?.isEnabled=ready && !state.optBoolean("auto_mode")
         auto?.isEnabled=state.optBoolean("auto_mode") || ready && state.optBoolean("auto_available")

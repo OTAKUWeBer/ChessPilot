@@ -13,7 +13,9 @@ dart tool/version.dart --check
 
 The version is `MAJOR.MINOR.PATCH[-prerelease]+BUILD`. Increase BUILD for each distributed Android update. Numeric fields are bounded to fit the shared Windows file-version representation. The helper validates the complete update plan before writing and does not update dependencies. CI checks consistency and exercises the version helper. SDK/runtime pins are independent of the product version.
 
-Product docs use version-neutral output paths, and the README source-version badge reads `app/pubspec.yaml`, so a normal bump needs no manual version-badge edits. Update the What's new highlights when release behavior changes. Installer filenames contain the release version at build time. Platform native sources, Flutter assets and Rust runtime must all come from the same revision.
+Product docs use version-neutral output paths, and the README release badge reads GitHub's latest stable release, so a normal bump needs no manual version-badge edits. Update the What's new highlights when release behavior changes. Installer filenames contain the release version at build time. Platform native sources, Flutter assets and Rust runtime must all come from the same revision.
+
+The README CodeFactor badge explicitly targets `main`. In CodeFactor repository Settings, choose `main` as the default branch, and enable its inspection under Branches. GitHub branch renaming alone does not establish that CodeFactor is analyzing the new application. Check that its latest reviewed revision matches the intended source before citing a grade; GitHub CI remains the build/test gate.
 
 ## Before publishing a stable release
 
