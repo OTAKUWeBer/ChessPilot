@@ -46,11 +46,12 @@ install -m 755 "$repo/packaging/linux/AppRun" "$appdir/AppRun"
 install -m 755 "$repo/packaging/linux/install.sh" "$work/payload/install.sh"
 mkdir -p "$appdir/usr/bin"
 ln -s ../../chesspilot "$appdir/usr/bin/chesspilot"
-export APPIMAGE_EXTRACT_AND_RUN=1 DEPLOY_GTK_VERSION=3
+# linuxdeploy's bundled strip cannot read modern Arch RELR sections; GTK subprocesses inherit this.
+export APPIMAGE_EXTRACT_AND_RUN=1 DEPLOY_GTK_VERSION=3 NO_STRIP=1
 "$tools/linuxdeploy-x86_64.AppImage" --appdir "$appdir" --deploy-deps-only "$appdir" \
   --executable "$(command -v curl)" \
   --custom-apprun "$repo/packaging/linux/AppRun" --desktop-file "$repo/packaging/linux/chesspilot.desktop" \
-  --icon-file "$bundle/data/chesspilot.png" --plugin gtk
+  --icon-file "$repo/packaging/linux/chesspilot.png" --plugin gtk
 
 # Retain the distro copyright/source notices for packaged GTK and library dependencies.
 mkdir -p "$appdir/licenses/Linux-runtime"

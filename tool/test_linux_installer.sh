@@ -104,6 +104,7 @@ if [ -n "${1:-}" ]; then
   installed="$testroot/real/chesspilot/app"
   [ -f "$installed/chess_detection.onnx" ] && [ -f "$installed/lib/libchesspilot_runtime.so" ]
   [ -f "$installed/usr/lib/libgtk-3.so.0" ]
+  file "$installed/usr/share/icons/hicolor/512x512/apps/chesspilot.png" | grep -Fq '512 x 512'
   xvfb-run -a "$installed/AppRun" --help
   CHESSPILOT_BUNDLE_TEST="$installed" cargo test --manifest-path "$repo/native/Cargo.toml" --test resources relocated_bundle_resolves_default_assets_without_checkout_paths -- --ignored
   XDG_DATA_HOME="$testroot/real" sh "$installer" -- --uninstall

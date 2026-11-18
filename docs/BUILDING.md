@@ -198,6 +198,8 @@ bash tool/build_linux_installer.sh
 
 Arch packaging prerequisites are `gtk3 librsvg gobject-introspection file`, in addition to the normal build tools. The script fetches hash-pinned official linuxdeploy, GTK plugin and Makeself tools into ignored `native/target/linux-packaging-tools`; no system Makeself or FUSE installation is needed. Ubuntu 24.04 is the CI release host. Build on the oldest supported distribution because bundling does not remove glibc/kernel/driver requirements; an Arch-built binary is not an older-Ubuntu compatibility build.
 
+Packaging exports `NO_STRIP=1` for linuxdeploy and its GTK subprocesses because its bundled strip cannot parse modern Arch `.relr.dyn` sections. It uses the 512px Linux packaging icon; the full-resolution app logo is retained. If an older checkout reports either `.relr.dyn` strip errors or an invalid 1024px icon, update and rerun the packaging command; rebuilding Flutter is unnecessary for these packaging-only fixes.
+
 Output: **`app/build/linux/installer/ChessPilot-VERSION-linux-x64-setup.run`** and its `.sha256` sidecar. Upload the `.run` as the Linux application installer. It contains the complete native/Flutter/model payload plus GTK dependencies, adds a per-user launcher, preserves downloaded engines/configuration/cache across upgrades, and supports `-- --uninstall`. Packaging checks the bundled model, excludes maintainer engine/config/cache/logs, retains dependency notices, and embeds a SHA-256 integrity check. This is a per-user shell installer, not a DEB/RPM or AppImage.
 
 Test the installer on Linux without touching your real installation:
