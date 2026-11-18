@@ -48,7 +48,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libgtk-3-bin liblzma-dev libstdc++-12-dev xvfb makeself librsvg2-dev libgirepository1.0-dev libgdk-pixbuf2.0-bin file dpkg-dev
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libgtk-3-bin liblzma-dev libstdc++-12-dev xvfb makeself librsvg2-dev libgirepository1.0-dev libgdk-pixbuf2.0-bin file dpkg-dev binutils desktop-file-utils
       - name: Install Rust
         run: rustup toolchain install 1.92.0 --profile minimal --component clippy --component rustfmt
       - name: Install Flutter
@@ -60,6 +60,7 @@ jobs:
             bash -n tool/build_linux.sh
             bash -n tool/build_linux_installer.sh
             bash -n tool/test_linux_installer.sh
+            bash -n tool/test_linux_formats.sh
             bash -n packaging/linux/install.sh
             bash -n packaging/linux/AppRun
             bash tool/flutter_linux.sh --version
@@ -78,6 +79,11 @@ jobs:
         run: cargo clippy --manifest-path native/Cargo.toml --workspace --all-targets --locked -- -D warnings
       - name: Run native regression tests
         run: cargo test --manifest-path native/Cargo.toml --workspace --locked
+      - name: Check desktop window sizing
+        run: |
+          cmake -S tool/tests/window_size -B native/target/window-size-check
+          cmake --build native/target/window-size-check --config Release
+          ctest --test-dir native/target/window-size-check -C Release --output-on-failure
       - name: Prepare pinned ONNX Runtime
         run: cmake -P tool/prepare_desktop.cmake
       - name: Resolve Flutter dependencies
@@ -118,6 +124,9 @@ jobs:
       - name: Check Linux installer lifecycle and relocated runtime
         if: runner.os == 'Linux'
         run: bash tool/test_linux_installer.sh app/build/linux/installer/*-setup.run app/build/linux/installer/ChessPilot-*-linux-x86_64
+      - name: Check AppImage and Debian payloads without system installation
+        if: runner.os == 'Linux'
+        run: bash tool/test_linux_formats.sh app/build/linux/installer/*.AppImage app/build/linux/installer/*.deb
       - uses: actions/upload-artifact@v4
         with:
           name: ChessPilot-${{ matrix.platform }}-x64
@@ -139,6 +148,19 @@ jobs:
           path: |
             app/build/linux/installer/ChessPilot-*-linux-x86_64
             app/build/linux/installer/ChessPilot-*-linux-x86_64.sha256
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: ChessPilot-linux-x64-packages
+          path: |
+            app/build/linux/installer/*.AppImage
+            app/build/linux/installer/*.AppImage.sha256
+            app/build/linux/installer/*.deb
+            app/build/linux/installer/*.deb.sha256
+            app/build/linux/installer/*-build-info.txt*
           if-no-files-found: error
           compression-level: 0
           retention-days: 7

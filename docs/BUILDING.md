@@ -114,7 +114,7 @@ sudo pacman -S --needed base-devel git curl unzip zip xz clang cmake ninja pkgco
 bash tool/build_linux.sh
 ```
 
-If pulling fails, resolve the Git state before building; the helper does not reset or stash changes. The first SDK/toolchain setup can take longer and needs internet. Subsequent runs reuse the private pinned SDK. The helper installs/selects Rust 1.92.0, prepares the hash-checked ONNX Runtime, prints SDK/doctor information, runs pub get, builds the release bundle and packages the one-file portable app plus optional installer. Android/Chrome doctor warnings are not Linux build requirements. It does not run the app or send input.
+If pulling fails, resolve the Git state before building; the helper does not reset or stash changes. The first SDK/toolchain setup can take longer and needs internet. Subsequent runs reuse the private pinned SDK. The helper installs/selects Rust 1.92.0, prepares the hash-checked ONNX Runtime, prints SDK/doctor information, runs pub get, builds the release bundle and packages the portable executable, AppImage, DEB and optional installer. Android/Chrome doctor warnings are not Linux build requirements. It does not run the app or send input.
 
 Report: `native/target/linux-build-report.log`. Portable release upload: **`app/build/linux/installer/ChessPilot-VERSION-linux-x86_64`**. The optional installer is **`app/build/linux/installer/ChessPilot-VERSION-linux-x64-setup.run`**. The intermediate executable at `app/build/linux/x64/release/bundle/chesspilot` requires its whole bundle; do not copy it alone into Downloads or Releases.
 
@@ -184,33 +184,34 @@ To make a portable archive, from `app`:
 tar -czf ChessPilot-linux-x64.tar.gz -C build/linux/x64/release/bundle .
 ```
 
-This archive remains an optional complete portable bundle. For the one-file installer, use the packaging command below. The current GTK launcher may run through XWayland even when board capture/input uses the native wlroots protocols. Keep the session's normal `XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY` values; the compositor must expose screencopy and `zwlr_virtual_pointer_manager_v1`. GNOME/KDE portal-based automation is unfinished. A successful Linux build does not establish live Wayland calibration. Follow [Linux capture and gameplay checks](TESTING.md#linux-capture-and-gameplay) on the actual desktop.
+This archive remains an optional complete portable bundle. For single-file packages, use the packaging command below. The current GTK launcher may run through XWayland even when board capture/input uses the native wlroots protocols. Keep the session's normal `XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY` values; the compositor must expose screencopy and `zwlr_virtual_pointer_manager_v1`. GNOME/KDE portal-based automation is unfinished. A successful Linux build does not establish live Wayland calibration. Follow [Linux capture and gameplay checks](TESTING.md#linux-capture-and-gameplay) on the actual desktop.
 
-### Build the Linux one-file app and installer
+### Build all Linux packages
 
 After a release build, run from the repository root (return from `app` first). Ubuntu/Debian packaging prerequisites:
 
 ```sh
 sudo apt-get install -y libgtk-3-dev libgtk-3-bin librsvg2-dev \
-  libgirepository1.0-dev libgdk-pixbuf2.0-bin file dpkg-dev
+  libgirepository1.0-dev libgdk-pixbuf2.0-bin file dpkg-dev binutils desktop-file-utils
 bash tool/build_linux_installer.sh
 ```
 
-Arch packaging prerequisites are `gtk3 librsvg gobject-introspection file`, in addition to the normal build tools. The script fetches hash-pinned official linuxdeploy, GTK plugin and Makeself tools into ignored `native/target/linux-packaging-tools`; no system Makeself or FUSE installation is needed. Ubuntu 22.04 is the CI release build baseline. Build on the oldest supported distribution because bundling does not remove glibc/kernel/driver requirements; an Arch-built executable is not an older-Ubuntu compatibility build.
+Arch packaging prerequisites are `gtk3 librsvg gobject-introspection file binutils dpkg desktop-file-utils`, in addition to the normal build tools. The script fetches hash-pinned official linuxdeploy, GTK plugin, Makeself and appimagetool tools into ignored `native/target/linux-packaging-tools`; no system Makeself or FUSE installation is needed. Ubuntu 22.04 is the CI release build baseline. Build on the oldest supported distribution because bundling does not remove glibc/kernel/driver requirements; an Arch-built executable is not an older-Ubuntu compatibility build.
 
 Packaging exports `NO_STRIP=1` for linuxdeploy and its GTK subprocesses because its bundled strip cannot parse modern Arch `.relr.dyn` sections. It uses the 512px Linux packaging icon; the full-resolution app logo is retained. If an older checkout reports either `.relr.dyn` strip errors or an invalid 1024px icon, update and rerun the packaging command; rebuilding Flutter is unnecessary for these packaging-only fixes.
 
-Output: **`app/build/linux/installer/ChessPilot-VERSION-linux-x64-setup.run`** and its `.sha256` sidecar. Upload the `.run` as the Linux application installer. It contains the complete native/Flutter/model payload plus GTK dependencies, adds a per-user launcher, preserves downloaded engines/configuration/cache across upgrades, and supports `-- --uninstall`. Packaging checks the bundled model, excludes maintainer engine/config/cache/logs, retains dependency notices, and embeds a SHA-256 integrity check. This is a per-user shell installer, not a DEB/RPM or AppImage.
+Output: **`app/build/linux/installer/ChessPilot-VERSION-linux-x64-setup.run`** and its `.sha256` sidecar. Upload the `.run` as the Linux application installer. It contains the complete native/Flutter/model payload plus GTK dependencies, adds a per-user launcher, preserves downloaded engines/configuration/cache across upgrades, and supports `-- --uninstall`. Packaging checks the bundled model, excludes maintainer engine/config/cache/logs, retains dependency notices, and embeds a SHA-256 integrity check. This is the optional per-user shell installer.
 
-The same command also outputs **`app/build/linux/installer/ChessPilot-VERSION-linux-x86_64`** plus its checksum. This is the one-file portable app: it self-extracts and runs `AppRun` directly, then cleans up its temporary application directory. Its launcher directs engine downloads and options to persistent user data. It installs no menu entry and needs no other package format. No `.deb` or AppImage is generated.
+The same command also outputs **`app/build/linux/installer/ChessPilot-VERSION-linux-x86_64`** plus its checksum. This is the one-file portable app: it self-extracts and runs `AppRun` directly, then cleans up its temporary application directory. Its launcher directs engine downloads and options to persistent user data. It installs no menu entry and needs no other package format. It also outputs **`ChessPilot-VERSION-linux-x86_64.AppImage`**, **`chesspilot_VERSION_amd64.deb`** and a build-info file. All four formats reuse the same payload and bundled model. AppImage uses the exact runtime boundary reported by the hash-pinned appimagetool, with no guessed offset or floating runtime download. The DEB installs under `/opt/chesspilot` and redirects writes to user data. Its glibc dependency is calculated from the bundled ELF version requirements, including curl; an Arch build cannot claim compatibility with older glibc. No Python/Pillow packaging step is needed.
 
 Test the installer on Linux without touching your real installation:
 
 ```sh
 bash tool/test_linux_installer.sh app/build/linux/installer/*-setup.run app/build/linux/installer/ChessPilot-*-linux-x86_64
+bash tool/test_linux_formats.sh app/build/linux/installer/*.AppImage app/build/linux/installer/*.deb
 ```
 
-The real-package check needs Xvfb (`xvfb` on Ubuntu, `xorg-server-xvfb` on Arch). CI runs it automatically against temporary installation paths.
+The real-package checks need `desktop-file-validate` and Xvfb (`xvfb` on Ubuntu, `xorg-server-xvfb` on Arch). CI runs it automatically against temporary installation paths.
 
 ## Android ARM64 APK, built on Windows
 

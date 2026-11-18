@@ -30,6 +30,7 @@ coverage/
 *.7z
 *.AppImage
 *.run
+*.deb
 
 # Logs, local settings and signing material
 *.log

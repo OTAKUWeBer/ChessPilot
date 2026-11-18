@@ -143,3 +143,7 @@ Do not run the standard `uiautomator dump` during active capture/input testing: 
 Still check black orientation, castling, all promotions, Stop during gesture delivery, sustained Auto with no duplicate moves, static-screen refresh under long idle, capture-consent revocation and permission denial/recovery. Cover portrait/landscape and rotation, cutouts, gesture navigation, magnification rejection, large text, secure screens, activity recreation and process death. Include both 4 KB and 16 KB page-size devices/images and two physical phones of different performance. Release-mode memory/performance, sustained-play and full security acceptance remain open. Do not infer these results from the limited run above, compilation or broker tests.
 
 The current controls are described in [Android controls](ENGINEERING.md#android-controls). Linux evidence and remaining compositor coverage are recorded separately in [Linux evidence](#linux-capture-and-gameplay).
+
+## Additional Linux release formats
+
+`tool/test_linux_formats.sh APPIMAGE DEB` verifies both artifact checksums, starts the real AppImage without FUSE, extracts both formats without system installation, validates the DEB identity/desktop entry, checks the bundled model, and runs relocated runtime probes. The DEB and AppImage share the existing portable user-data routing. Full package-manager install/update/removal and live gameplay still require acceptance testing on the target distributions.

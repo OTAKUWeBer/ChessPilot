@@ -11,6 +11,7 @@ Desktop packages are attached to [successful rust-branch builds](https://github.
 | Windows x64 | `ChessPilot-windows-x64-installer` artifact; unzip it to find the setup EXE |
 | Windows portable | `ChessPilot-windows-x64` artifact; unzip it, then extract the enclosed `ChessPilot-windows-x64.zip` |
 | Linux one-file app | `ChessPilot-linux-x64-portable` artifact; unzip it to find `ChessPilot-VERSION-linux-x86_64` |
+| Linux AppImage / Debian package | `ChessPilot-linux-x64-packages` artifact; unzip it to find the `.AppImage` and `.deb` |
 | Linux installer | `ChessPilot-linux-x64-installer` artifact; unzip it to find the single `*-setup.run` installer |
 | Linux bundle | `ChessPilot-linux-x64` artifact; unzip it, then extract the enclosed `.tar.gz` |
 | Android ARM64, API 24+ | `app-release.apk` from a trusted publisher or your own build; desktop CI does not currently publish an APK |
@@ -47,6 +48,23 @@ This is a self-extracting executable file. It starts ChessPilot directly, needs 
 For an offline first launch, place a compatible executable named `stockfish` in that `native` folder, keep its license/source notices, and make it executable. To update, close ChessPilot and replace the portable executable. Removing that file leaves your engine/settings intact. A complete bundle avoids the extraction work at startup if you prefer that format.
 
 Release CI uses Ubuntu 22.04 as its build baseline for broader compatibility. The host still needs compatible glibc, graphics drivers and a supported display session; this does not cover every distro, Linux architecture or Wayland compositor. Use the CI-built release rather than an Arch-local build when distributing to older systems.
+
+### AppImage
+
+```sh
+chmod +x ./ChessPilot-VERSION-linux-x86_64.AppImage
+./ChessPilot-VERSION-linux-x86_64.AppImage
+```
+
+If FUSE mounting is unavailable, launch with `--appimage-extract-and-run`. The AppImage includes the same application payload and uses the same persistent user-data location as the extensionless portable executable. Replace the file to update; no system installation is required.
+
+### Debian / Ubuntu / Mint
+
+```sh
+sudo apt install ./chesspilot_VERSION_amd64.deb
+```
+
+Open ChessPilot from the applications menu or run `chesspilot`. The package installs application files in `/opt/chesspilot`; Stockfish and options stay in your user-data folder, so the app needs no administrator privileges. Install a newer DEB to update. `sudo apt remove chesspilot` removes the application while keeping your user data. The package declares the minimum glibc required by its payload; use a release built on the documented Ubuntu baseline rather than an Arch-built DEB on older distributions.
 
 ### Optional installer
 
@@ -114,7 +132,7 @@ The model is included on every platform. Desktop downloads Stockfish only when a
 
 ## If setup fails
 
-- **Engine setup:** confirm the desktop app folder is writable and first-launch downloads have internet access, or supply a compatible offline engine.
+- **Engine setup:** confirm the desktop app folder (or user-data folder for Linux portable/AppImage/DEB) is writable and first-launch downloads have internet access, or supply a compatible offline engine.
 - **No board/capture:** keep the board unobstructed, check the supported Linux session or restart full-display sharing on Android.
 - **No moves:** choose the correct color, start on your turn, stop Auto before manual Play, and check touch-control/capture readiness.
 - **Need details:** open Help/Shortcuts → Diagnostics / logs. Desktop can open the log folder; Android can share logs. Include your app version, OS/device/display server and relevant error when reporting a problem.
