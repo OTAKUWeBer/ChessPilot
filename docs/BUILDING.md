@@ -24,17 +24,17 @@ cargo --version
 For a new checkout:
 
 ```sh
-git clone --single-branch --branch rust https://github.com/OTAKUWeBer/ChessPilot.git ChessPilot-rust
-cd ChessPilot-rust
+git clone --single-branch --branch main https://github.com/OTAKUWeBer/ChessPilot.git ChessPilot
+cd ChessPilot
 ```
 
-The standalone Rust branch starts with a new history. For a checkout from before this cleanup, keep that working folder and use the fresh clone above; `git pull --ff-only` cannot join the old history to the new root commit. Do not reset away local changes.
+`main` contains the Rust/Flutter application; `legacy-python` preserves the Python 2.x code. When migrating from a Python checkout or an older branch layout, keep that working folder and use the fresh clone above. The histories are separate; do not reset away local changes.
 
-For an existing checkout of the standalone branch:
+For an existing checkout of the current `main` branch:
 
 ```sh
-git switch rust
-git pull --ff-only origin rust
+git switch main
+git pull --ff-only origin main
 ```
 
 All build commands and output paths below start in the **repository root**, containing `app/`, `native/` and `tool/`. After a block changes into `app/`, return to the root before starting another platform's block. Do not replace existing user engine/configuration files to rebuild the app.
@@ -121,9 +121,9 @@ Report: `native/target/linux-build-report.log`. Portable release upload: **`app/
 If you need to run an individual Flutter command using that SDK from any working directory:
 
 ```sh
-bash /path/to/rust-root/tool/flutter_linux.sh --version
-bash /path/to/rust-root/tool/flutter_linux.sh pub get
-bash /path/to/rust-root/tool/flutter_linux.sh build linux --release
+bash /path/to/ChessPilot/tool/flutter_linux.sh --version
+bash /path/to/ChessPilot/tool/flutter_linux.sh pub get
+bash /path/to/ChessPilot/tool/flutter_linux.sh build linux --release
 ```
 
 The launcher always uses `app` as the Flutter project. Do not copy generated SDK caches between Windows and Linux. The `flutter` and `dart` commands from an unrelated system installation can keep showing the old error; use the project launcher or `fvm flutter`.

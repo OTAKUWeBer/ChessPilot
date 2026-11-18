@@ -7,7 +7,7 @@
 **Chessboard detection, Stockfish analysis and move automation for Windows, Linux and Android.**
 
 <p align="center">
-  <a href="app/pubspec.yaml"><img src="https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2FOTAKUWeBer%2FChessPilot%2Frust%2Fapp%2Fpubspec.yaml&amp;query=%24.version&amp;label=source&amp;color=4CAF50&amp;style=for-the-badge" alt="Source version from pubspec.yaml" /></a>
+  <a href="app/pubspec.yaml"><img src="https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2FOTAKUWeBer%2FChessPilot%2Fmain%2Fapp%2Fpubspec.yaml&amp;query=%24.version&amp;label=source&amp;color=4CAF50&amp;style=for-the-badge" alt="Source version from pubspec.yaml" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F48041?style=for-the-badge" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/UI-Flutter-02569B?style=for-the-badge" alt="Flutter interface" />
   <img src="https://img.shields.io/badge/core-Rust-CE422B?style=for-the-badge" alt="Rust core" />
@@ -15,7 +15,7 @@
 
 <p align="center">
   <a href="https://github.com/OTAKUWeBer/ChessPilot/releases"><img src="https://img.shields.io/github/downloads/OTAKUWeBer/ChessPilot/total?label=all%20release%20downloads&amp;style=for-the-badge&amp;color=CAF979" alt="Download count across all published releases" /></a>
-  <a href="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Arust"><img src="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml/badge.svg?branch=rust" alt="Rust and Flutter quality checks and desktop builds" /></a>
+  <a href="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Amain"><img src="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml/badge.svg?branch=main" alt="Rust and Flutter quality checks and desktop builds" /></a>
 </p>
 
 ChessPilot reads a visible 2D board, evaluates the position locally, and optionally plays the best move. Capture, detection and analysis run on your device after initial setup. The interface uses Flutter; Rust owns the detector, engine and automation pipeline.
@@ -54,7 +54,7 @@ The same bundled [detection model](assets/models/chess_detection.onnx.sha256) is
 
 Follow the [installation and first-launch guide](docs/INSTALLING.md). It covers downloading the correct package, extracting GitHub artifacts, Windows setup/portable use, Linux sessions, Android permissions, and updating/uninstalling.
 
-Get this branch's Windows/Linux packages from [successful Rust + Flutter builds](https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Arust). The download badge totals published release assets across all versions, including earlier releases; it does not count CI artifact downloads. Android build/distribution instructions are in the installation guide.
+Download the app packages from [GitHub Releases](https://github.com/OTAKUWeBer/ChessPilot/releases). Development desktop packages remain available from [successful Rust + Flutter builds](https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Amain). The download badge totals published release assets across all versions, including earlier releases; it does not count CI artifact downloads.
 
 | Platform | Package | Supported automation |
 | --- | --- | --- |

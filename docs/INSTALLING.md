@@ -4,7 +4,9 @@ Choose the package for your device. Installing a downloaded app does not require
 
 ## Get the app
 
-Desktop packages are attached to [successful rust-branch builds](https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Arust). GitHub may require sign-in to download artifacts, and older artifacts may expire. Check that the build/version matches the one you intend to install.
+Download the package for your platform from [GitHub Releases](https://github.com/OTAKUWeBer/ChessPilot/releases). Release files can be downloaded directly; only the Windows portable ZIP needs extracting. The Linux portable executable/AppImage must be marked executable before launching. Check that the release/version matches the one you intend to install.
+
+For development builds, desktop packages are also attached to [successful main-branch builds](https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Amain). GitHub may require sign-in to download these CI artifacts, and older artifacts may expire. The table below describes their contents; published releases use the filenames listed in the [release notes](releases/3.0.0.md).
 
 | Device | Package |
 | --- | --- |

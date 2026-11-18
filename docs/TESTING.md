@@ -23,7 +23,7 @@ The CMake fixture builds and installs the same native bundle rules without requi
 ```sh
 cmake -S tool/tests/desktop_bundle -B native/target/bundle-check -G Ninja \
   -DCMAKE_BUILD_TYPE=Debug \
-  -DCMAKE_INSTALL_PREFIX=/absolute/path/to/rust-root/native/target/bundle-check/install
+  -DCMAKE_INSTALL_PREFIX=/absolute/path/to/ChessPilot/native/target/bundle-check/install
 cmake --build native/target/bundle-check
 cmake --install native/target/bundle-check --component Runtime
 ```

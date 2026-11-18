@@ -2,10 +2,10 @@ name: Rust and Flutter desktop
 
 on:
   push:
-    branches: [rust]
+    branches: [main]
     paths: ['app/**', 'native/**', 'tool/**', 'packaging/**', 'assets/models/chess_detection.onnx*', 'assets/**', 'engine_config.txt', 'LICENSE', '.gitattributes', '.github/workflows/native.yml']
   pull_request:
-    branches: [rust]
+    branches: [main]
     paths: ['app/**', 'native/**', 'tool/**', 'packaging/**', 'assets/models/chess_detection.onnx*', 'assets/**', 'engine_config.txt', 'LICENSE', '.gitattributes', '.github/workflows/native.yml']
   workflow_dispatch:
 

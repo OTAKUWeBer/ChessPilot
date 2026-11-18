@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thank you for taking the time to report an issue!
-        Before submitting, please check the [Troubleshooting & FAQ](https://github.com/OTAKUWeBer/ChessPilot/blob/rust/README.md#-troubleshooting-and-logs) section in the README.
+        Before submitting, please check the [Troubleshooting & FAQ](https://github.com/OTAKUWeBer/ChessPilot/blob/main/README.md#-troubleshooting-and-logs) section in the README.
 
   - type: dropdown
     id: os
