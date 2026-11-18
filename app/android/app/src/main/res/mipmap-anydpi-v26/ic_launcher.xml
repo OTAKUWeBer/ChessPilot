@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/chesspilot_icon_background" />
+    <foreground>
+        <inset android:inset="15%" android:drawable="@drawable/chesspilot_logo" />
+    </foreground>
+</adaptive-icon>

@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.18)
+project(chesspilot_bundle_check LANGUAGES NONE)
+set(BINARY_NAME bundle_check)
+set(INSTALL_BUNDLE_LIB_DIR "${CMAKE_INSTALL_PREFIX}/lib")
+add_custom_target(${BINARY_NAME} ALL)
+include("${CMAKE_CURRENT_LIST_DIR}/../../../app/cmake/native_bundle.cmake")

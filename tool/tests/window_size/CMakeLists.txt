@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.18)
+project(chesspilot_window_size_check LANGUAGES CXX)
+enable_testing()
+add_executable(window_size_test window_size_test.cpp)
+target_compile_features(window_size_test PRIVATE cxx_std_17)
+add_test(NAME desktop_window_size COMMAND window_size_test)

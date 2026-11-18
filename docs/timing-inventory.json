@@ -1,0 +1,548 @@
+{
+  "source_hashes": {
+    "src/core/notation.py": "e7a622ce0304f5b64eef352957cbf1c873bd1275c639f9f7b446994fc7fe8b92",
+    "src/game/auto_play.py": "b63d81e1c8d3763a5a39857e6bd8b4685865c5942d77da0424288b8c985a3b52",
+    "src/game/move_execution.py": "21a4f386fe27b48e255837e6e25d5c002f3899c6d306ae1ed56fcf76c9436b4a",
+    "src/game/move_processor.py": "f0661c2fc61f5b18e05d7f1de18113dab59961252f227c457469c59ecb9f25c5",
+    "src/game/move_validator.py": "e885789f53971265adcbde1c10475a168538f93345202972c6d61819fd4e3824",
+    "src/game/promotion.py": "5574ee56640b5b1557ce31cd6f9bf3945017718a61f91a49642546cdaf5cfb4c",
+    "src/gui/download_dialog.py": "1d51f7aea1196ab56eecfd8e16c871e084dbb19f0118527010f7a97846720577",
+    "src/services/engine_service.py": "dc1b42d4a2cf7109260f6ddca96e90ea58a2f288f96217b1713c72293076bdb4",
+    "src/utils/system_interaction.py": "61ba61a192529b2f289bd0e52d47434b96a36859f5a9cef3f559301a08daf7da",
+    "src/wayland_capture/wayland.py": "48c092a77917adab1d4944ba3aa4b353b608645fb6c49ee1d949ca796cb2cca9"
+  },
+  "calls": [
+    {
+      "file": "src/core/notation.py",
+      "line": 34,
+      "function": "chess_notation_to_index",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: QMessageBox.critical(root, 'Error', f'Invalid move notation: {move}'))"
+    },
+    {
+      "file": "src/core/notation.py",
+      "line": 46,
+      "function": "chess_notation_to_index",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, _turn_off)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 218,
+      "function": "_run_move_detection_loop",
+      "kind": "sleep",
+      "expression": "time.sleep(0.2)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 250,
+      "function": "_run_move_detection_loop",
+      "kind": "sleep",
+      "expression": "time.sleep(1.0)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 270,
+      "function": "_stop_auto_mode",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, _update_ui)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 278,
+      "function": "_should_continue_processing",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.AUTO_MODE_POLL_INTERVAL)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 283,
+      "function": "_should_continue_processing",
+      "kind": "sleep",
+      "expression": "time.sleep(0.5)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 294,
+      "function": "_capture_current_position",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.FEN_RETRY_DELAY)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 299,
+      "function": "_capture_current_position",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.FEN_RETRY_DELAY)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 307,
+      "function": "_capture_current_position",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.FEN_RETRY_DELAY)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 332,
+      "function": "_handle_opponent_turn",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.AUTO_MODE_POLL_INTERVAL)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 336,
+      "function": "_handle_player_turn",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.AUTO_MODE_POLL_INTERVAL)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 340,
+      "function": "_handle_player_turn",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.AUTO_MODE_POLL_INTERVAL)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 352,
+      "function": "_process_detected_move",
+      "kind": "sleep",
+      "expression": "time.sleep(settle_delay)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 360,
+      "function": "_process_detected_move",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.OPPONENT_MOVE_SETTLE_DELAY)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 363,
+      "function": "_process_detected_move",
+      "kind": "sleep",
+      "expression": "time.sleep(delay)"
+    },
+    {
+      "file": "src/game/auto_play.py",
+      "line": 371,
+      "function": "_process_detected_move",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.MIN_MOVE_INTERVAL)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 36,
+      "function": "MoveExecutionMethods._safe_disable_auto_mode",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, _turn_off)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 63,
+      "function": "MoveExecutionMethods.drag_piece",
+      "kind": "sleep",
+      "expression": "time.sleep(0.04)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 67,
+      "function": "MoveExecutionMethods.drag_piece",
+      "kind": "sleep",
+      "expression": "time.sleep(0.02)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 69,
+      "function": "MoveExecutionMethods.drag_piece",
+      "kind": "sleep",
+      "expression": "time.sleep(0.04)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 84,
+      "function": "MoveExecutionMethods.drag_piece",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda err=e: QMessageBox.critical(root, 'Error', f'Failed to drag piece: {str(err)}'))"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 113,
+      "function": "MoveExecutionMethods.click_piece",
+      "kind": "sleep",
+      "expression": "time.sleep(0.02)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 120,
+      "function": "MoveExecutionMethods.click_piece",
+      "kind": "sleep",
+      "expression": "time.sleep(0.02)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 124,
+      "function": "MoveExecutionMethods.click_piece",
+      "kind": "sleep",
+      "expression": "time.sleep(0.02)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 129,
+      "function": "MoveExecutionMethods.click_piece",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda err=e: QMessageBox.critical(root, 'Error', f'Failed to click piece: {str(err)}'))"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 144,
+      "function": "MoveExecutor.move_piece",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: QMessageBox.critical(root, 'Error', 'Could not map move to board positions'))"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 163,
+      "function": "MoveExecutor.execute_move",
+      "kind": "sleep",
+      "expression": "time.sleep(0.1)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 219,
+      "function": "MoveExecutor._attempt_single_move",
+      "kind": "sleep",
+      "expression": "time.sleep(0.2)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 224,
+      "function": "MoveExecutor._attempt_single_move",
+      "kind": "sleep",
+      "expression": "time.sleep(0.2)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 269,
+      "function": "MoveExecutor._execute_physical_move",
+      "kind": "sleep",
+      "expression": "time.sleep(delay)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 278,
+      "function": "MoveExecutor._verify_move_execution",
+      "kind": "sleep",
+      "expression": "time.sleep(extra_delay)"
+    },
+    {
+      "file": "src/game/move_execution.py",
+      "line": 325,
+      "function": "MoveExecutor._disable_auto_mode",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, _update_ui)"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 38,
+      "function": "process_move",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: btn_play.setEnabled(False))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 39,
+      "function": "process_move",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status('\\nAnalyzing board...'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 65,
+      "function": "_initialize_move_processing",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: btn_play.setEnabled(False))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 66,
+      "function": "_initialize_move_processing",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status('\\nAnalyzing board...'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 76,
+      "function": "_extract_board_position",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.FEN_RETRY_DELAY)"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 83,
+      "function": "_extract_board_position",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status(f'\\nRetrying board detection ({attempt + 2}/{max_retries})\u2026'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 84,
+      "function": "_extract_board_position",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.FEN_RETRY_DELAY)"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 87,
+      "function": "_extract_board_position",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status('\\nBoard detection failed after normal and refined search. Keep the full board visible, then retry.'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 105,
+      "function": "_extract_board_position",
+      "kind": "sleep",
+      "expression": "time.sleep(AppConfig.FEN_RETRY_DELAY)"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 114,
+      "function": "_extract_fen_from_boxes",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status(f'Retrying FEN extraction ({attempt + 2}/{max_retries})\u2026'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 116,
+      "function": "_extract_fen_from_boxes",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status('Board detection failed: keep the full board and both kings visible, then retry.'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 132,
+      "function": "_extract_fen_from_boxes",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda err=e: update_status(f'Error: {str(err)}'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 180,
+      "function": "_calculate_best_move",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status(f'\\n{msg}'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 183,
+      "function": "_calculate_best_move",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status('No valid move found!'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 229,
+      "function": "_auto_enable_castling_checkbox",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status('Auto-enabled Kingside Castle'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 232,
+      "function": "_auto_enable_castling_checkbox",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: update_status('Auto-enabled Queenside Castle'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 242,
+      "function": "_perform_castling_move",
+      "kind": "sleep",
+      "expression": "time.sleep(0.2)"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 283,
+      "function": "_execute_castling_pieces",
+      "kind": "sleep",
+      "expression": "time.sleep(0.25)"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 300,
+      "function": "_execute_castling_pieces",
+      "kind": "sleep",
+      "expression": "time.sleep(delay)"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 313,
+      "function": "_verify_castling_execution",
+      "kind": "sleep",
+      "expression": "time.sleep(0.2)"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 356,
+      "function": "_disable_auto_mode",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, _update_ui)"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 362,
+      "function": "_handle_processing_error",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda err=error: update_status(f'Error: {str(err)}'))"
+    },
+    {
+      "file": "src/game/move_processor.py",
+      "line": 377,
+      "function": "_finalize_move_processing",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: btn_play.setEnabled(True))"
+    },
+    {
+      "file": "src/game/move_validator.py",
+      "line": 121,
+      "function": "MoveValidator.verify_move",
+      "kind": "sleep",
+      "expression": "time.sleep(0.5)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 82,
+      "function": "select_promotion_piece",
+      "kind": "sleep",
+      "expression": "time.sleep(0.05)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 91,
+      "function": "select_promotion_piece",
+      "kind": "sleep",
+      "expression": "time.sleep(0.1)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 118,
+      "function": "wait_for_promotion_dialog",
+      "kind": "sleep",
+      "expression": "time.sleep(check_interval)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 124,
+      "function": "wait_for_promotion_dialog",
+      "kind": "sleep",
+      "expression": "time.sleep(check_interval)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 130,
+      "function": "wait_for_promotion_dialog",
+      "kind": "sleep",
+      "expression": "time.sleep(check_interval)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 138,
+      "function": "wait_for_promotion_dialog",
+      "kind": "sleep",
+      "expression": "time.sleep(check_interval)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 142,
+      "function": "wait_for_promotion_dialog",
+      "kind": "sleep",
+      "expression": "time.sleep(check_interval)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 167,
+      "function": "handle_pawn_promotion",
+      "kind": "sleep",
+      "expression": "time.sleep(0.2)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 183,
+      "function": "handle_pawn_promotion",
+      "kind": "sleep",
+      "expression": "time.sleep(0.2)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 197,
+      "function": "handle_pawn_promotion",
+      "kind": "sleep",
+      "expression": "time.sleep(0.2)"
+    },
+    {
+      "file": "src/game/promotion.py",
+      "line": 199,
+      "function": "handle_pawn_promotion",
+      "kind": "sleep",
+      "expression": "time.sleep(0.2)"
+    },
+    {
+      "file": "src/gui/download_dialog.py",
+      "line": 134,
+      "function": "StockfishDownloaderApp._close_after",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(100, self.close)"
+    },
+    {
+      "file": "src/gui/download_dialog.py",
+      "line": 136,
+      "function": "StockfishDownloaderApp._close_after",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(ms, self.close)"
+    },
+    {
+      "file": "src/services/engine_service.py",
+      "line": 350,
+      "function": "_show_error_dialog",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: QMessageBox.critical(root, 'Error', message))"
+    },
+    {
+      "file": "src/utils/system_interaction.py",
+      "line": 49,
+      "function": "capture_screenshot_in_memory",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: QMessageBox.critical(root, 'Error', f'Screenshot failed: {str(e)}'))"
+    },
+    {
+      "file": "src/utils/system_interaction.py",
+      "line": 57,
+      "function": "capture_screenshot_in_memory",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, _turn_off)"
+    },
+    {
+      "file": "src/utils/system_interaction.py",
+      "line": 150,
+      "function": "disable_auto_mode",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: root.auto_mode_check.setChecked(False))"
+    },
+    {
+      "file": "src/utils/system_interaction.py",
+      "line": 159,
+      "function": "show_error_message",
+      "kind": "singleShot",
+      "expression": "QTimer.singleShot(0, lambda: QMessageBox.critical(root, 'Error', f'Could not relocate the mouse to Play Next Move button\\n{error_msg}'))"
+    },
+    {
+      "file": "src/wayland_capture/wayland.py",
+      "line": 200,
+      "function": "WaylandInput.swipe",
+      "kind": "sleep",
+      "expression": "time.sleep(step_duration)"
+    }
+  ]
+}

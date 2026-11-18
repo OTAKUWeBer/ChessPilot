@@ -1,0 +1,3 @@
+assets/models/chess_detection.onnx binary
+assets/models/chess_detection.onnx.sha256 text eol=lf
+*.sh text eol=lf
