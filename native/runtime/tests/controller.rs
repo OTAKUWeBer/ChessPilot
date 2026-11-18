@@ -830,6 +830,127 @@ fn normal_moves_in_both_orientations_commit_only_visual_confirmation() {
     }
 }
 #[test]
+fn mating_move_is_verified_when_a_result_popup_hides_opponent_pieces() {
+    let before = "4k3/2R3R1/7K/2p5/p7/6p1/6P1/8 w - - 1 28";
+    let after = "2R1k3/6R1/7K/2p5/p7/6p1/6P1/8 b - - 2 28";
+    let covered = "2R1k3/6R1/7K/8/p7/6p1/6P1/8 w - - 0 1";
+    let mut source = Source::new(&[before, before, covered, covered]);
+    for frame in source.positions.iter_mut().skip(2) {
+        frame.as_mut().unwrap().board.geometry.y += 20.;
+    }
+    let mut engine = HistoryEngine::new(before, "c7c8", after);
+    engine.analysis.score = Some(Score::Mate(1));
+    engine.has_moves = false;
+    let mut input = Input::default();
+    let mut confirmed = None;
+    let mut terminal = false;
+    controller::auto_play(
+        &mut source,
+        &mut input,
+        &mut engine,
+        AutoRequest {
+            settings: &Settings::default(),
+            color: Color::White,
+            position: None,
+        },
+        &AtomicBool::new(false),
+        |progress| match progress {
+            Progress::Played(outcome) => confirmed = outcome.confirmed_fen,
+            Progress::Terminal => terminal = true,
+            _ => {}
+        },
+    )
+    .unwrap();
+    assert_eq!(confirmed.as_deref(), Some(after));
+    assert!(terminal);
+    assert_eq!(input.events.len(), 1);
+    assert_eq!(source.reads, 4);
+}
+
+#[test]
+fn result_popup_verification_requires_delivered_mate_and_fresh_consistent_frames() {
+    for color in [Color::White, Color::Black] {
+        let orient = |fen: &str| {
+            if color == Color::White {
+                fen.to_owned()
+            } else {
+                fen.chars()
+                    .map(|ch| {
+                        if ch.is_ascii_uppercase() {
+                            ch.to_ascii_lowercase()
+                        } else if ch.is_ascii_lowercase() {
+                            ch.to_ascii_uppercase()
+                        } else {
+                            ch
+                        }
+                    })
+                    .collect::<String>()
+                    .replace(" W ", " b ")
+                    .replace(" B ", " w ")
+            }
+        };
+        let before = orient("4k3/2R3R1/7K/2p5/p7/6p1/6P1/8 w - - 1 28");
+        let after = orient("2R1k3/6R1/7K/2p5/p7/6p1/6P1/8 b - - 2 28");
+        let covered = orient("2R1k3/6R1/7K/8/p7/6p1/6P1/8 w - - 0 1");
+        for case in 0..11 {
+            let mut source = Source::new(&[&before, &before, &covered, &covered]);
+            for frame in source.positions.iter_mut().skip(2) {
+                frame.as_mut().unwrap().board.geometry.y += 20.;
+            }
+            let mut engine = HistoryEngine::new(&before, "c7c8", &after);
+            engine.analysis.score = Some(Score::Mate(1));
+            engine.has_moves = false;
+            let mut input = Input::default();
+            match case {
+                1 => source.positions[2].as_mut().unwrap().board.fen = before.clone(),
+                2 => {
+                    source.positions[2].as_mut().unwrap().board.fen =
+                        orient("2R1k3/8/7K/8/p7/6p1/6P1/8 w - - 0 1")
+                }
+                3 => {
+                    source.positions[2].as_mut().unwrap().board.fen =
+                        orient("2R5/6R1/7K/8/p7/6p1/6P1/8 w - - 0 1")
+                }
+                4 => {
+                    source.positions[2].as_mut().unwrap().board.fen =
+                        orient("2R1k3/6R1/7K/2q5/p7/6p1/6P1/8 w - - 0 1")
+                }
+                5 => source.positions[2].as_mut().unwrap().source.x += 1,
+                6 => {
+                    source.positions[2].as_mut().unwrap().captured_at =
+                        Instant::now() - Duration::from_secs(4)
+                }
+                7 => engine.analysis.score = Some(Score::Mate(3)),
+                8 => engine.analysis.score = Some(Score::Mate(-1)),
+                9 => engine.has_moves = true,
+                10 => {
+                    source.positions.pop_back();
+                }
+                _ => {}
+            }
+            let result = controller::play(
+                &mut source,
+                &mut input,
+                &mut engine,
+                &Settings::default(),
+                color,
+                &AtomicBool::new(false),
+                |_| {},
+            );
+            if case == 0 {
+                assert_eq!(
+                    result.unwrap().confirmed_fen.as_deref(),
+                    Some(after.as_str())
+                );
+            } else {
+                assert!(result.is_err(), "color {color:?}, case {case}");
+            }
+            assert_eq!(input.events.len(), 1, "never replay an unverified move");
+        }
+    }
+}
+
+#[test]
 fn changed_stale_or_cancelled_work_never_dispatches() {
     for case in 0..6 {
         let mut source = Source::new(&[START, START, E4]);

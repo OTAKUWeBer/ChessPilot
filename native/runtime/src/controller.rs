@@ -329,6 +329,7 @@ struct Verification<'a> {
     color: Color,
     expected: &'a str,
     promotion: bool,
+    checkmate: bool,
 }
 fn verify(
     source: &mut impl BoardSource,
@@ -342,10 +343,12 @@ fn verify(
         color,
         expected,
         promotion,
+        checkmate,
     } = request;
     let timeout = Duration::from_secs(2);
     let interval = Duration::from_millis(if promotion { 300 } else { 200 });
     let deadline = Instant::now() + timeout;
+    let mut mate_frame = None;
     for _ in 0..timeout.as_millis().div_ceil(interval.as_millis()) {
         let remaining = deadline.saturating_duration_since(Instant::now());
         if remaining.is_zero() {
@@ -354,12 +357,39 @@ fn verify(
         input.wait(interval.min(remaining), cancelled)?;
         check(cancelled)?;
         if let Ok(current) = source.observe(color, cancelled) {
-            geometry(reference, &current)?;
+            if reference.source != current.source {
+                return Err(PlayError::GeometryChanged);
+            }
             fresh(current.captured_at)?;
-            if placement(&current.board.fen) == placement(expected) {
+            let geometry_result = geometry(reference, &current);
+            if geometry_result.is_ok() && placement(&current.board.fen) == placement(expected) {
                 check(cancelled)?;
                 return Ok(expected.into());
             }
+            // Result popups can hide enemy pieces and distort the detected board outline.
+            if checkmate {
+                let actual = fen_to_list(&current.board.fen).map_err(PlayError::Detection)?;
+                let expected_cells = fen_to_list(expected).map_err(PlayError::Engine)?;
+                let matches = actual.iter().zip(expected_cells).all(|(&seen, wanted)| {
+                    seen == wanted
+                        || (seen == ' '
+                            && wanted.is_ascii_alphabetic()
+                            && wanted.is_ascii_uppercase() != (color == Color::White)
+                            && !wanted.eq_ignore_ascii_case(&'k'))
+                });
+                if matches {
+                    let visible = placement(&current.board.fen);
+                    if mate_frame.as_deref() == Some(visible) {
+                        check(cancelled)?;
+                        log::debug!(target: "session", "Verified mating move across two result-overlay frames");
+                        return Ok(expected.into());
+                    }
+                    mate_frame = Some(visible.to_owned());
+                    continue;
+                }
+            }
+            mate_frame = None;
+            geometry_result?;
             if placement(&current.board.fen) != placement(&reference.board.fen) {
                 if let Some(fen) = engine
                     .reconcile_reply(expected, &current.board.fen, cancelled)
@@ -369,6 +399,8 @@ fn verify(
                     return Ok(fen);
                 }
             }
+        } else {
+            mate_frame = None;
         }
     }
     check(cancelled)?;
@@ -718,6 +750,10 @@ pub fn play_position(
             "Best move and updated position disagree".into(),
         ));
     }
+    let checkmate = analysis.score == Some(Score::Mate(1))
+        && !engine
+            .has_legal_moves(expected, cancelled)
+            .map_err(PlayError::Engine)?;
     progress(Progress::Status("Checking board before input..."));
     let current = observe(source, input, color, cancelled)?;
     geometry(&original, &current)?;
@@ -763,6 +799,7 @@ pub fn play_position(
                 color,
                 expected,
                 promotion: mv.promotion.is_some(),
+                checkmate,
             },
             cancelled,
         )?

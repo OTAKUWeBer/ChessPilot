@@ -19,6 +19,12 @@ Installation, supported platforms and test evidence are documented below. Signin
 
 ---
 
+## 🎬 Demo
+
+[![ChessPilot demo: first move, Auto endgame and confirmed checkmate](assets/demo-preview.gif)](assets/chesspilot-demo.mp4)
+
+[Watch the 42-second demo](assets/chesspilot-demo.mp4). Real Windows computer-bot recordings show setup, an opening move, then the end of another game through confirmed checkmate. The middle is omitted and playback speed changes are labeled.
+
 ## ⚡ Features
 
 - **Local analysis:** persistent ONNX detection and Stockfish, with in-memory captures.
