@@ -10,7 +10,8 @@ Desktop packages are attached to [successful rust-branch builds](https://github.
 | --- | --- |
 | Windows x64 | `ChessPilot-windows-x64-installer` artifact; unzip it to find the setup EXE |
 | Windows portable | `ChessPilot-windows-x64` artifact; unzip it, then extract the enclosed `ChessPilot-windows-x64.zip` |
-| Linux x64 | `ChessPilot-linux-x64` artifact; unzip it, then extract the enclosed `.tar.gz` |
+| Linux x64 | `ChessPilot-linux-x64-installer` artifact; unzip it to find the single `*-setup.run` installer |
+| Linux portable | `ChessPilot-linux-x64` artifact; unzip it, then extract the enclosed `.tar.gz` |
 | Android ARM64, API 24+ | `app-release.apk` from a trusted publisher or your own build; desktop CI does not currently publish an APK |
 
 The current Windows installer is unsigned. Android release-mode builds currently use the developer's local debug key; production signing is still a publisher task. A file named “release” is a build mode, not proof of publisher signing. Do not change system security settings globally to install the app.
@@ -31,8 +32,31 @@ The setup EXE installs the supporting DLLs, model, data and licenses together. K
 
 ## Linux x64
 
-1. Unzip the downloaded GitHub artifact to obtain `ChessPilot-linux-x64.tar.gz`.
-2. In the folder containing that archive, extract it and launch the app:
+Download the single `ChessPilot-VERSION-linux-x64-setup.run` file from a published release, or extract it from the installer CI artifact. Close ChessPilot before installing or updating, then run from the download folder:
+
+```sh
+sh ./ChessPilot-VERSION-linux-x64-setup.run
+```
+
+Replace `VERSION` with the downloaded filename's version. No `sudo`, FUSE, Flutter SDK or manual library copying is needed. Setup shows extraction/integrity progress, installs under `${XDG_DATA_HOME:-$HOME/.local/share}/chesspilot/app`, and adds **ChessPilot** to your applications menu. You can also launch it directly:
+
+```sh
+"${XDG_DATA_HOME:-$HOME/.local/share}/chesspilot/app/AppRun"
+```
+
+The installer includes the Flutter/Rust libraries, ONNX Runtime, exact detector model and GTK runtime dependencies. The host still supplies its Linux kernel, glibc, display session and graphics drivers. CI builds on Ubuntu 24.04; older glibc systems are not covered. Use a current x86_64 desktop such as the build baseline or a compatible newer distribution.
+
+First launch downloads a CPU-compatible Stockfish beside the installed app and reuses it on later launches. **Update:** close ChessPilot and run the newer installer; your engine, options, download cache and other user files are preserved. **Uninstall:** run an installer again with:
+
+```sh
+sh ./ChessPilot-VERSION-linux-x64-setup.run -- --uninstall
+```
+
+This removes managed application files and the menu entry. Downloaded engines, settings, caches, custom files and ownership metadata remain in the user data folder. No unrelated installation directory is replaced.
+
+### Optional portable bundle
+
+To use the `.tar.gz` developer/portable package instead, extract the **entire bundle** and keep all its files together:
 
 ```sh
 mkdir -p ChessPilot
@@ -50,7 +74,7 @@ Keep `lib/`, `data/`, the model and licenses beside the executable. GTK3 and the
 
 On first launch, let Stockfish setup complete. For an offline setup, place a compatible executable named `stockfish` beside `chesspilot` and make that engine executable. Preserve its license/source information.
 
-**Update:** close the app, retain your existing engine/configuration/cache, and replace application files with the newer complete bundle. **Remove:** close the app and remove the extracted folder when you no longer need its contents; keep any settings you want to reuse.
+**Portable update:** close the app, retain your existing engine/configuration/cache, and replace application files with the newer complete bundle. **Portable removal:** close the app and remove the extracted folder when you no longer need its contents; keep any settings you want to reuse.
 
 ## Android
 

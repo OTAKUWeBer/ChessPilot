@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=ChessPilot
+Comment=Local chessboard detection and Stockfish analysis
+Exec=chesspilot
+Icon=chesspilot
+Terminal=false
+Categories=Game;BoardGame;
+StartupWMClass=io.github.otakuweber.chesspilot

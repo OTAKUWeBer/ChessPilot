@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+set -e
+export APPDIR="$(cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd -P)"
+export LD_LIBRARY_PATH="$APPDIR/lib:$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export PATH="$APPDIR/usr/bin:${PATH:-/usr/bin:/bin}"
+for hook in "$APPDIR"/apprun-hooks/*.sh; do
+  [ ! -f "$hook" ] || source "$hook"
+done
+# Keep WAYLAND_DISPLAY/XDG_RUNTIME_DIR intact for the native capture/input adapters.
+exec "$APPDIR/chesspilot" "$@"

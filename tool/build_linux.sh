@@ -27,3 +27,4 @@ bash tool/flutter_linux.sh doctor -v || true
 bash tool/flutter_linux.sh pub get
 bash tool/flutter_linux.sh build linux --release
 printf '\nBuilt: %s/app/build/linux/x64/release/bundle/chesspilot\n' "$repo"
+bash tool/build_linux_installer.sh

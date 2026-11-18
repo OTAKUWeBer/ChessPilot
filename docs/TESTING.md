@@ -68,6 +68,12 @@ This builds a separate **ChessPilot Installer Test** identity, installs into an 
 
 The local smoke check passed. Fresh Windows-machine gameplay, SmartScreen reputation and signing acceptance remain separate from this packaging check.
 
+### Linux installer lifecycle
+
+`bash tool/test_linux_installer.sh` exercises an isolated fixture: install, upgrade with stale-library removal, engine/config/cache/custom-file preservation, launcher argument/environment handling, paths with spaces, uninstall/reinstall, and rejection of unrelated folders, concurrent setup, traversal and escaping symlinks. Passing a real `*-setup.run` additionally checks archive integrity, installs it under ignored `native/target`, starts the installed GTK launcher with `--help` under Xvfb, and runs the relocated native resource probe. It never plays a move or replaces a real ChessPilot installation.
+
+The scripts and fixture install/update/uninstall plus an actual self-extracting fixture archive were checked on the Windows host through Git Bash. Native directory-symlink handling and the actual GTK/ELF installer build require Linux; the workflow includes those checks, but no successful Linux installer build is claimed from the Windows-only fixture run.
+
 ## Linux capture and gameplay
 
 The maintainer reported working Linux gameplay and castling on November 18, 2026. CI checks the complete GTK bundle, real ONNX inference and an Xvfb capture/capability probe; broader compositor and monitor combinations remain separate.
