@@ -9,7 +9,7 @@ use serde_json::Value;
 use std::{collections::VecDeque, path::PathBuf, sync::atomic::AtomicBool};
 
 fn manifest() -> Value {
-    serde_json::from_str(include_str!("fixtures/vision/python.json")).unwrap()
+    serde_json::from_str(include_str!("fixtures/vision/reference.json")).unwrap()
 }
 fn fnv64(bytes: impl IntoIterator<Item = u8>) -> String {
     bytes
@@ -21,7 +21,7 @@ fn fnv64(bytes: impl IntoIterator<Item = u8>) -> String {
 }
 
 #[test]
-fn preprocessing_matches_python_pillow_tensor_bytes() {
+fn preprocessing_matches_reference_tensor_bytes() {
     for case in manifest()["patterns"].as_array().unwrap() {
         let w = case["width"].as_u64().unwrap() as usize;
         let h = case["height"].as_u64().unwrap() as usize;
@@ -177,7 +177,7 @@ fn normal_raw_refined_and_tiled_search_preserve_screen_coordinates() {
 
 #[test]
 #[ignore = "Requires CHESSPILOT_MODEL and CHESSPILOT_ORT native runtime"]
-fn actual_onnx_inference_and_zoom_search_match_python() {
+fn actual_onnx_inference_and_zoom_search_match_reference() {
     let model = PathBuf::from(std::env::var_os("CHESSPILOT_MODEL").unwrap());
     let runtime = PathBuf::from(std::env::var_os("CHESSPILOT_ORT").unwrap());
     let mut reader = BoardReader::new(OnnxPredictor::load(&model, &runtime).unwrap());
@@ -242,7 +242,7 @@ fn actual_onnx_inference_and_zoom_search_match_python() {
 
 #[test]
 #[ignore = "Requires externally generated CHESSPILOT_PARITY_REPORT, CHESSPILOT_MODEL and CHESSPILOT_ORT"]
-fn actual_reported_image_matches_python() {
+fn actual_reported_image_matches_reference() {
     use chesspilot_core::detection::{
         CHESSBOARD_CLASS_ID, CLASS_TO_FEN, PROMOTION_PIECE_IDS, PROMOTION_PIECE_IDS_BLACK,
     };

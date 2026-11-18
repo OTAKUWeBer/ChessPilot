@@ -72,7 +72,7 @@ val packageNative by tasks.registering(Sync::class) {
     into(generatedNative)
     doFirst {
         check(listOf("libstockfish.so","libstockfish_dotprod.so").all { file("$engineAssets/arm64-v8a/$it").isFile }) {
-            "Prepare Android Stockfish first; see android-testing.md"
+            "Prepare Android Stockfish first; see docs/BUILDING.md"
         }
     }
 }

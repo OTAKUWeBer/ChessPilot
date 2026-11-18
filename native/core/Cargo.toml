@@ -1,5 +1,5 @@
 [package]
 name = "chesspilot-core"
-version = "3.0.0-beta.1"
+version.workspace = true
 edition = "2021"
 license = "MIT"

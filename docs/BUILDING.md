@@ -1,8 +1,8 @@
-# Build ChessPilot 3.0.0-beta.1
+# Build ChessPilot
 
 Build the Windows app on Windows, the Linux app on Linux, and the Android APK on Windows using the preparation script below. Android asset preparation currently uses Windows tools; a native Linux/macOS Android preparation script is not provided.
 
-The application does not need Python. The exact ONNX model is already in this repository. First-time builds need internet for SDK/dependency/runtime/Stockfish preparation; normal gameplay is local after setup.
+The exact ONNX model is already in this repository. First-time builds need internet for SDK/dependency/runtime/Stockfish preparation; normal gameplay is local after setup.
 
 ## Shared tools and checkout
 
@@ -96,9 +96,9 @@ Install [Inno Setup 6.3 or newer](https://jrsoftware.org/inno-setup) on the buil
 ./tool/build_windows_installer.ps1
 ```
 
-Output: **`app/build/windows/installer/ChessPilot-3.0.0-beta.1-windows-x64-setup.exe`**. Users run this one file and launch the app through its Start menu shortcut. The installer keeps the DLLs, Flutter data and model inside the selected installation folder. The default is per-user, without an administrator prompt; another writable folder can be selected. First launch downloads a CPU-compatible Stockfish beside the app when missing.
+Output: **`app/build/windows/installer/ChessPilot-VERSION-windows-x64-setup.exe`**. Users run this one file and launch the app through its Start menu shortcut. The installer keeps the DLLs, Flutter data and model inside the selected installation folder. The default is per-user, without an administrator prompt; another writable folder can be selected. First launch downloads a CPU-compatible Stockfish beside the app when missing.
 
-This unsigned beta setup excludes the developer's Stockfish, options, caches and logs. Existing installed engine/settings/cache files are preserved across reinstall and uninstall. See [installer behavior and isolated smoke checks](../packaging/windows/README.md). The CI installer artifact is separate from the portable ZIP.
+This unsigned setup excludes the developer's Stockfish, options, caches and logs. Existing installed engine/settings/cache files are preserved across reinstall and uninstall. See [installation behavior](INSTALLING.md#windows-x64) and [isolated installer checks](TESTING.md#windows-installer-lifecycle). The CI installer artifact is separate from the portable ZIP.
 
 ## Linux x64, including Arch
 
@@ -152,7 +152,7 @@ For the existing wlroots Wayland capture path on Arch:
 sudo pacman -S --needed grim
 ```
 
-These are build dependencies plus the wlroots capture helper; do not install Python/PyQt for the Rust app. See [Flutter's Linux prerequisites](https://docs.flutter.dev/platform-integration/linux/setup) and the Arch packages for [GTK3](https://archlinux.org/packages/extra/x86_64/gtk3/), [Ninja](https://archlinux.org/packages/extra/x86_64/ninja/) and [grim](https://archlinux.org/packages/extra/x86_64/grim/).
+These are build dependencies plus the wlroots capture helper. See [Flutter's Linux prerequisites](https://docs.flutter.dev/platform-integration/linux/setup) and the Arch packages for [GTK3](https://archlinux.org/packages/extra/x86_64/gtk3/), [Ninja](https://archlinux.org/packages/extra/x86_64/ninja/) and [grim](https://archlinux.org/packages/extra/x86_64/grim/).
 
 After installing Flutter/Rust and adding them to PATH:
 
@@ -184,7 +184,7 @@ To make a portable archive, from `app`:
 tar -czf ChessPilot-linux-x64.tar.gz -C build/linux/x64/release/bundle .
 ```
 
-This produces a bundle archive, not an AppImage or DEB installer. The current GTK launcher may run through XWayland even when board capture/input uses the native wlroots protocols. Keep the session's normal `XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY` values; the compositor must expose screencopy and `zwlr_virtual_pointer_manager_v1`. GNOME/KDE portal-based automation is unfinished. A successful Linux build does not establish live Wayland calibration. Follow [Linux capture and gameplay checks](../linux-testing.md) on the actual desktop.
+This produces a bundle archive, not an AppImage or DEB installer. The current GTK launcher may run through XWayland even when board capture/input uses the native wlroots protocols. Keep the session's normal `XDG_RUNTIME_DIR` and `WAYLAND_DISPLAY` values; the compositor must expose screencopy and `zwlr_virtual_pointer_manager_v1`. GNOME/KDE portal-based automation is unfinished. A successful Linux build does not establish live Wayland calibration. Follow [Linux capture and gameplay checks](TESTING.md#linux-capture-and-gameplay) on the actual desktop.
 
 ## Android ARM64 APK, built on Windows
 
@@ -244,20 +244,14 @@ Release-mode output: **`app/build/app/outputs/flutter-apk/app-release.apk`**. Th
 
 Use the normal build command shown above when changing build modes. With Flutter 3.38.6, adding `--no-pub` can retain development-plugin registration from a previous debug build and fail release compilation. The normal command regenerates the plugin registration. The release-mode APK has built locally; physical-phone acceptance so far refers to the earlier debug engineering build.
 
-### Install on a connected phone
+## Install or verify a build
 
-Enable Android Developer options/USB debugging, connect the phone and accept its USB debugging prompt. Then, from `app`:
+Use [INSTALLING.md](INSTALLING.md) for installation and first launch. Developer ADB/device checks, installer smoke tests and platform evidence are in [TESTING.md](TESTING.md). Release signing/version maintenance is in [RELEASING.md](RELEASING.md).
 
-```powershell
-adb devices
-adb -s YOUR_DEVICE_SERIAL install -r build/app/outputs/flutter-apk/app-debug.apk
-adb -s YOUR_DEVICE_SERIAL shell am start -n io.github.otakuweber.chesspilot/.MainActivity
-```
+## Desktop asset preparation details
 
-Replace `YOUR_DEVICE_SERIAL` with the device shown by `adb devices`; choose `app-release.apk` instead to install the optimized local build. In ChessPilot, enable touch control, share the entire display and allow running notifications as described in [Android setup and testing](../android-testing.md).
+The preparation script pins ONNX Runtime 1.20.1 and verifies cached archives. If the GitHub release download fails, it uses the hash-pinned official Microsoft.ML.OnnxRuntime NuGet package through two endpoints. Runtime/model changes require real inference regression checks; dependencies do not float to latest.
 
-## What is verified, and what remains
+`-DCHESSPILOT_DESKTOP_PLATFORM=windows-x64`, `windows-arm64`, `linux-x64` or `linux-arm64` selects prepared assets before `-P`. This does not supply cross-compilers or Flutter cross-build support. `CHESSPILOT_DESKTOP_ASSETS`, `CHESSPILOT_RUST_TARGET` and `CHESSPILOT_RUST_TOOLCHAIN` select the corresponding CMake inputs. Prepared downloads remain under ignored `native/target/`; ordinary Flutter/CMake builds do not download them implicitly.
 
-The [beta CI run](https://github.com/OTAKUWeBer/ChessPilot/actions/runs/44147469834) passed complete Windows/Linux builds, native and Flutter regressions, actual ONNX/refined-search parity, model integrity, and the Xvfb X11 capture/capability probe. Local Android debug and release-mode builds passed, and the debug build has physical-phone main-flow checks; see the platform testing documents for exact cases.
-
-The full release goal is still open: live Linux/Wayland behavior, longer Windows/phone runs, additional devices/monitors, phone special moves/rotation/large text/permission recovery, production signing and distribution acceptance remain. A build or unit-test pass does not claim those runtime cases.
+The Windows installer builder locates Inno Setup on PATH or in its usual installation folders; `-IsccPath` selects a custom compiler. It verifies executable version/architecture, required runtime files and model checksum before building. Installer output excludes developer-local engines, configuration, caches and logs. See the installation guide for end-user update/uninstall behavior and the test guide for payload verification.

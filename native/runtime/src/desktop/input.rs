@@ -1,4 +1,4 @@
-//! Windows gesture order/timing from game/move_execution.py; OS delivery is not board verification.
+//! Desktop gesture sequencing; OS delivery is not board verification.
 use chesspilot_core::{board::Point, config::MoveMode};
 use std::{
     collections::hash_map::RandomState,
@@ -17,7 +17,7 @@ pub fn random_unit() -> f64 {
     })
 }
 
-/// Python's symmetric uniform offsets, bounded further for tiny squares/menu choices.
+/// Symmetric uniform offsets, bounded further for tiny squares/menu choices.
 pub fn offset_point(
     point: Point,
     square_size: f64,

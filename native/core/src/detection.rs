@@ -1,4 +1,4 @@
-//! Source: board_detection/model_classes.py and fen_extractor.py.
+//! Model class mappings and detection-to-board conversion.
 use crate::{board::BoardGeometry, fen::flip_board, Color};
 
 pub const CHESSBOARD_CLASS_ID: u8 = 12;
@@ -79,7 +79,7 @@ pub fn get_fen_from_position(
         }
         rows.push(text);
     }
-    // Preserve Python's supplied active-color/default-history contract during porting.
+    // The caller supplies active color; pixels alone do not establish move history.
     let mut fen = format!("{} {} - - 0 1", rows.join("/"), color.fen());
     if color == Color::Black {
         fen = flip_board(&fen)?;

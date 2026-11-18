@@ -1,11 +1,12 @@
-# ================================
-# ChessPilot Engine Configuration
-# ================================
-# You can edit these values to change engine behavior.
-# Be sure to restart the app after editing this file.
+# ChessPilot Stockfish configuration
+# Restart ChessPilot after editing. Existing user files are never replaced.
+# Threads first, then Hash (megabytes). Leave room for capture, inference and the UI.
+setoption name Threads value 2
+setoption name Hash value 256
 
-# Memory used in MB (64–1024+ recommended depending on your system)
-setoption name Hash value 1024
+# Optional: weaken play for practice (0-20; 20 is full strength).
+# setoption name Skill Level value 10
 
-# CPU threads to use (1–8 usually; match your CPU core count)
-setoption name Threads value 4
+# Keep standard chess and one analysis line for normal automation.
+# setoption name UCI_Chess960 value false
+# setoption name MultiPV value 1

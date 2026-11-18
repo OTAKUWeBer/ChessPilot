@@ -1,4 +1,4 @@
-//! Native replacement for cpu_features.py; unknown CPUs never gain assumed instructions.
+//! Native CPU feature detection; unknown CPUs never gain assumed instructions.
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 #[derive(Debug, Clone)]

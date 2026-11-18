@@ -50,7 +50,7 @@ try {
 } finally { $stream.Dispose() }
 $expected = ((Get-Content -LiteralPath (Join-Path $repo 'assets/models/chess_detection.onnx.sha256') -Raw).Trim() -split '\s+')[0]
 if ((Get-FileHash -LiteralPath (Join-Path $BundleDir 'chess_detection.onnx') -Algorithm SHA256).Hash -ne $expected) {
-    throw 'Bundled ONNX model differs from the tracked Python model.'
+    throw 'Bundled ONNX model differs from the tracked detection model.'
 }
 if (-not $IsccPath) {
     $command = Get-Command ISCC.exe -ErrorAction SilentlyContinue

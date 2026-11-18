@@ -1,4 +1,4 @@
-//! Ports of the Python domain modules; OS input and UI stay outside this crate.
+//! Chess domain types and rules; OS input and UI stay outside this crate.
 pub mod board;
 pub mod config;
 pub mod detection;

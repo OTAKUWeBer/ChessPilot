@@ -51,7 +51,7 @@ fn asset(name: &str) -> Asset {
     }
 }
 #[test]
-fn compatible_pc_choices_match_frozen_python_scoring() {
+fn compatible_pc_choices_match_reference_scoring() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/downloads.json")).unwrap();
     let assets: Vec<_> = fixture["assets"]
         .as_array()

@@ -285,7 +285,7 @@ fn compositor(mode: &str) -> (Fragmented, Trace, thread::JoinHandle<()>) {
     (Fragmented(client), trace, worker)
 }
 #[test]
-fn wire_strings_headers_and_fragmented_roundtrips_match_the_python_pointer_trace() {
+fn wire_strings_headers_and_fragmented_roundtrips_match_reference_pointer_trace() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/wayland.json")).unwrap();
     for (mode, index) in [(MoveMode::Drag, 0), (MoveMode::Click, 1)] {
         let (stream, trace, server) = compositor("normal");

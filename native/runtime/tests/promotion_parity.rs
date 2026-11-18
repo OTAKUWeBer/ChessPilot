@@ -9,7 +9,7 @@ fn as_json(pieces: Vec<PromotionPiece>) -> Value {
     json!(pieces.into_iter().map(|p|json!({"class_id":p.class_id,"confidence":p.confidence,"position":[p.position.x,p.position.y],"file":p.file,"rank":p.rank,"is_promotion_rank":p.is_promotion_rank,"piece_char":p.piece_char})).collect::<Vec<_>>())
 }
 #[test]
-fn promotion_candidates_match_frozen_python_in_both_colors_and_fractional_geometry() {
+fn promotion_candidates_match_reference_in_both_colors_and_fractional_geometry() {
     let fixture: Value = serde_json::from_str(include_str!("fixtures/promotion.json")).unwrap();
     for case in fixture["cases"].as_array().unwrap() {
         let b = &case["board"];

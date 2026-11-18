@@ -1,4 +1,4 @@
-//! Port of board_detection/get_positions.py. Capture supplies packed RGB frames.
+//! Board detection over packed RGB capture frames.
 mod onnx;
 mod preprocess;
 use chesspilot_core::{

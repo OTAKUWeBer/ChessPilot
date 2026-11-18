@@ -39,7 +39,7 @@ fn return_targets_require_a_nonzero_native_window_and_integer_client_pixels() {
 }
 
 #[test]
-fn humanize_preserves_python_offsets_and_stays_inside_small_square_targets() {
+fn humanize_preserves_offsets_and_stays_inside_small_square_targets() {
     use chesspilot_runtime::desktop::input::offset_point;
     let center = Point { x: 50., y: 50. };
     for (size, limit, bound) in [
@@ -71,7 +71,7 @@ fn humanize_preserves_python_offsets_and_stays_inside_small_square_targets() {
 }
 
 #[test]
-fn capture_points_keep_origin_and_python_rounding() {
+fn capture_points_keep_origin_and_ties_even_rounding() {
     let source = CaptureBounds {
         x: -1920,
         y: -100,
@@ -254,7 +254,7 @@ fn windows_timer_oversleep_counts_toward_the_requested_gesture_delay() {
     assert_eq!(pointer.buttons, [true, false, true, false]);
 }
 #[test]
-fn windows_drag_and_click_preserve_python_order_and_timing() {
+fn windows_drag_and_click_preserve_gesture_order_and_timing() {
     for mode in [MoveMode::Drag, MoveMode::Click] {
         let cancelled = AtomicBool::new(false);
         let mut pointer = Recording {

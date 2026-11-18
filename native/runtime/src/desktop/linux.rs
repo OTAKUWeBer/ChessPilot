@@ -1,4 +1,4 @@
-//! X11 uses native protocol requests; wlroots preserves grim + virtual-pointer without Python.
+//! Native X11 capture/input and wlroots screencopy/virtual-pointer adapters.
 use super::{
     input::{self, InputError, PixelPoint, Pointer},
     unix_socket,

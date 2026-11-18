@@ -1,4 +1,4 @@
-//! Source: core/game_state.py. Keep FEN histories keyed by active color.
+//! Game state and FEN histories keyed by active color.
 use crate::{board::BoardGeometry, config::MoveMode, Color};
 
 #[derive(Debug, Clone, Default)]

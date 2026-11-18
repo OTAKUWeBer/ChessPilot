@@ -1,4 +1,4 @@
-//! Pure piece discovery from game/promotion.py; gesture/menu ownership stays in runtime.
+//! Pure promotion-piece discovery; gesture/menu ownership stays in runtime.
 use crate::{
     board::{BoardGeometry, Point},
     detection::{Detection, CLASS_TO_FEN, PROMOTION_PIECE_IDS, PROMOTION_PIECE_IDS_BLACK},

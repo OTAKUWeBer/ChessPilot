@@ -1,7 +1,7 @@
-// Expected values captured from the current Python implementation.
+// Frozen coordinate and castling regression cases.
 use chesspilot_core::{board::*, fen::*, notation::*, Color::*};
 #[test]
-fn python_coordinates_w() {
+fn coordinates_w() {
     let expected = [
         (0, 7),
         (1, 7),
@@ -77,7 +77,7 @@ fn python_coordinates_w() {
     }
 }
 #[test]
-fn python_coordinates_b() {
+fn coordinates_b() {
     let expected = [
         (7, 0),
         (6, 0),
@@ -153,7 +153,7 @@ fn python_coordinates_b() {
     }
 }
 #[test]
-fn python_castling_flags() {
+fn castling_flags() {
     assert_eq!(
         update_fen_castling_rights(White, false, false, "r3k2r/8/8/8/8/8/8/R3K2R w - - 0 1")
             .unwrap(),
@@ -194,7 +194,7 @@ fn python_castling_flags() {
     );
 }
 #[test]
-fn python_fractional_and_negative_monitor_geometry() {
+fn fractional_and_negative_monitor_geometry() {
     assert_eq!(
         BoardGeometry::new(724.0, 189.0, 130.875)
             .unwrap()

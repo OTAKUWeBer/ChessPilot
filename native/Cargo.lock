@@ -37,11 +37,11 @@ checksum = "4e7648175b45a9a48536d676f68d918270699102aa8dab5496df06904c914600"
 
 [[package]]
 name = "chesspilot-core"
-version = "3.0.0-beta.1"
+version = "3.0.0"
 
 [[package]]
 name = "chesspilot-runtime"
-version = "3.0.0-beta.1"
+version = "3.0.0"
 dependencies = [
  "chesspilot-core",
  "jni",

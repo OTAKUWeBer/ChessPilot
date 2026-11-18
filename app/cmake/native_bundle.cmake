@@ -29,7 +29,7 @@ foreach(required "${model}" "${CHESSPILOT_DESKTOP_ASSETS}/${runtime_library}"
     "${CHESSPILOT_DESKTOP_ASSETS}/licenses/ONNXRuntime-ThirdPartyNotices.txt"
     "${CHESSPILOT_DESKTOP_ASSETS}/licenses/ONNXRuntime-SOURCE.txt")
   if(NOT EXISTS "${required}")
-    message(FATAL_ERROR "Missing desktop asset ${required}. Run cmake -P tool/prepare_desktop.cmake first; see desktop-building.md")
+    message(FATAL_ERROR "Missing desktop asset ${required}. Run cmake -P tool/prepare_desktop.cmake first; see docs/BUILDING.md")
   endif()
 endforeach()
 find_program(CHESSPILOT_CARGO cargo REQUIRED)

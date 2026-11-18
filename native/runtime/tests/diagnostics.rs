@@ -28,9 +28,9 @@ impl Drop for Temp {
     }
 }
 #[test]
-fn rotation_retains_order_reopens_existing_data_and_does_not_touch_python_logs() {
+fn rotation_retains_order_reopens_existing_data_and_preserves_unrelated_logs() {
     let temp = Temp::new();
-    fs::write(temp.0.join("chesspilot.log"), b"Python reference").unwrap();
+    fs::write(temp.0.join("chesspilot.log"), b"Unrelated log").unwrap();
     {
         let mut log = RotatingLog::new(&temp.0, 12, 2).unwrap();
         for text in [
@@ -70,7 +70,7 @@ fn rotation_retains_order_reopens_existing_data_and_does_not_touch_python_logs()
     );
     assert_eq!(
         fs::read(temp.0.join("chesspilot.log")).unwrap(),
-        b"Python reference"
+        b"Unrelated log"
     );
 }
 #[test]

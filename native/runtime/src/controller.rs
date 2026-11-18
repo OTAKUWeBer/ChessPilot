@@ -1,4 +1,4 @@
-//! Serialized capture/analyze/execute/verify port of game/move_processor.py and move_execution.py.
+//! Serialized capture, analysis, execution and visual verification.
 use crate::{
     desktop::{self, input::InputError, Capture, CaptureBounds, Observation, RawObservation},
     engine::{Analysis, EngineService, Score},

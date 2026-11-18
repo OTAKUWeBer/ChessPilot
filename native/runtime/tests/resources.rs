@@ -41,8 +41,8 @@ fn defaults_and_portable_config_preserve_user_content() {
     assert_eq!(
         engine_options(&fs::read_to_string(&path).unwrap()).unwrap(),
         [
-            "setoption name Hash value 1024",
-            "setoption name Threads value 4"
+            "setoption name Threads value 2",
+            "setoption name Hash value 256"
         ]
     );
     fs::write(&path, "# user\nsetoption name Hash value 32\n").unwrap();
@@ -79,6 +79,17 @@ fn local_resources_options_and_missing_assets() {
     );
     assert!(engine_options("quit").is_err());
     assert!(engine_options("setoption name Hash value 16\rquit").is_err());
+    for invalid in [
+        "setoption name ",
+        "setoption name Hash value 0",
+        "setoption name Threads value -1",
+        "setoption name Threads value many",
+        "setoption name Skill Level value 21",
+        "setoption name UCI_Chess960 value true",
+    ] {
+        assert!(engine_options(invalid).is_err(), "{invalid}");
+    }
+    assert!(engine_options("setoption name Skill Level value 0\nsetoption name MultiPV value 2\nsetoption name UCI_Chess960 value false\nsetoption name Clear Hash").is_ok());
 }
 
 #[test]

@@ -1,4 +1,4 @@
-//! Bounded native diagnostics. Rotation follows logging_setup.py's 5 MiB / five-backup policy.
+//! Bounded native diagnostics with 5 MiB rotation and five backups.
 use log::{Level, LevelFilter, Log, Metadata, Record};
 use serde_json::{json, Value};
 use std::{
@@ -144,7 +144,7 @@ impl RotatingLog {
     }
 }
 
-/// Preserve the Python Windows/XDG order while rejecting relative environment-directory values.
+/// Use the Windows/XDG directory priority while rejecting relative environment-directory values.
 pub fn default_directories(
     os: &str,
     environment: impl Fn(&str) -> Option<PathBuf>,

@@ -1,4 +1,4 @@
-//! Persistent Stockfish UCI service. Source: services/engine_service.py.
+//! Persistent Stockfish UCI service.
 use chesspilot_core::{
     board::fen_to_list,
     fen::{is_two_square_king_move, rook_move},
@@ -242,7 +242,7 @@ impl EngineProcess {
         #[cfg(windows)]
         {
             use std::os::windows::process::CommandExt;
-            command.creation_flags(0x08000000); // CREATE_NO_WINDOW, as in Python.
+            command.creation_flags(0x08000000); // CREATE_NO_WINDOW
         }
         let mut child = command.spawn()?;
         let input = child.stdin.take();
@@ -458,6 +458,10 @@ impl EngineProcess {
             };
             let parts: Vec<_> = line.split_whitespace().collect();
             if parts.first() == Some(&"info") {
+                // Secondary variations must not replace the chosen move's score or mate result.
+                if parts.windows(2).any(|p| p[0] == "multipv" && p[1] != "1") {
+                    continue;
+                }
                 if let Some(d) = parts
                     .windows(2)
                     .find(|p| p[0] == "depth")

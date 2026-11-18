@@ -1,11 +1,11 @@
-//! Source: services/engine_service.py and utils/resource_path.py.
+//! Native asset discovery and engine configuration.
 use std::{
     fs::{self, OpenOptions},
     io::{self, Read, Write},
     path::{Path, PathBuf},
 };
 
-pub const DEFAULT_CONFIG: &str = "# ChessPilot Engine Configuration\n# Restart the engine after editing.\nsetoption name Hash value 1024\nsetoption name Threads value 4\n";
+pub const DEFAULT_CONFIG: &str = include_str!("../../../engine_config.txt");
 
 pub fn native_asset_directories() -> io::Result<Vec<PathBuf>> {
     let exe = std::env::current_exe()?;
@@ -226,6 +226,27 @@ pub fn engine_options(text: &str) -> io::Result<Vec<String>> {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Invalid engine option in config",
+            ));
+        }
+        let option = &line["setoption name ".len()..];
+        let (name, value) = option.split_once(" value ").unwrap_or((option, ""));
+        let problem = match name.trim().to_ascii_lowercase().as_str() {
+            "hash" | "threads" if !value.trim().parse::<u32>().is_ok_and(|n| n > 0) => {
+                Some("use a positive whole number")
+            }
+            "skill level" if !value.trim().parse::<u32>().is_ok_and(|n| n <= 20) => {
+                Some("use a whole number from 0 to 20")
+            }
+            "uci_chess960" if !value.trim().eq_ignore_ascii_case("false") => {
+                Some("must remain false; ChessPilot supports standard chess")
+            }
+            "" => Some("option name is required"),
+            _ => None,
+        };
+        if let Some(problem) = problem {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("Invalid {name}: {problem}"),
             ));
         }
         options.push(line.into());

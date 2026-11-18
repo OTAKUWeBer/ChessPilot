@@ -1,4 +1,4 @@
-//! Source: game/move_validator.py, including promotion and en-passant comparisons.
+//! Move verification, including promotion and en passant.
 use crate::{board::fen_to_list, notation::Move, Color};
 
 pub fn did_my_piece_move(

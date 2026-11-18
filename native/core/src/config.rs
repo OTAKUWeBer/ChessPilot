@@ -1,4 +1,4 @@
-//! Ported Python defaults; Android uses a lower analysis depth for responsiveness.
+//! Application defaults; Android uses a lower analysis depth for responsiveness.
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub const WINDOW_WIDTH: f64 = 380.0;
 pub const WINDOW_HEIGHT: f64 = 520.0;

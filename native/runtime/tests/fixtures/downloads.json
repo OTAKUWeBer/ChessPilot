@@ -66,7 +66,7 @@
       "flags": [],
       "expected": "stockfish-windows-x86-64-sse41-popcnt.zip",
       "native_expected": "stockfish-windows-x86-64.zip",
-      "difference": "The Python scorer can select SSE4.1/POPCNT without detected flags; Rust rejects unsupported instructions."
+      "difference": "The reference scorer can select SSE4.1/POPCNT without detected flags; native selection rejects unsupported instructions."
     },
     {
       "os": "linux",

@@ -1,4 +1,4 @@
-//! Source: core/fen_utils.py and board_detection/fen_extractor.py:flip_board.
+//! FEN transformations and placement-based castling checks.
 use crate::{board::fen_to_list, notation::Move, Color};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -27,7 +27,7 @@ pub fn flip_board(fen: &str) -> Result<String, String> {
     Ok(fields.join(" "))
 }
 
-/// Placement-based compatibility check, matching Python; not full legal rights.
+/// Placement-based compatibility check, not a reconstruction of legal move history.
 pub fn is_castling_possible(fen: &str, color: Color, side: CastleSide) -> Result<bool, String> {
     let board = fen_to_list(fen)?;
     let (base, king, rook) = match color {

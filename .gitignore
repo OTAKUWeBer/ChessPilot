@@ -1,95 +1,79 @@
-# Python environment folders
-myenv/
-venv/
-.venv/
-env/
-.python-version
-
-# Python cache and compiled files
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.py[cod]
-
-# Build artifacts
+# Generated builds and tool caches
+target/
 build/
 dist/
-*.egg-info/
-*.egg
+.dart_tool/
+.fvm/
+.gradle/
+.kotlin/
+.cxx/
+.pub-cache/
+.cache/
+coverage/
 
-# Logs and debug files
+# Compiled binaries and release archives
+*.exe
+*.dll
+*.so
+*.so.*
+*.dylib
+*.pdb
+*.a
+*.lib
+*.apk
+*.aab
+*.msix
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.7z
+*.AppImage
+
+# Logs, local settings and signing material
 *.log
 *.out
 *.err
-debug.log
-pip-log.txt
-pip-delete-this-directory.txt
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+*.pfx
+*.p12
+*.key
+*.pem
+key.properties
+local.properties
 
-# IDE and editor settings
+# Editor, OS and patch files
 .vscode/
 .idea/
-*.sublime-workspace
-*.sublime-project
+.DS_Store
+Thumbs.db
+Desktop.ini
 *.swp
 *.bak
 *.tmp
 *.orig
-*.~*
+*.rej
+*~
 
-# System-specific files
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-
-# Test and coverage files
-htmlcov/
-.coverage
-.coverage.*
-.cache
-nosetests.xml
-coverage.xml
-release_notes.md
-*.cover
-*.py,cover
-.tox/
+# Local environments and leftovers from earlier checkouts
+/next/
+venv/
+.venv/
+myenv/
+env/
+.python-version
+__pycache__/
+*.py[cod]
 .pytest_cache/
-
-# Jupyter Notebook checkpoints
-.ipynb_checkpoints/
-
-# Temporary files
-tempCodeRunnerFile.py
-
-# Project-specific files
+release_notes.md
 release-notes.md
+
+# Downloaded engines/models; keep the bundled source model
 stockfish
 stockfish.exe
 chess_detection.onnx
-!/src/chess_detection.onnx
-*.zip
-wayland-info
-grim
-.test_write
-
-# AUR / AppImage packaging
-.SRCINFO
-chesspilot.desktop
-chesspilot.png
-ChessPilot-*.AppImage
-
-# AppImage extraction
-*.AppDir/
-*.AppDir
-
-# Editor/patch backup files
-*.orig
-*.rej
-*~
-.env
-
-# Native build outputs and local pre-migration artifacts
-/native/target/
-/next/
 !/assets/models/chess_detection.onnx

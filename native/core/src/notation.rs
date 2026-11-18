@@ -1,4 +1,4 @@
-//! Source: core/notation.py; GUI error reporting belongs to the caller.
+//! Chess move notation; presentation errors belong to the caller.
 use crate::{board::algebraic_to_index, Color};
 
 pub type ScreenSquare = (usize, usize);

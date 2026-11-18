@@ -3,10 +3,10 @@ name: Rust and Flutter desktop
 on:
   push:
     branches: [rust]
-    paths: ['app/**', 'native/**', 'tool/**', 'packaging/**', 'assets/models/chess_detection.onnx*', 'assets/**', '.github/workflows/native.yml']
+    paths: ['app/**', 'native/**', 'tool/**', 'packaging/**', 'assets/models/chess_detection.onnx*', 'assets/**', 'engine_config.txt', 'LICENSE', '.gitattributes', '.github/workflows/native.yml']
   pull_request:
     branches: [rust]
-    paths: ['app/**', 'native/**', 'tool/**', 'packaging/**', 'assets/models/chess_detection.onnx*', 'assets/**', '.github/workflows/native.yml']
+    paths: ['app/**', 'native/**', 'tool/**', 'packaging/**', 'assets/models/chess_detection.onnx*', 'assets/**', 'engine_config.txt', 'LICENSE', '.gitattributes', '.github/workflows/native.yml']
   workflow_dispatch:
 
 permissions:
@@ -40,7 +40,7 @@ jobs:
       CHESSPILOT_LIBRARY_PATH: ${{ github.workspace }}/app/build/${{ matrix.bundle }}/${{ matrix.native }}
     steps:
       - uses: actions/checkout@v4
-      - name: Verify the exact Python model
+      - name: Verify bundled detection model
         shell: bash
         working-directory: assets/models
         run: sha256sum --check chess_detection.onnx.sha256
@@ -54,7 +54,7 @@ jobs:
       - name: Install Flutter
         shell: bash
         run: |
-          flutter_version="$(python -c 'import json; print(json.load(open("app/.fvmrc"))["flutter"])')"
+          flutter_version="$(sed -nE 's/^[[:space:]]*"flutter"[[:space:]]*:[[:space:]]*"([0-9]+\.[0-9]+\.[0-9]+)"[[:space:]]*,?[[:space:]]*$/\1/p' "app/.fvmrc")"
           if [ "$RUNNER_OS" = Linux ]; then
             bash -n tool/flutter_linux.sh
             bash -n tool/build_linux.sh
@@ -64,6 +64,10 @@ jobs:
             git clone --depth 1 --branch "$flutter_version" https://github.com/flutter/flutter.git "$RUNNER_TEMP/flutter"
             echo "$RUNNER_TEMP/flutter/bin" >> "$GITHUB_PATH"
           fi
+      - name: Check release version consistency
+        run: dart tool/version.dart --check
+      - name: Test release version tooling
+        run: dart --enable-asserts tool/tests/version_test.dart
       - name: Check Rust formatting
         run: cargo fmt --manifest-path native/Cargo.toml --all --check
       - name: Check Rust warnings
@@ -85,7 +89,7 @@ jobs:
         working-directory: app
         run: flutter test --no-pub
       - name: Check real ONNX inference and refined search
-        run: cargo test --manifest-path native/Cargo.toml --release --locked --test vision actual_onnx_inference_and_zoom_search_match_python -- --ignored
+        run: cargo test --manifest-path native/Cargo.toml --release --locked --test vision actual_onnx_inference_and_zoom_search_match_reference -- --ignored
       - name: Probe X11 capture and input capability without a gesture
         if: runner.os == 'Linux'
         env:

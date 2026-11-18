@@ -1,4 +1,4 @@
-//! Port of downloader.py: CPU selection, progress, cancellation and offline-safe installation.
+//! CPU-compatible engine selection, progress and verified installation.
 use crate::{
     cpu::{self, CpuInfo},
     desktop::helper,
@@ -255,7 +255,7 @@ fn score(name: &str, cpu: &CpuInfo) -> i32 {
     instruction + fallback + bonus + penalty + 5
 }
 pub fn choose_asset<'a>(assets: &'a [Asset], os: &str, cpu: &CpuInfo) -> Option<&'a Asset> {
-    // Strictly preserve the first highest-scored compatible asset, as in Python.
+    // Strictly preserve the first highest-scored compatible asset, with stable tie-breaking.
     let mut best = None;
     let mut best_score = i32::MIN;
     for asset in assets {

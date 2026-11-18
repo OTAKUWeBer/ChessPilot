@@ -26,7 +26,7 @@ inline DesktopWindowSize desktop_window_size(double available_height, double pix
   double scale = 1.0;
   if (std::isfinite(available_height) && available_height > 0 &&
       std::isfinite(pixel_ratio) && pixel_ratio > 0) {
-    // Preserve src/main.py's dampened high-resolution desktop scaling.
+    // Scale gently on high-resolution desktops.
     scale = std::max(std::sqrt(available_height / pixel_ratio / 1080.0), 1.0);
     if (!std::isfinite(scale) || scale > std::numeric_limits<int>::max() / 520.0) scale = 1.0;
   }

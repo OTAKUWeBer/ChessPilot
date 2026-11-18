@@ -1,4 +1,4 @@
-//! Port of wayland_capture/wayland.py, restricted to wl_registry/callback and virtual-pointer v1.
+//! wlroots input restricted to registry, callback and virtual-pointer v1.
 use super::input::{PixelPoint, Pointer};
 use std::{
     io::{self, Read, Write},

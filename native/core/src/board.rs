@@ -1,4 +1,4 @@
-//! Source: core/board_utils.py and GameState.store_board_positions.
+//! Board geometry, square centers and coordinate mapping.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Point {
     pub x: f64,
@@ -23,7 +23,7 @@ impl BoardGeometry {
         if col >= 8 || row >= 8 {
             return Err("Square is outside the board".into());
         }
-        // Python uses size // 2, including for fractional detector sizes.
+        // Floor the half-square offset, including for fractional detector sizes.
         let half = (self.square_size / 2.0).floor();
         Ok(Point {
             x: self.x + col as f64 * self.square_size + half,

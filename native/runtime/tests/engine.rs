@@ -31,7 +31,7 @@ fn service(mode: &str) -> EngineService {
     .unwrap()
 }
 
-// The same test executable is a portable subprocess fixture; no Python/shell dependency.
+// The same test executable is a portable subprocess fixture; no shell dependency.
 #[test]
 fn fake_engine() {
     let Ok(mode) = std::env::var("CHESSPILOT_TEST_ENGINE") else {
@@ -80,6 +80,7 @@ fn fake_engine() {
                 "eof" => std::process::exit(7),
                 "critical" => println!("info string CRITICAL ERROR: Incorrect number of kings"),
                 "invalid_move" => println!("bestmove nope"),
+                "multipv" => println!("info depth 5 multipv 1 score cp 31\ninfo depth 5 multipv 2 score mate 1\nbestmove e2e4"),
                 _ => {
                     println!("info depth 1 score mate -1");
                     println!("info depth 2 score cp 12");
@@ -237,6 +238,20 @@ fn persistent_engine_returns_move_fen_progress_and_latest_score() {
     assert!(engine.process_id().is_none());
     engine.initialize(&AtomicBool::new(false)).unwrap();
     assert!(engine.process_id().is_some());
+}
+
+#[test]
+fn secondary_variations_cannot_turn_the_best_moves_score_into_checkmate() {
+    let mut engine = service("multipv");
+    let mut progress = Vec::new();
+    let analysis = engine
+        .get_best_move(5, START, &AtomicBool::new(false), |_, score| {
+            progress.push(score)
+        })
+        .unwrap();
+    assert_eq!(analysis.best_move.as_deref(), Some("e2e4"));
+    assert_eq!(analysis.score, Some(Score::Centipawns(31)));
+    assert!(!progress.contains(&Some(Score::Mate(1))));
 }
 
 #[test]
