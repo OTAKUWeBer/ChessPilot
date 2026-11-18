@@ -7,17 +7,29 @@
 **Chessboard detection, Stockfish analysis and move automation for Windows, Linux and Android.**
 
 <p align="center">
+  <a href="app/pubspec.yaml"><img src="https://img.shields.io/badge/dynamic/yaml?url=https%3A%2F%2Fraw.githubusercontent.com%2FOTAKUWeBer%2FChessPilot%2Frust%2Fapp%2Fpubspec.yaml&amp;query=%24.version&amp;label=source&amp;color=4CAF50&amp;style=for-the-badge" alt="Source version from pubspec.yaml" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-F48041?style=for-the-badge" alt="MIT license" /></a>
   <img src="https://img.shields.io/badge/UI-Flutter-02569B?style=for-the-badge" alt="Flutter interface" />
   <img src="https://img.shields.io/badge/core-Rust-CE422B?style=for-the-badge" alt="Rust core" />
-  <a href="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Arust"><img src="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml/badge.svg?branch=rust" alt="Desktop build status" /></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/OTAKUWeBer/ChessPilot/releases"><img src="https://img.shields.io/github/downloads/OTAKUWeBer/ChessPilot/total?label=all%20release%20downloads&amp;style=for-the-badge&amp;color=CAF979" alt="Download count across all published releases" /></a>
+  <a href="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Arust"><img src="https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml/badge.svg?branch=rust" alt="Rust and Flutter quality checks and desktop builds" /></a>
 </p>
 
 ChessPilot reads a visible 2D board, evaluates the position locally, and optionally plays the best move. Capture, detection and analysis run on your device after initial setup. The interface uses Flutter; Rust owns the detector, engine and automation pipeline.
 
-Installation, supported platforms and test evidence are documented below. Signing and broader device-coverage notes describe the current distribution status.
+Source: [Rust core and runtime](native/) · [Flutter interface](app/lib/) · [Android platform services](app/android/app/src/main/kotlin/io/github/otakuweber/chesspilot/).
 
 ---
+
+## ✨ What's new in 3.0
+
+- **Rust + Flutter rebuild:** native capture, in-memory ONNX detection, persistent Stockfish and move input behind a shared interface.
+- **Android support:** a movable compact overlay, Play/Auto/Stop/Exit controls, guided capture/touch permissions and a phone default of depth 10.
+- **Desktop packaging:** a Windows setup EXE, complete Windows/Linux portable bundles and the same bundled detector model on all three platforms. Linux supports X11 and the documented wlroots Wayland path.
+- **Verified gameplay:** legal opponent-reply tracking, automatic castling-right updates, cancellable waits and clear game results. The latest fix recognizes a verified mating move when a result popup covers part of the board.
 
 ## 🎬 Demo
 
@@ -41,6 +53,8 @@ The same bundled [detection model](assets/models/chess_detection.onnx.sha256) is
 ## 📦 Install ChessPilot
 
 Follow the [installation and first-launch guide](docs/INSTALLING.md). It covers downloading the correct package, extracting GitHub artifacts, Windows setup/portable use, Linux sessions, Android permissions, and updating/uninstalling.
+
+Get this branch's Windows/Linux packages from [successful Rust + Flutter builds](https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Arust). The download badge totals published release assets across all versions, including earlier releases; it does not count CI artifact downloads. Android build/distribution instructions are in the installation guide.
 
 | Platform | Package | Supported automation |
 | --- | --- | --- |
@@ -100,6 +114,8 @@ Logs are named `chesspilot-native.log`. Windows normally uses `%LOCALAPPDATA%/Ch
 ## Verification and release status
 
 Checks cover domain rules, reference fixtures, engine failure/recovery/shutdown, actual inference, controller transitions, native buffer ownership, configuration, diagnostics, installers and platform adapters. Integration checks needing an engine, display or network are explicit opt-ins.
+
+The live CI badge above covers Rust formatting, Clippy, native tests, Flutter analysis/tests, desktop builds and model inference checks on Windows/Linux. It reports the workflow result; no separate numerical quality grade or coverage percentage is currently published for this branch.
 
 Remaining release gates include production signing, clean-install/distribution review, longer memory/performance/security testing, additional monitor/phone coverage, physical phone castling/promotions/rotation/revocation cases and non-wlroots portal support. A successful build does not establish every device/runtime case. See [Android evidence](docs/TESTING.md#android-physical-device-evidence), [Linux checks](docs/TESTING.md#linux-capture-and-gameplay) and [desktop packaging](docs/BUILDING.md).
 
