@@ -463,16 +463,28 @@ pub fn ensure_stockfish(
     check_cancel(cancelled)?;
     let dirs = resources::native_asset_directories().map_err(|e| e.to_string())?;
     let parent = dirs.first().ok_or("Missing application directory")?;
-    progress(json!({"stage":"Checking Stockfish in the app folder","downloaded":0}));
+    let configured = if cfg!(target_os = "linux") {
+        std::env::var_os("CHESSPILOT_ENGINE_HOME").map(PathBuf::from)
+    } else {
+        None
+    };
+    let parent = resources::stockfish_install_directory(parent, configured.as_deref())
+        .map_err(|error| error.to_string())?;
+    let stage = if configured.is_some() {
+        "Checking Stockfish in app data"
+    } else {
+        "Checking Stockfish in the app folder"
+    };
+    progress(json!({"stage":stage,"downloaded":0}));
     let name = if cfg!(windows) {
         "stockfish.exe"
     } else {
         "stockfish"
     };
-    if let Ok(existing) = resources::resource_path(name, std::slice::from_ref(parent)) {
+    if let Ok(existing) = resources::resource_path(name, std::slice::from_ref(&parent)) {
         return Ok(existing);
     }
-    install_stockfish(parent, cancelled, progress)
+    install_stockfish(&parent, cancelled, progress)
 }
 pub fn install_stockfish(
     parent: &Path,

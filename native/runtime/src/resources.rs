@@ -98,6 +98,19 @@ pub fn stockfish_path(directories: &[PathBuf]) -> io::Result<PathBuf> {
     };
     executable_path(name, directories)
 }
+pub fn stockfish_install_directory(
+    bundle: &Path,
+    configured: Option<&Path>,
+) -> io::Result<PathBuf> {
+    match configured {
+        Some(path) if path.is_absolute() => Ok(path.to_path_buf()),
+        Some(_) => Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "CHESSPILOT_ENGINE_HOME must be an absolute path",
+        )),
+        None => Ok(bundle.to_path_buf()),
+    }
+}
 fn absolute_env(name: &str) -> Option<PathBuf> {
     std::env::var_os(name)
         .map(PathBuf::from)

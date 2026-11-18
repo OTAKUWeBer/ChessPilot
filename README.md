@@ -28,7 +28,7 @@ Source: [Rust core and runtime](native/) · [Flutter interface](app/lib/) · [An
 
 - **Rust + Flutter rebuild:** native capture, in-memory ONNX detection, persistent Stockfish and move input behind a shared interface.
 - **Android support:** a movable compact overlay, Play/Auto/Stop/Exit controls, guided capture/touch permissions and a phone default of depth 10.
-- **Desktop packaging:** one Windows setup EXE or Linux `.run` installer, with application libraries and the detector model included. Android uses one APK. Linux supports X11 and the documented wlroots Wayland path.
+- **Desktop packaging:** one Windows setup EXE or a single Linux portable executable, with application libraries and the detector model included. An optional Linux `.run` installer adds a menu launcher; Android uses one APK. Linux supports X11 and the documented wlroots Wayland path.
 - **Verified gameplay:** legal opponent-reply tracking, automatic castling-right updates, cancellable waits and clear game results. The latest fix recognizes a verified mating move when a result popup covers part of the board.
 
 ## 🎬 Demo
@@ -59,18 +59,18 @@ Get this branch's Windows/Linux packages from [successful Rust + Flutter builds]
 | Platform | Package | Supported automation |
 | --- | --- | --- |
 | Windows x64 | Setup EXE or portable bundle | Native capture and Click/Drag |
-| Linux x64 | Single `.run` installer (portable bundle also available) | X11/XTEST or supported wlroots Wayland with `grim` |
+| Linux x64 | `ChessPilot-VERSION-linux-x86_64` portable app; optional `.run` installer | X11/XTEST or supported wlroots Wayland with `grim` |
 | Android ARM64, API 24+ | APK | Whole-display sharing and enabled touch service |
 
-The model ships with every platform. Desktop checks/downloads a CPU-compatible official Stockfish engine into the app folder only when missing; Android packages its compatible engines/network. Gameplay works offline after setup.
+The model ships with every platform. Desktop checks/downloads a CPU-compatible official Stockfish engine only when missing; the Linux one-file app keeps it in persistent user data, while installed/portable desktop bundles keep it beside the app. Android packages its compatible engines/network. Gameplay works offline after setup.
 
-For release uploads, use the Windows `*-setup.exe`, Linux `*-setup.run` and Android APK. The Linux installer contains Flutter, Rust, ONNX Runtime, the model and GTK dependencies; it installs into your user data folder and adds an application-menu launcher. Do not distribute the bare Linux `chesspilot` executable by itself.
+For release uploads, use the Windows `*-setup.exe`, Linux `ChessPilot-VERSION-linux-x86_64` and Android APK. The Linux one-file app includes Flutter, Rust, ONNX Runtime, the model and GTK dependencies, extracts them temporarily and launches without installation. The optional `*-setup.run` installs a persistent copy and menu launcher. The intermediate `bundle/chesspilot` executable still requires its whole bundle.
 
 Windows installers are currently unsigned and Android release-mode builds currently use the developer's local debug key. GNOME/KDE Wayland portal automation, macOS and iOS are not implemented. See [platform evidence](docs/TESTING.md) for tested cases and remaining coverage.
 
 ## ▶️ Start playing
 
-1. Install the app or keep the entire portable desktop bundle together.
+1. Launch the Linux one-file app, install the app package, or keep the entire portable desktop bundle together.
 2. Complete engine setup. On Android, enable touch control and consent to sharing the entire display; notification controls provide Stop and Exit.
 3. Open an unobstructed 2D chessboard and move the app/overlay away from it.
 4. Choose your color, applicable castling rights and Click/Drag mode. Start **Play Next Move** or **Auto on your turn**.

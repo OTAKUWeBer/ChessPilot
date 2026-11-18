@@ -74,6 +74,8 @@ The local smoke check passed. Fresh Windows-machine gameplay, SmartScreen reputa
 
 The scripts and fixture install/update/uninstall plus an actual self-extracting fixture archive were checked on the Windows host through Git Bash. Native directory-symlink handling and the actual GTK/ELF installer build require Linux; the workflow includes those checks, but no successful Linux installer build is claimed from the Windows-only fixture run.
 
+The portable fixture also runs the extensionless one-file app twice, checks argument forwarding, verifies temporary extraction cleanup, confirms there is no menu installation, and preserves engine/options in its user-data profile. Passing the second argument checks the real portable artifact's checksum, starts its GTK `--help` path and probes model/runtime discovery after extraction. Linux-native tests additionally check engine reuse through the portable profile override. CI's release build baseline is Ubuntu 22.04; this and the other listed distributions still require physical acceptance testing.
+
 ## Linux capture and gameplay
 
 The maintainer reported working Linux gameplay and castling on November 18, 2026. CI checks the complete GTK bundle, real ONNX inference and an Xvfb capture/capability probe; broader compositor and monitor combinations remain separate.

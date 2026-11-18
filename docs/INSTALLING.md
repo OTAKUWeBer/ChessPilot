@@ -10,8 +10,9 @@ Desktop packages are attached to [successful rust-branch builds](https://github.
 | --- | --- |
 | Windows x64 | `ChessPilot-windows-x64-installer` artifact; unzip it to find the setup EXE |
 | Windows portable | `ChessPilot-windows-x64` artifact; unzip it, then extract the enclosed `ChessPilot-windows-x64.zip` |
-| Linux x64 | `ChessPilot-linux-x64-installer` artifact; unzip it to find the single `*-setup.run` installer |
-| Linux portable | `ChessPilot-linux-x64` artifact; unzip it, then extract the enclosed `.tar.gz` |
+| Linux one-file app | `ChessPilot-linux-x64-portable` artifact; unzip it to find `ChessPilot-VERSION-linux-x86_64` |
+| Linux installer | `ChessPilot-linux-x64-installer` artifact; unzip it to find the single `*-setup.run` installer |
+| Linux bundle | `ChessPilot-linux-x64` artifact; unzip it, then extract the enclosed `.tar.gz` |
 | Android ARM64, API 24+ | `app-release.apk` from a trusted publisher or your own build; desktop CI does not currently publish an APK |
 
 The current Windows installer is unsigned. Android release-mode builds currently use the developer's local debug key; production signing is still a publisher task. A file named “release” is a build mode, not proof of publisher signing. Do not change system security settings globally to install the app.
@@ -32,6 +33,23 @@ The setup EXE installs the supporting DLLs, model, data and licenses together. K
 
 ## Linux x64
 
+### One-file portable app
+
+Download `ChessPilot-VERSION-linux-x86_64`, or extract it from the portable CI artifact. Replace `VERSION` below with the downloaded version:
+
+```sh
+chmod +x ./ChessPilot-VERSION-linux-x86_64
+./ChessPilot-VERSION-linux-x86_64
+```
+
+This is a self-extracting executable file. It starts ChessPilot directly, needs no installer or FUSE, and carries its libraries and detector model. Temporary application files are removed when it exits normally. Keep the file anywhere; no menu entry is installed. Stockfish downloads/cache live under `${XDG_DATA_HOME:-$HOME/.local/share}/chesspilot/native`, and engine options live in the enclosing `chesspilot` folder. They survive moving or replacing the executable.
+
+For an offline first launch, place a compatible executable named `stockfish` in that `native` folder, keep its license/source notices, and make it executable. To update, close ChessPilot and replace the portable executable. Removing that file leaves your engine/settings intact. A complete bundle avoids the extraction work at startup if you prefer that format.
+
+Release CI uses Ubuntu 22.04 as its build baseline for broader compatibility. The host still needs compatible glibc, graphics drivers and a supported display session; this does not cover every distro, Linux architecture or Wayland compositor. Use the CI-built release rather than an Arch-local build when distributing to older systems.
+
+### Optional installer
+
 Download the single `ChessPilot-VERSION-linux-x64-setup.run` file from a published release, or extract it from the installer CI artifact. Close ChessPilot before installing or updating, then run from the download folder:
 
 ```sh
@@ -44,7 +62,7 @@ Replace `VERSION` with the downloaded filename's version. No `sudo`, FUSE, Flutt
 "${XDG_DATA_HOME:-$HOME/.local/share}/chesspilot/app/AppRun"
 ```
 
-The installer includes the Flutter/Rust libraries, ONNX Runtime, exact detector model and GTK runtime dependencies. The host still supplies its Linux kernel, glibc, display session and graphics drivers. CI builds on Ubuntu 24.04; older glibc systems are not covered. Use a current x86_64 desktop such as the build baseline or a compatible newer distribution.
+The installer includes the Flutter/Rust libraries, ONNX Runtime, exact detector model and GTK runtime dependencies. It shares the portable app's Ubuntu 22.04 build baseline and host/display requirements.
 
 First launch downloads a CPU-compatible Stockfish beside the installed app and reuses it on later launches. **Update:** close ChessPilot and run the newer installer; your engine, options, download cache and other user files are preserved. **Uninstall:** run an installer again with:
 

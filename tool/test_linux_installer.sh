@@ -16,6 +16,12 @@ cat > "$payload/AppDir/chesspilot" <<'EOF'
 #!/usr/bin/env bash
 if [ "${1:-}" = --help ]; then echo 'fixture help'; exit 0; fi
 printf '%s\n' "$LD_LIBRARY_PATH" "${WAYLAND_DISPLAY:-}" "${XDG_RUNTIME_DIR:-}" "${PACKAGE_HOOK:-}" "$@" > "$CHESSPILOT_PACKAGE_TEST_TRACE"
+printf 'bundle=%s\nprofile=%s\nengine=%s\n' "$APPDIR" "${CHESSPILOT_DATA_HOME:-}" "${CHESSPILOT_ENGINE_HOME:-}" >> "$CHESSPILOT_PACKAGE_TEST_TRACE"
+if [ -n "${CHESSPILOT_ENGINE_HOME:-}" ]; then
+  mkdir -p "$CHESSPILOT_ENGINE_HOME"
+  [ -f "$CHESSPILOT_ENGINE_HOME/stockfish" ] || printf 'engine\n' > "$CHESSPILOT_ENGINE_HOME/stockfish"
+  [ -f "$CHESSPILOT_DATA_HOME/engine_config.txt" ] || printf 'options\n' > "$CHESSPILOT_DATA_HOME/engine_config.txt"
+fi
 EOF
 printf 'export PACKAGE_HOOK=loaded\n' > "$payload/AppDir/apprun-hooks/test.sh"
 printf 'model\n' > "$payload/AppDir/chess_detection.onnx"
@@ -93,6 +99,26 @@ if [ -n "$makeself" ]; then
   XDG_DATA_HOME="$testroot/from-archive" sh "$testroot/fixture.run"
   [ -f "$testroot/from-archive/chesspilot/app/chess_detection.onnx" ]
   XDG_DATA_HOME="$testroot/from-archive" sh "$testroot/fixture.run" -- --uninstall
+
+  touch "$payload/AppDir/.chesspilot-portable"
+  "$makeself" --nox11 --sha256 --nomd5 --nocrc "$payload/AppDir" "$testroot/ChessPilot-linux-x86_64" 'ChessPilot portable fixture' ./AppRun
+  for launch in 1 2; do
+    env -u CHESSPILOT_DATA_HOME -u CHESSPILOT_ENGINE_HOME XDG_DATA_HOME="$testroot/portable-profile" \
+      CHESSPILOT_PACKAGE_TEST_TRACE="$testroot/portable-trace" \
+      sh "$testroot/ChessPilot-linux-x86_64" -- 'argument with spaces'
+    grep -Fqx "profile=$testroot/portable-profile/chesspilot" "$testroot/portable-trace"
+    grep -Fqx "engine=$testroot/portable-profile/chesspilot/native" "$testroot/portable-trace"
+    grep -qx 'argument with spaces' "$testroot/portable-trace"
+    extracted="$(sed -n 's/^bundle=//p' "$testroot/portable-trace")"
+    [ -n "$extracted" ] && [ ! -e "$extracted" ]
+    [ ! -e "$testroot/portable-profile/applications/io.github.otakuweber.chesspilot.desktop" ]
+    if [ "$launch" = 1 ]; then
+      printf 'saved engine\n' > "$testroot/portable-profile/chesspilot/native/stockfish"
+      printf 'custom options\n' > "$testroot/portable-profile/chesspilot/engine_config.txt"
+    fi
+  done
+  grep -qx 'saved engine' "$testroot/portable-profile/chesspilot/native/stockfish"
+  grep -qx 'custom options' "$testroot/portable-profile/chesspilot/engine_config.txt"
 else
   printf 'Self-extracting archive check requires Makeself; set CHESSPILOT_MAKESELF or run on CI.\n'
 fi
@@ -109,5 +135,15 @@ if [ -n "${1:-}" ]; then
   CHESSPILOT_BUNDLE_TEST="$installed" cargo test --manifest-path "$repo/native/Cargo.toml" --test resources relocated_bundle_resolves_default_assets_without_checkout_paths -- --ignored
   XDG_DATA_HOME="$testroot/real" sh "$installer" -- --uninstall
   [ ! -e "$installed/chesspilot" ]
+fi
+if [ -n "${2:-}" ]; then
+  portable="$(realpath -e -- "$2")"
+  sh "$portable" --check
+  env -u CHESSPILOT_DATA_HOME -u CHESSPILOT_ENGINE_HOME XDG_DATA_HOME="$testroot/real-portable-profile" \
+    xvfb-run -a "$portable" -- --help
+  sh "$portable" --noexec --target "$testroot/portable-extracted"
+  [ -f "$testroot/portable-extracted/.chesspilot-portable" ]
+  CHESSPILOT_BUNDLE_TEST="$testroot/portable-extracted" cargo test --manifest-path "$repo/native/Cargo.toml" --test resources relocated_bundle_resolves_default_assets_without_checkout_paths -- --ignored
+  [ ! -e "$testroot/real-portable-profile/applications/io.github.otakuweber.chesspilot.desktop" ]
 fi
 printf 'Linux installer lifecycle and launcher checks passed.\n'

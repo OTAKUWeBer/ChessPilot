@@ -296,6 +296,38 @@ fn real_https_download_and_cpu_install_pass_uci() {
 }
 
 #[test]
+#[cfg(target_os = "linux")]
+fn portable_startup_reuses_stockfish_outside_the_extracted_bundle() {
+    if std::env::var_os("CHESSPILOT_PORTABLE_TEST_CHILD").is_some() {
+        let directory = PathBuf::from(std::env::var_os("CHESSPILOT_ENGINE_HOME").unwrap());
+        let mut progress = Vec::new();
+        let engine = ensure_stockfish(&AtomicBool::new(false), |p| progress.push(p)).unwrap();
+        assert_eq!(engine, directory.join("stockfish"));
+        assert_eq!(progress[0]["stage"], "Checking Stockfish in app data");
+        assert_eq!(progress.len(), 1);
+        return;
+    }
+    let temp = Temp::new();
+    let profile = temp.0.join("profile with spaces");
+    fs::create_dir(&profile).unwrap();
+    fs::write(profile.join("stockfish"), b"existing engine fixture").unwrap();
+    let status = Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "portable_startup_reuses_stockfish_outside_the_extracted_bundle",
+        ])
+        .env("CHESSPILOT_PORTABLE_TEST_CHILD", "1")
+        .env("CHESSPILOT_ENGINE_HOME", &profile)
+        .status()
+        .unwrap();
+    assert!(status.success());
+    assert_eq!(
+        fs::read(profile.join("stockfish")).unwrap(),
+        b"existing engine fixture"
+    );
+}
+
+#[test]
 fn an_unwritable_app_destination_fails_before_contacting_the_release_server() {
     let temp = Temp::new();
     let blocked = temp.0.join("blocked");

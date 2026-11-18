@@ -81,5 +81,13 @@ cp "$tools/makeself.sh" "$tools/makeself-header.sh" "$tools/makeself-COPYING" "$
 installer="$output/ChessPilot-$version-linux-x64-setup.run"
 "$tools/makeself.sh" --nox11 --sha256 --nomd5 --nocrc --tar-format posix "$work/payload" "$installer" "ChessPilot $version" ./install.sh
 sh "$installer" --check
-(cd -- "$output" && sha256sum "$(basename -- "$installer")" > "$(basename -- "$installer").sha256")
-printf '\nRelease upload: %s\n' "$installer"
+
+# Portable one-file app: extract, run and clean up without installing a menu entry.
+touch "$appdir/.chesspilot-portable"
+portable="$output/ChessPilot-$version-linux-x86_64"
+"$tools/makeself.sh" --nox11 --sha256 --nomd5 --nocrc --tar-format posix "$appdir" "$portable" "ChessPilot $version portable" ./AppRun
+sh "$portable" --check
+for artifact in "$installer" "$portable"; do
+  (cd -- "$output" && sha256sum "$(basename -- "$artifact")" > "$(basename -- "$artifact").sha256")
+done
+printf '\nPortable app: %s\nOptional installer: %s\n' "$portable" "$installer"

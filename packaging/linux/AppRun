@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -e
 export APPDIR="$(cd -- "$(dirname -- "$(readlink -f -- "$0")")" && pwd -P)"
+if [ -f "$APPDIR/.chesspilot-portable" ]; then
+  # A one-file app extracts to a temporary directory; downloads/settings must survive it.
+  export CHESSPILOT_DATA_HOME="${CHESSPILOT_DATA_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}/chesspilot}"
+  export CHESSPILOT_ENGINE_HOME="$CHESSPILOT_DATA_HOME/native"
+fi
 export LD_LIBRARY_PATH="$APPDIR/lib:$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 export PATH="$APPDIR/usr/bin:${PATH:-/usr/bin:/bin}"
 for hook in "$APPDIR"/apprun-hooks/*.sh; do

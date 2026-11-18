@@ -32,6 +32,21 @@ impl Drop for Temp {
 }
 
 #[test]
+fn portable_engine_storage_is_explicit_absolute_and_separate_from_bundled_assets() {
+    let temp = Temp::new();
+    let bundle = temp.0.join("temporary-bundle");
+    let profile = temp.0.join("persistent-profile");
+    assert_eq!(stockfish_install_directory(&bundle, None).unwrap(), bundle);
+    assert_eq!(
+        stockfish_install_directory(&bundle, Some(&profile)).unwrap(),
+        profile
+    );
+    assert!(stockfish_install_directory(&bundle, Some(std::path::Path::new("relative"))).is_err());
+    assert!(!bundle.exists());
+    assert!(!profile.exists());
+}
+
+#[test]
 fn defaults_and_portable_config_preserve_user_content() {
     let temp = Temp::new();
     let portable = temp.0.join("portable");

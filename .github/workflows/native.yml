@@ -26,7 +26,7 @@ jobs:
             bundle: windows/x64/runner/Release
             native: chesspilot_runtime.dll
             ort: onnxruntime.dll
-          - os: ubuntu-24.04
+          - os: ubuntu-22.04
             platform: linux
             bundle: linux/x64/release/bundle
             native: lib/libchesspilot_runtime.so
@@ -112,12 +112,12 @@ jobs:
       - name: Archive Linux bundle with executable permissions
         if: runner.os == 'Linux'
         run: tar -czf ChessPilot-linux-x64.tar.gz -C app/build/linux/x64/release/bundle .
-      - name: Build single-file Linux installer with GTK dependencies
+      - name: Build Linux portable app and installer with GTK dependencies
         if: runner.os == 'Linux'
         run: bash tool/build_linux_installer.sh
       - name: Check Linux installer lifecycle and relocated runtime
         if: runner.os == 'Linux'
-        run: bash tool/test_linux_installer.sh app/build/linux/installer/*-setup.run
+        run: bash tool/test_linux_installer.sh app/build/linux/installer/*-setup.run app/build/linux/installer/ChessPilot-*-linux-x86_64
       - uses: actions/upload-artifact@v4
         with:
           name: ChessPilot-${{ matrix.platform }}-x64
@@ -129,6 +129,16 @@ jobs:
         with:
           name: ChessPilot-windows-x64-installer
           path: app/build/windows/installer/*-setup.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Linux'
+        with:
+          name: ChessPilot-linux-x64-portable
+          path: |
+            app/build/linux/installer/ChessPilot-*-linux-x86_64
+            app/build/linux/installer/ChessPilot-*-linux-x86_64.sha256
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
