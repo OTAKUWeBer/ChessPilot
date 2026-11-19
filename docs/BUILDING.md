@@ -244,6 +244,8 @@ Complete the interactive license prompts yourself. If Flutter selects another JD
 
 To build and verify all supported APK variants from the repository root:
 
+First configure the private publisher keystore in `app/android/key.properties` as described in [Android signing and Google review](RELEASING.md#android-signing-and-google-review). For local tests that must update the existing debug-signed APKs, explicitly add `-AllowDevelopmentSigning` to the command below.
+
 ```powershell
 ./tool/build_android.ps1 -AndroidSdk $env:ANDROID_SDK_ROOT
 ```
@@ -278,7 +280,7 @@ For an optimized local APK, from `app`:
 flutter build apk --release --target-platform android-arm64
 ```
 
-Release-mode output: **`app/build/app/outputs/flutter-apk/app-release.apk`**. The project currently signs this with the debug key for local testing. Configure your own release keystore/signing before public distribution; this is not a store-ready signed release.
+Release-mode output: **`app/build/app/outputs/flutter-apk/app-release.apk`**. Gradle uses `app/android/key.properties` when present. Without it, manual Flutter builds retain the existing debug key for local testing; the multi-APK helper refuses that fallback unless `-AllowDevelopmentSigning` is supplied. Release mode alone does not establish publisher identity or Google approval.
 
 Use the normal build command shown above when changing build modes. With Flutter 3.38.6, adding `--no-pub` can retain development-plugin registration from a previous debug build and fail release compilation. The normal command regenerates the plugin registration. The release-mode APK has built locally; physical-phone acceptance so far refers to the earlier debug engineering build.
 

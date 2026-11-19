@@ -495,6 +495,8 @@ class _PilotControlsState extends State<PilotControls> {
                   const Text(
                     'If Android shows “Restricted setting”, open ChessPilot App info, tap the three-dot menu, '
                     'and choose Allow restricted settings if you trust this installation. '
+                    'If the menu is missing, open Settings → Apps → App management (or See all apps) → ChessPilot yourself. '
+                    'Some phones hide this menu when App info is opened from a shortcut. '
                     'Then return to Accessibility and enable ChessPilot touch control.\n\n'
                     'The option varies by phone and may be unavailable on managed devices. '
                     'ChessPilot cannot enable this permission for you.',

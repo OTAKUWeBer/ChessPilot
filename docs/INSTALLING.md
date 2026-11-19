@@ -18,7 +18,9 @@ For development builds, desktop packages are also attached to [successful main-b
 | Linux bundle | `ChessPilot-linux-x64` artifact; unzip it, then extract the enclosed `.tar.gz` |
 | Android ARM64, API 24+ | `app-release.apk` from a trusted publisher or your own build; desktop CI does not currently publish an APK |
 
-The current Windows installer is unsigned. Android release-mode builds currently use the developer's local debug key; production signing is still a publisher task. A file named “release” is a build mode, not proof of publisher signing. Do not change system security settings globally to install the app.
+The current Windows installer is unsigned. Existing Android APKs use a development signing key; production signing is still a publisher task. A file named “release” is a build mode, not proof of publisher signing. Review any security warning before choosing to install.
+
+Publisher signing configuration, developer identity verification and the Play Protect appeal procedure are documented in [release maintenance](RELEASING.md#android-signing-and-google-review). Existing published APKs have not been approved by that procedure merely because the build configuration supports a publisher key.
 
 ## Windows x64
 
@@ -122,7 +124,7 @@ Current-source Android builds provide these APKs; the published 3.0.0 release co
 | APK suffix | Use |
 | --- | --- |
 | `android-universal.apk` | One larger APK covering ARMv7, ARM64 and x86-64; use when unsure |
-| `android-arm64.apk` | Modern ARM64 phones, including Realme 9 Pro+ |
+| `android-arm64.apk` | Modern phones with a 64-bit ARM Android system |
 | `android-armv7.apk` | 32-bit ARM Android devices |
 | `android-x86_64.apk` | 64-bit Intel/AMD Android systems and emulators |
 
@@ -140,9 +142,35 @@ Opening the dashboard or dragging the controls pauses automation. **Stop** pause
 
 ### Android installation and restricted settings
 
-**“Restricted setting” when enabling touch control:** Android can restrict accessibility for sideloaded apps. If you trust your ChessPilot installation, open **Settings → Apps → ChessPilot → App info → three-dot menu → Allow restricted settings**, follow the device's confirmation, then return to Accessibility and enable **ChessPilot touch control**. The app now includes a disclosure, an App info shortcut and these steps. Menus vary on Realme and other manufacturers; managed-device restrictions may require the device administrator. See [Android's official instructions](https://support.google.com/android/answer/12623953).
+#### If Google Play Protect blocks installation
 
-**“App blocked to protect your device” / sensitive-data or financial-fraud warning:** Google documents this as enhanced fraud protection that can block internet-sideloaded apps requesting accessibility. It is separate from CPU architecture and Android's restricted-settings toggle. A universal APK, changing the icon or changing the signing key does not establish that the block is resolved. Keep Play Protect enabled. The publisher must review the permissions and distribution against [Google's developer guidance](https://developers.google.com/android/play-protect/warning-dev-guidance), and submit an appeal if the classification is believed to be incorrect. Do not assume an ABI rebuild has been approved by Google.
+If you have reviewed the warning, trust the APK from the official release, and choose to proceed, you can temporarily turn scanning off:
+
+1. Open the **Google Play Store** app.
+2. Tap your **profile icon** in the top-right corner.
+3. Select **Play Protect**.
+4. Tap the **Settings (gear) icon** in the top-right corner.
+5. Turn off **Scan apps with Play Protect** and confirm Android's prompt.
+6. Open the ChessPilot APK again and try installing it.
+7. Return to the same menu and turn **Scan apps with Play Protect** back on.
+
+This temporarily reduces protection for all apps. Google recommends keeping Play Protect enabled; turning it back on may flag, block or disable the app again. These steps do not establish Google approval or guarantee installation on every device. See [Google's Play Protect settings](https://support.google.com/googleplay/answer/2812853).
+
+The sensitive-data/financial-fraud warning can affect internet-sideloaded apps using Accessibility. It is separate from CPU architecture and the touch-control restriction below. Publisher review/appeal remains necessary if the app is incorrectly classified; see [Google's developer guidance](https://developers.google.com/android/play-protect/warning-dev-guidance).
+
+#### Enable ChessPilot touch control
+
+If Accessibility shows **Restricted setting** or the ChessPilot entry is greyed out:
+
+1. Open the phone's **Settings** app directly.
+2. Go to **Apps → App management** (or **See all apps**) and select **ChessPilot**.
+3. Tap the **three-dot menu (⋮) → Allow restricted settings**.
+4. Complete the phone's PIN, fingerprint or other confirmation yourself.
+5. Return to **Settings → Accessibility → Downloaded apps** (sometimes under **Additional settings**).
+6. Select **ChessPilot touch control**, turn it on and accept Android's permission dialog.
+7. Return to ChessPilot and approve screen sharing when you are ready to play.
+
+If the three-dot menu is missing, first try opening ChessPilot touch control once so Android shows the restriction warning, then repeat the steps from the main **Settings → Apps** list. Some phones hide the menu when App info is opened from a shortcut. Menu names vary, and managed devices may require an administrator. Turning Play Protect off does not remove this separate restriction. See [Android's restricted-settings instructions](https://support.google.com/android/answer/12623953).
 
 ChessPilot's release manifest requests foreground screen sharing and notification permissions. Its accessibility service performs user-enabled gestures, does not retrieve accessibility window content, and does not claim to be an accessibility tool for users with disabilities. Actual screenshot reading uses separate Android screen-sharing consent. Screenshots are processed locally; SMS/contacts/notification-listener permissions are not requested.
 

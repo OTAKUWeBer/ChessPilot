@@ -86,6 +86,8 @@ Windows installers are currently unsigned and Android release-mode builds curren
 
 A screenshot cannot reveal earlier castling/en-passant history. Start on your turn with appropriate rights; after a verified baseline, legal transitions preserve the position metadata. Uncertain input is never blindly repeated.
 
+**Android installation blocked or touch control greyed out?** Follow the separate [Play Protect installation and touch-control steps](docs/INSTALLING.md#android-installation-and-restricted-settings). Phone menu names vary; opening App info through the main Settings app list can expose a menu hidden by shortcuts.
+
 Desktop shortcuts: **W/B** color, **P** Play, **A** Auto, **K/Q** castling rights, **←/→** depth, **Esc** Stop/change color. Before color selection, **D/C** changes move mode and **↑/↓** adjusts screenshot delay. Phone controls do not show desktop shortcuts.
 
 ## ⚙️ Engine settings and display sizes

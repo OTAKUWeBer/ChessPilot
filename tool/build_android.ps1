@@ -1,9 +1,16 @@
 param(
     [Parameter(Mandatory=$true)][string]$AndroidSdk,
-    [string]$Flutter = 'flutter'
+    [string]$Flutter = 'flutter',
+    [switch]$AllowDevelopmentSigning
 )
 $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+if (-not (Test-Path -LiteralPath "$repo/app/android/key.properties")) {
+    if (-not $AllowDevelopmentSigning) {
+        throw 'Configure app/android/key.properties for publisher signing; see docs/RELEASING.md. Use -AllowDevelopmentSigning only for local testing with the existing debug key.'
+    }
+    Write-Warning 'Using the local debug signing key. These APKs are for testing, not publisher-signed distribution.'
+}
 $version = [regex]::Match((Get-Content "$repo/app/pubspec.yaml" -Raw), '(?m)^version:\s*([0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?)\+\d+\s*$').Groups[1].Value
 if (-not $version) { throw 'Invalid pubspec release version' }
 $output = Join-Path $repo "dist/$version/android"

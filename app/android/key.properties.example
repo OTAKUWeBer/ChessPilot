@@ -1,0 +1,6 @@
+# Copy to key.properties (ignored). Use forward slashes in an absolute keystore path.
+# Keep the real file and keystore private and backed up outside the repository.
+storeFile=X:/private-signing/chesspilot-release.jks
+storePassword=REPLACE_LOCALLY
+keyAlias=chesspilot
+keyPassword=REPLACE_LOCALLY

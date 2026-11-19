@@ -76,6 +76,10 @@ void main() {
       await tester.tap(find.text("Can't enable touch control?"));
       await tester.pumpAndSettle();
       expect(find.textContaining('Allow restricted settings'), findsOneWidget);
+      expect(
+        find.textContaining('App management (or See all apps)'),
+        findsOneWidget,
+      );
       await tester.ensureVisible(find.text('Open ChessPilot App info'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Open ChessPilot App info'));

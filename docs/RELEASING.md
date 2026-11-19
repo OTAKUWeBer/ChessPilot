@@ -29,6 +29,38 @@ Build Android variants with `tool/build_android.ps1`; it checks that every APK h
 
 Keep local artifacts under ignored `dist/VERSION/windows`, `dist/VERSION/linux` and `dist/VERSION/android` folders. An imported package is a build candidate until its checksum, architecture, version, library baseline and payload have been checked. Published asset names must match the release revision and version. The source remains in Git; binaries belong in GitHub Releases.
 
-Finish production signing (the current Windows installer is unsigned and Android release-mode APK uses a local debug key), clean-install/update checks, device/monitor coverage and sustained memory/performance/security checks. Include required dependency licenses, engine source information and model redistribution review. Platform test evidence and remaining cases stay in [TESTING.md](TESTING.md).
+Finish production signing (the current Windows installer is unsigned and existing Android APKs use a local debug key), clean-install/update checks, device/monitor coverage and sustained memory/performance/security checks. Include required dependency licenses, engine source information and model redistribution review. Platform test evidence and remaining cases stay in [TESTING.md](TESTING.md).
 
 Describe the actual tested platforms and limitations in the release notes. GitHub records uploaded asset digests; standalone checksum files are not release assets. Do not publish SDK caches, personal screenshots, logs, credentials or debug signing keys. The README includes a recorded demo from `assets/`; retain its version/session context when updating it.
+
+## Android signing and Google review
+
+These are three separate requirements: APK signing identifies updates, Android developer verification establishes publisher identity, and Play Protect evaluates app risk. None substitutes for the others. Google documents the reported financial-fraud warning for internet-sideloaded apps using sensitive access including Accessibility. ChessPilot needs user-enabled Accessibility gestures for touch control; changing the signing key does not guarantee removal of that block. See [Google's warning guidance](https://developers.google.com/android/play-protect/warning-dev-guidance).
+
+### Publisher signing
+
+Create a dedicated, private signing key using Android Studio's signing wizard or the JDK's interactive `keytool`. Keep the password out of command-line arguments, chat and Git. For example, after creating a private directory outside this checkout:
+
+```powershell
+keytool -genkeypair -v -keystore X:/private-signing/chesspilot-release.jks -alias chesspilot -keyalg RSA -keysize 3072 -validity 10000
+```
+
+Copy `app/android/key.properties.example` to `app/android/key.properties` and fill in the real absolute path, alias and passwords locally. Use forward slashes in paths. Gradle validates all four fields and the keystore path; the signing task validates the key/passwords. Both the real properties file and keystores are ignored. Back up the key and credentials securely outside the repo; losing the key can prevent future updates. Never upload them as release assets.
+
+`tool/build_android.ps1` requires this configuration by default. `-AllowDevelopmentSigning` explicitly retains local debug signing for compatibility testing only. Do not use that option for publisher builds. The currently distributed 3.0.0 and locally built 3.0.1 APKs share the old debug certificate. A new unrelated publisher key cannot silently update them: plan and test migration before replacing public APKs, and preserve user data. Do not delete the old key. See [Android's signing and update rules](https://developer.android.com/studio/publish/app-signing).
+
+### Developer identity verification
+
+Use [Android Developer Console](https://developer.android.com/developer-verification/guides/android-developer-console) for distribution exclusively outside Play, or [Play Console](https://developer.android.com/developer-verification/guides/google-play-console) for Play distribution. Complete the publisher's account verification and package/signing-key registration for `io.github.otakuweber.chesspilot`. Account options and regional rollout change; follow the [current official verification guide](https://developer.android.com/developer-verification). Identity verification alone does not establish Play Protect approval.
+
+### Play Protect appeal
+
+Use the exact APK that produced the block; rebuilding or re-signing produces a different hash. Record its filename, SHA-256 (`Get-FileHash -Algorithm SHA256 PATH_TO_APK`), certificate SHA-256 (`apksigner verify --print-certs PATH_TO_APK`), version, download URL, affected Android version/region and warning screenshot. Keep the matching source revision. The [official appeal form](https://support.google.com/googleplay/android-developer/contact/protectappeals) currently requests the APK SHA-256 of the file uploaded to VirusTotal; the publisher should review and upload the intended distributable artifact, then follow the form. Do not upload signing material or private diagnostic data.
+
+Suggested additional information, after confirming it matches the submitted build:
+
+> ChessPilot is an open-source chess-board automation utility. Package: io.github.otakuweber.chesspilot. Source: https://github.com/OTAKUWeBer/ChessPilot. The reported warning is the sensitive-data/financial-fraud installation block. Accessibility is explicitly enabled by the user and used to perform chess-piece taps/drags after the user starts Play or Auto. Stockfish selects moves from the captured board; Play requests one move and Auto continues selecting and performing moves on the user's turn until stopped. The service declares canPerformGestures=true, canRetrieveWindowContent=false and isAccessibilityTool=false. It does not process accessibility events or retrieve window text. Board screenshots use a separate, visible MediaProjection foreground service with Android screen-sharing consent and are processed locally. Stop pauses automation; Exit ends the capture session. The app does not request SMS, contacts, call-log or notification-listener access. Please review the classification of the exact APK identified by the supplied SHA-256. Device/Android version, distribution URL, source revision and screenshots are attached separately.
+
+Google Play distribution also requires an Accessibility API declaration and review. Its [automation policy](https://support.google.com/googleplay/android-developer/answer/10964491) restricts autonomous planning/execution and distinguishes static human-defined scripts. Our engine-selected Auto behavior could fall within that restriction; this is a policy-risk inference, not a Google decision. Do not describe it as merely replaying a fixed script or promise Play acceptance. Publisher identity verification and the sideloaded Play Protect appeal are separate processes.
+
+Only claim behavior actually checked in the submitted artifact. This is an appeal draft, not evidence that Google approved the app or that the complete app passed a security audit. Submission uses the publisher's contact information; completing identity checks and receiving Google's decision cannot be automated by changing code. An installation performed with scanning temporarily disabled is not evidence of successful Play Protect review. Do not falsely declare the app an accessibility tool to avoid the warning. Android's per-app restricted-settings consent remains separate; see [installation guidance](INSTALLING.md#android-installation-and-restricted-settings).

@@ -1,4 +1,5 @@
 import java.security.MessageDigest
+import java.util.Properties
 
 plugins {
     id("com.android.application")
@@ -19,6 +20,16 @@ val selectedTargets = providers.gradleProperty("target-platform")
         checkNotNull(nativePlatforms[platform]) { "Unsupported Android target: $platform" }
     }
 val splitPerAbi = providers.gradleProperty("split-per-abi").orNull.toBoolean()
+val signingFile = rootProject.file("key.properties")
+val releaseKey = Properties().apply {
+    if (signingFile.isFile) signingFile.inputStream().use { load(it) }
+}
+if (signingFile.isFile) {
+    listOf("storeFile", "storePassword", "keyAlias", "keyPassword").forEach {
+        check(!releaseKey.getProperty(it).isNullOrBlank()) { "Missing $it in Android key.properties" }
+    }
+    check(rootProject.file(releaseKey.getProperty("storeFile")).isFile) { "Release keystore does not exist" }
+}
 
 android {
     namespace = "io.github.otakuweber.chesspilot"
@@ -42,6 +53,16 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (signingFile.isFile) {
+            create("publisher") {
+                storeFile = rootProject.file(releaseKey.getProperty("storeFile"))
+                storePassword = releaseKey.getProperty("storePassword")
+                keyAlias = releaseKey.getProperty("keyAlias")
+                keyPassword = releaseKey.getProperty("keyPassword")
+            }
+        }
+    }
     buildTypes {
         configureEach {
             if (!splitPerAbi) {
@@ -50,8 +71,8 @@ android {
             }
         }
         release {
-            // Preserve the existing APK update identity; signing limitations are documented in docs/RELEASING.md.
-            signingConfig = signingConfigs.getByName("debug")
+            // Keep existing test installs updateable until the publisher chooses a signing migration.
+            signingConfig = signingConfigs.getByName(if (signingFile.isFile) "publisher" else "debug")
         }
     }
     packaging { jniLibs.useLegacyPackaging = true }
