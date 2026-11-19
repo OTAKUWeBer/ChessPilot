@@ -11,7 +11,7 @@ For development builds, desktop packages are also attached to [successful main-b
 | Device | Package |
 | --- | --- |
 | Windows x64 | `ChessPilot-windows-x64-installer` artifact; unzip it to find the setup EXE |
-| Windows portable | `ChessPilot-windows-x64` artifact; unzip it, then extract the enclosed `ChessPilot-windows-x64.zip` |
+| Windows portable | Release: `ChessPilot-VERSION-windows-x64-portable.zip`. CI: unzip the `ChessPilot-windows-x64` artifact, then extract its enclosed `ChessPilot-windows-x64.zip`. |
 | Linux one-file app | `ChessPilot-linux-x64-portable` artifact; unzip it to find `ChessPilot-VERSION-linux-x86_64` |
 | Linux AppImage / Debian package | `ChessPilot-linux-x64-packages` artifact; unzip it to find the `.AppImage` and `.deb` |
 | Linux installer | `ChessPilot-linux-x64-installer` artifact; unzip it to find the single `*-setup.run` installer |
