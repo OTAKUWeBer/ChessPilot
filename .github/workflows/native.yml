@@ -8,11 +8,61 @@ on:
     branches: [main]
     paths: ['app/**', 'native/**', 'tool/**', 'packaging/**', 'assets/models/chess_detection.onnx*', 'assets/**', 'engine_config.txt', 'LICENSE', '.gitattributes', '.github/workflows/native.yml']
   workflow_dispatch:
+    inputs:
+      build_android:
+        description: Build all Android APK candidates (re-sign locally before distribution)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
+concurrency:
+  group: native-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  android:
+    name: Android APK candidates
+    if: github.event_name == 'workflow_dispatch' && inputs.build_android
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    env:
+      RUSTUP_TOOLCHAIN: 1.92.0
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install Rust Android targets
+        run: rustup toolchain install 1.92.0 --profile minimal --target armv7-linux-androideabi --target aarch64-linux-android --target x86_64-linux-android
+      - name: Install pinned Flutter
+        shell: pwsh
+        run: |
+          $version = (Get-Content app/.fvmrc -Raw | ConvertFrom-Json).flutter
+          git clone --depth 1 --branch $version https://github.com/flutter/flutter.git "$env:RUNNER_TEMP/flutter"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          "$env:RUNNER_TEMP/flutter/bin" >> $env:GITHUB_PATH
+      - name: Install Android build prerequisites
+        shell: bash
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'platform-tools' 'platforms;android-36' 'build-tools;36.0.0' 'ndk;28.2.13676358' 'cmake;3.22.1'
+      - name: Check release version
+        run: dart tool/version.dart --check
+      - name: Build and verify all APK candidates
+        shell: pwsh
+        run: ./tool/build_android.ps1 -AndroidSdk $env:ANDROID_HOME -AllowDevelopmentSigning
+      - name: Run Android unit tests
+        working-directory: app/android
+        run: bash ./gradlew :app:testReleaseUnitTest -Ptarget-platform=android-arm,android-arm64,android-x64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ChessPilot-android-candidates
+          path: dist/*/android/*.apk
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
   desktop:
     name: Desktop (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}

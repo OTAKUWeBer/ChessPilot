@@ -246,6 +246,8 @@ To build and verify all supported APK variants from the repository root:
 
 First configure the private publisher keystore in `app/android/key.properties` as described in [Android signing and Google review](RELEASING.md#android-signing-and-google-review). For local tests that must update the existing debug-signed APKs, explicitly add `-AllowDevelopmentSigning` to the command below.
 
+Alternatively, manually run the GitHub Actions **Rust and Flutter desktop** workflow with **build_android** enabled. It builds all four APK candidates on a hosted runner. CI candidates use a temporary signing key; follow the [maintainer re-signing procedure](RELEASING.md) before distributing them or updating an existing installation. The same run builds Windows and Linux desktop packages.
+
 ```powershell
 ./tool/build_android.ps1 -AndroidSdk $env:ANDROID_SDK_ROOT
 ```

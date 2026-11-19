@@ -32,12 +32,12 @@ Source: [Rust core and runtime](native/) · [Flutter interface](app/lib/) · [An
 
 ---
 
-## ✨ What's new in 3.0
+## ✨ What's new in 3.1
 
-- **Rust + Flutter rebuild:** native capture, in-memory ONNX detection, persistent Stockfish and move input behind a shared interface.
-- **Android support:** a movable compact overlay, Play/Auto/Stop/Exit controls, guided capture/touch permissions and a phone default of depth 10.
-- **Desktop packaging:** Windows setup EXE and portable ZIP; Linux portable executable, AppImage, DEB and optional `.run` installer; Android APK. Application libraries and the detector model are included. Linux supports X11 and the documented wlroots Wayland path.
-- **Verified gameplay:** legal opponent-reply tracking, automatic castling-right updates, cancellable waits and clear game results. The latest fix recognizes a verified mating move when a result popup covers part of the board.
+- **More Android devices:** ARMv7, ARM64, x86-64 and universal APKs, each with matching native libraries and Stockfish engines, including 32-bit ARM support.
+- **Clearer phone setup:** touch-control disclosure, restricted-settings recovery instructions and Help/Exit that stay visible while scrolling.
+- **Installation guidance:** separate steps for Play Protect blocks and Accessibility restrictions, including the missing App info menu case. Google approval is not implied.
+- **Desktop packages:** rebuilt Windows setup/portable and Linux portable/AppImage/DEB/installer packages retain the Rust capture, detection, engine and mouse pipeline. See the [3.1.0 release notes](docs/releases/3.1.0.md) for download choices, upgrades and limitations.
 
 ## 🎬 Demo
 
@@ -68,11 +68,11 @@ Download the app packages from [GitHub Releases](https://github.com/OTAKUWeBer/C
 | --- | --- | --- |
 | Windows x64 | Setup EXE or portable bundle | Native capture and Click/Drag |
 | Linux x64 | Portable executable, AppImage, DEB or `.run` installer | X11/XTEST or supported wlroots Wayland with `grim` |
-| Android API 24+ | APK; source builds ARMv7 / ARM64 / x86-64 / universal | Whole-display sharing and enabled touch service |
+| Android API 24+ | ARMv7 / ARM64 / x86-64 / universal APK | Whole-display sharing and enabled touch service |
 
 The model ships with every platform. Desktop checks/downloads a CPU-compatible official Stockfish engine only when missing; Linux portable executables, AppImages and DEBs keep it in persistent user data, while the `.run` installation and desktop bundles keep it beside the app. Android packages its compatible engines/network. Gameplay works offline after setup.
 
-Linux packages include Flutter, Rust, ONNX Runtime, the model and GTK dependencies. Choose AppImage or the extensionless portable executable for direct launching, DEB for a Debian/Ubuntu system installation, or `.run` for a per-user installation. The intermediate `bundle/chesspilot` executable still requires its whole bundle. See [installation](docs/INSTALLING.md) and [3.0.0 release notes](docs/releases/3.0.0.md).
+Linux packages include Flutter, Rust, ONNX Runtime, the model and GTK dependencies. Choose AppImage or the extensionless portable executable for direct launching, DEB for a Debian/Ubuntu system installation, or `.run` for a per-user installation. The intermediate `bundle/chesspilot` executable still requires its whole bundle. See [installation](docs/INSTALLING.md) and [3.1.0 release notes](docs/releases/3.1.0.md).
 
 Windows installers are currently unsigned and Android release-mode builds currently use the developer's local debug key. GNOME/KDE Wayland portal automation, macOS and iOS are not implemented. See [platform evidence](docs/TESTING.md) for tested cases and remaining coverage.
 

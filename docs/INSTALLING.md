@@ -6,7 +6,7 @@ Choose the package for your device. Installing a downloaded app does not require
 
 Download the package for your platform from [GitHub Releases](https://github.com/OTAKUWeBer/ChessPilot/releases). Release files can be downloaded directly; only the Windows portable ZIP needs extracting. The Linux portable executable/AppImage must be marked executable before launching. Check that the release/version matches the one you intend to install.
 
-For development builds, desktop packages are also attached to [successful main-branch builds](https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Amain). GitHub may require sign-in to download these CI artifacts, and older artifacts may expire. The table below describes their contents; published releases use the filenames listed in the [release notes](releases/3.0.0.md).
+For development builds, desktop packages are also attached to [successful main-branch builds](https://github.com/OTAKUWeBer/ChessPilot/actions/workflows/native.yml?query=branch%3Amain). GitHub may require sign-in to download these CI artifacts, and older artifacts may expire. The table below describes their contents; published releases use the filenames listed in the [release notes](releases/3.1.0.md).
 
 | Device | Package |
 | --- | --- |
@@ -16,7 +16,7 @@ For development builds, desktop packages are also attached to [successful main-b
 | Linux AppImage / Debian package | `ChessPilot-linux-x64-packages` artifact; unzip it to find the `.AppImage` and `.deb` |
 | Linux installer | `ChessPilot-linux-x64-installer` artifact; unzip it to find the single `*-setup.run` installer |
 | Linux bundle | `ChessPilot-linux-x64` artifact; unzip it, then extract the enclosed `.tar.gz` |
-| Android ARM64, API 24+ | `app-release.apk` from a trusted publisher or your own build; desktop CI does not currently publish an APK |
+| Android API 24+ | Choose a release APK for your architecture. Manually requested CI runs also provide `ChessPilot-android-candidates`, which use a temporary CI signing key and require maintainer re-signing before distribution. |
 
 The current Windows installer is unsigned. Existing Android APKs use a development signing key; production signing is still a publisher task. A file named “release” is a build mode, not proof of publisher signing. Review any security warning before choosing to install.
 
@@ -119,7 +119,7 @@ On first launch, let Stockfish setup complete. For an offline setup, place a com
 ## Android
 
 
-Current-source Android builds provide these APKs; the published 3.0.0 release contains ARM64 only. Each variant includes its matching Rust runtime, ONNX Runtime and Stockfish executable:
+The 3.1.0 package set provides these APKs; older 3.0.0 downloads contain ARM64 only. Each variant includes its matching Rust runtime, ONNX Runtime and Stockfish executable:
 
 | APK suffix | Use |
 | --- | --- |

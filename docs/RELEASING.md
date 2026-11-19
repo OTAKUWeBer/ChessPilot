@@ -5,7 +5,7 @@
 From the repository root, with the pinned Dart/Flutter SDK installed:
 
 ```sh
-dart tool/version.dart 3.0.1+4
+dart tool/version.dart 3.1.0+5
 dart tool/version.dart --check
 ```
 
@@ -21,11 +21,13 @@ The README CodeFactor badge explicitly targets `main`. In CodeFactor repository 
 
 Run the checks in [the engineering guide](ENGINEERING.md), build all intended platforms using [the build guide](BUILDING.md), and verify the packaged model and complete payload. Desktop CI builds Windows/Linux bundles, checks real inference and validates both desktop installers. Android release assembly must also pass on the release host.
 
-The release assets are the Windows `ChessPilot-VERSION-windows-x64-setup.exe` and `ChessPilot-VERSION-windows-x64.zip`, Android `ChessPilot-VERSION-android-{armv7,arm64,x86_64,universal}.apk`, and Linux `ChessPilot-VERSION-linux-x86_64`, `ChessPilot-VERSION-linux-x86_64.AppImage`, `chesspilot_VERSION_amd64.deb` and optional `ChessPilot-VERSION-linux-x64-setup.run`. Use the release notes in [releases/3.0.0.md](releases/3.0.0.md).
+The release assets are the Windows `ChessPilot-VERSION-windows-x64-setup.exe` and `ChessPilot-VERSION-windows-x64.zip`, Android `ChessPilot-VERSION-android-{armv7,arm64,x86_64,universal}.apk`, and Linux `ChessPilot-VERSION-linux-x86_64`, `ChessPilot-VERSION-linux-x86_64.AppImage`, `chesspilot_VERSION_amd64.deb` and optional `ChessPilot-VERSION-linux-x64-setup.run`. Use the release notes in [releases/3.1.0.md](releases/3.1.0.md).
 
 Build all intended platforms from the release revision. Linux release artifacts must come from the Ubuntu 22.04 CI build, not an Arch-local build. CI checks the portable app, installer, AppImage and DEB, including checksums, GTK startup and relocated model/runtime discovery. Keep checksums and build-info files locally for verification; upload only the intended app packages, without `.sha256` sidecars. Never upload loose DLLs, `.so` files, personal engines/configuration, imported helper scripts or the intermediate Linux `bundle/chesspilot` executable.
 
 Build Android variants with `tool/build_android.ps1`; it checks that every APK has all native components for its declared ABIs. APK variants must share the same signing identity. Packaging changes do not prove that Google Play Protect or manufacturer-specific accessibility restrictions are resolved; complete device acceptance before publishing.
+
+For CI builds, manually run **Rust and Flutter desktop** with `build_android=true`. The Android job creates all four candidate APKs and verifies their payloads using a temporary runner development key. Do not publish these directly: re-sign each with the retained maintainer key locally using `apksigner sign --out FINAL_APK --ks PRIVATE_KEYSTORE INPUT_APK`, then rerun `tool/test_android_packages.ps1` on the final directory. Compare the final certificate SHA-256 to the existing release before accepting an update build. Keep private keys out of CI artifacts. A freshly generated runner key cannot update the installed release.
 
 Keep local artifacts under ignored `dist/VERSION/windows`, `dist/VERSION/linux` and `dist/VERSION/android` folders. An imported package is a build candidate until its checksum, architecture, version, library baseline and payload have been checked. Published asset names must match the release revision and version. The source remains in Git; binaries belong in GitHub Releases.
 
