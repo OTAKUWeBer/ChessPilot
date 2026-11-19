@@ -65,6 +65,27 @@ void main() {
       await tester.tap(find.text('Close'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Open accessibility settings'));
+      await tester.pumpAndSettle();
+      expect(find.text('Touch control for chess moves'), findsOneWidget);
+      expect(calls.where((name) => name == 'enableTouch'), isEmpty);
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+      expect(calls.where((name) => name == 'enableTouch'), isEmpty);
+      await tester.ensureVisible(find.text("Can't enable touch control?"));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text("Can't enable touch control?"));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('Allow restricted settings'), findsOneWidget);
+      await tester.ensureVisible(find.text('Open ChessPilot App info'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open ChessPilot App info'));
+      await tester.pump();
+      expect(calls, contains('appInfo'));
+      await tester.ensureVisible(find.text('Open accessibility settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open accessibility settings'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue'));
       await tester.pump();
       platform = {
         'touch': true,

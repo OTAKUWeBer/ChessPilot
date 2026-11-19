@@ -147,3 +147,9 @@ The current controls are described in [Android controls](ENGINEERING.md#android-
 ## Additional Linux release formats
 
 `tool/test_linux_formats.sh APPIMAGE DEB` verifies both artifact checksums, starts the real AppImage without FUSE, extracts both formats without system installation, validates the DEB identity/desktop entry, checks the bundled model, and runs relocated runtime probes. The DEB and AppImage share the existing portable user-data routing. Full package-manager install/update/removal and live gameplay still require acceptance testing on the target distributions.
+
+## Android multi-ABI packaging and setup
+
+`tool/build_android.ps1` builds ARMv7, ARM64, x86-64 and universal APKs. `tool/test_android_packages.ps1` checks version/package identity, matching signing certificates, APK alignment, the complete native ABI set (including the Stockfish executable), exact model/NNUE hashes, license notices and absence of unrelated sensitive permissions. The 32-bit Rust/JNI path is compiled separately; ARM64 is not relabeled as universal.
+
+The phone setup widget test covers consent cancellation/acceptance, restricted-settings instructions, the App info action, and accessible Exit controls after scrolling. Android's restricted-settings menu and Play Protect decisions remain OS-controlled; no device permission has been enabled automatically. The 3.0.1 APKs need physical testing on the affected Realme and other target devices before claiming these reported installation/control failures are resolved.

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.Manifest
@@ -47,6 +48,11 @@ class MainActivity : FlutterActivity() {
                     }
                     "enableTouch" -> {
                         startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        result.success(null)
+                    }
+                    "appInfo" -> {
+                        startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                            Uri.fromParts("package", packageName, null)))
                         result.success(null)
                     }
                     "startCapture" -> {

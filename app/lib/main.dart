@@ -408,6 +408,37 @@ class _PilotControlsState extends State<PilotControls> {
     );
   }
 
+  Future<void> _enablePhoneTouch() async {
+    final allowed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Touch control for chess moves'),
+        content: const SingleChildScrollView(
+          child: Text(
+            'ChessPilot uses Android Accessibility to tap and drag chess pieces when you start Play or Auto. '
+            'The touch service does not read accessibility window text.\n\n'
+            'Screen sharing is a separate permission. Captured images are processed on your device. '
+            'Stop pauses moves; Exit also ends screen sharing.\n\n'
+            'Continue to Android settings, then choose ChessPilot touch control. You can disable it there at any time.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    if (allowed == true && mounted) {
+      await controller.platformAction('enableTouch');
+    }
+  }
+
   Widget _phoneSetup() {
     final touch = controller.platformState?['touch'] == true;
     final sharing = controller.platformState?['capture'] == true;
@@ -449,12 +480,34 @@ class _PilotControlsState extends State<PilotControls> {
               style: const TextStyle(fontSize: 13, color: Colors.white70),
             ),
             const SizedBox(height: 10),
-            if (!touch)
+            if (!touch) ...[
               OutlinedButton(
-                onPressed: () => controller.platformAction('enableTouch'),
+                onPressed: _enablePhoneTouch,
                 child: const Text('Open accessibility settings'),
-              )
-            else ...[
+              ),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text(
+                  "Can't enable touch control?",
+                  style: TextStyle(fontSize: 13),
+                ),
+                children: [
+                  const Text(
+                    'If Android shows “Restricted setting”, open ChessPilot App info, tap the three-dot menu, '
+                    'and choose Allow restricted settings if you trust this installation. '
+                    'Then return to Accessibility and enable ChessPilot touch control.\n\n'
+                    'The option varies by phone and may be unavailable on managed devices. '
+                    'ChessPilot cannot enable this permission for you.',
+                    style: TextStyle(fontSize: 13, color: Colors.white70),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => controller.platformAction('appInfo'),
+                    icon: const Icon(Icons.info_outline),
+                    label: const Text('Open ChessPilot App info'),
+                  ),
+                ],
+              ),
+            ] else ...[
               const Text(
                 'Touch control enabled',
                 style: TextStyle(fontSize: 12, color: Color(0xff81c784)),
@@ -881,6 +934,18 @@ class _PilotControlsState extends State<PilotControls> {
             autofocus: true,
             child: Scaffold(
               backgroundColor: _compactSetup ? const Color(0xff373737) : null,
+              appBar: controller.isAndroid
+                  ? AppBar(
+                      automaticallyImplyLeading: false,
+                      title: _header(),
+                      titleSpacing: 15,
+                      toolbarHeight: 60,
+                      backgroundColor: Theme.of(
+                        context,
+                      ).scaffoldBackgroundColor,
+                      scrolledUnderElevation: 0,
+                    )
+                  : null,
               body: SafeArea(
                 child: ListView(
                   padding: _compactSetup
@@ -890,7 +955,7 @@ class _PilotControlsState extends State<PilotControls> {
                           vertical: 12,
                         ),
                   children: [
-                    if (!_compactSetup) ...[
+                    if (!_compactSetup && !controller.isAndroid) ...[
                       _header(),
                       const SizedBox(height: 12),
                     ],

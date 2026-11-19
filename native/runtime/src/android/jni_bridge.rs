@@ -117,7 +117,7 @@ pub extern "system" fn Java_io_github_otakuweber_chesspilot_PlatformBridge_frame
         let length = env
             .get_direct_buffer_capacity(&buffer)
             .map_err(|e| e.to_string())?;
-        if length > 64 * 1024 * 1024 * 64 {
+        if length as u64 > 64_u64 * 1024 * 1024 * 64 || length > isize::MAX as usize {
             return Err("Android frame buffer exceeded limit".into());
         }
         let ptr = env

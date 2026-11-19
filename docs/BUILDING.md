@@ -1,6 +1,6 @@
 # Build ChessPilot
 
-Build the Windows app on Windows, the Linux app on Linux, and the Android APK on Windows using the preparation script below. Android asset preparation currently uses Windows tools; a native Linux/macOS Android preparation script is not provided.
+Build the Windows app on Windows, the Linux app on Linux, and the Android APK on Windows using the preparation script below. The Android recipe below is tested on Windows. The PowerShell preparation helper also handles Linux SDK tool paths; a complete Linux-hosted Android build has not been validated here.
 
 The exact ONNX model is already in this repository. First-time builds need internet for SDK/dependency/runtime/Stockfish preparation; normal gameplay is local after setup.
 
@@ -241,13 +241,24 @@ Complete the interactive license prompts yourself. If Flutter selects another JD
 
 ### Prepare the engines and build
 
+
+To build and verify all supported APK variants from the repository root:
+
+```powershell
+./tool/build_android.ps1 -AndroidSdk $env:ANDROID_SDK_ROOT
+```
+
+Use `-Flutter C:/path/to/flutter/bin/flutter.bat` when Flutter is not on PATH. This prepares the pinned Stockfish 19 source/network, installs the three Rust targets, builds architecture-specific APKs plus one universal APK, and verifies signatures, alignment, architecture, model/network hashes and license assets. Output: **`dist/VERSION/android/ChessPilot-VERSION-android-{armv7,arm64,x86_64,universal}.apk`**. The ARMv7 APK includes 32-bit Stockfish; ARM64 includes its baseline and optional dot-product engine; x86-64 includes an SSE2-baseline engine. The universal package contains all three supported ABIs. There is no 32-bit x86 Flutter release target.
+
+To build only ARM64 manually, the existing steps remain available below; pass `-Abis arm64-v8a` to engine preparation to avoid building the other engines.
+
 From the Rust project root:
 
 ```powershell
 $ErrorActionPreference = 'Stop'
 rustup toolchain install 1.92.0-x86_64-pc-windows-msvc --profile minimal
 $env:RUSTUP_TOOLCHAIN = '1.92.0-x86_64-pc-windows-msvc'
-rustup target add aarch64-linux-android
+rustup target add armv7-linux-androideabi aarch64-linux-android x86_64-linux-android
 ./tool/prepare_android.ps1 -AndroidSdk $env:ANDROID_SDK_ROOT
 if ($LASTEXITCODE -ne 0) { throw 'Android engine preparation failed' }
 Set-Location app
@@ -255,7 +266,7 @@ flutter pub get
 flutter build apk --debug --target-platform android-arm64
 ```
 
-The preparation step downloads pinned official Stockfish sources/network, verifies hashes, builds the baseline/dot-product Android executables, and saves them under ignored `native/target/`. It can take longer on the first run. Gradle then builds the Rust ARM64 library using the NDK linker and packages everything; a separate manual `cargo build` is not required.
+The preparation step downloads pinned official Stockfish sources/network, verifies hashes, builds matching ARMv7, ARM64 and x86-64 Android executables (with the additional dot-product build on ARM64), and saves them under ignored `native/target/`. It can take longer on the first run. Gradle then builds the Rust ARM64 library using the NDK linker and packages everything; a separate manual `cargo build` is not required.
 
 The standard Windows MSVC host path has been checked locally. The earlier GNU host/linker helper setup is an alternative, not a prerequisite on a machine with working MSVC tools. If deliberately selecting that alternative, follow the engineering guide and set `ORG_GRADLE_PROJECT_rustToolchain` explicitly.
 

@@ -116,7 +116,19 @@ On first launch, let Stockfish setup complete. For an offline setup, place a com
 
 ## Android
 
-1. Copy `app-release.apk` to the phone and open it with the file manager. If Android requests permission to install from that source, allow it specifically for the file manager/browser you are using.
+
+Current-source Android builds provide these APKs; the published 3.0.0 release contains ARM64 only. Each variant includes its matching Rust runtime, ONNX Runtime and Stockfish executable:
+
+| APK suffix | Use |
+| --- | --- |
+| `android-universal.apk` | One larger APK covering ARMv7, ARM64 and x86-64; use when unsure |
+| `android-arm64.apk` | Modern ARM64 phones, including Realme 9 Pro+ |
+| `android-armv7.apk` | 32-bit ARM Android devices |
+| `android-x86_64.apk` | 64-bit Intel/AMD Android systems and emulators |
+
+All require Android 7 / API 24 or newer. Flutter release builds do not support 32-bit x86; an APK from another application does not establish ChessPilot compatibility. A universal APK covers the listed architectures, not every Android version/device.
+
+1. Copy the APK matching your device (or the universal APK) to the phone and open it with the file manager. If Android requests permission to install from that source, allow it specifically for the file manager/browser you are using.
 2. Open ChessPilot and choose your color. Enable **ChessPilot touch control** in Android Accessibility when prompted; this lets the app tap and drag pieces.
 3. Choose **Share entire display** and approve Android's screen-sharing consent. Sharing only one app can prevent the detector/input coordinates from matching the display.
 4. Allow notifications when requested so running controls, Stop and Exit remain accessible. No separate general draw-over-other-apps permission is needed for the accessibility overlay.
@@ -125,6 +137,16 @@ On first launch, let Stockfish setup complete. For an offline setup, place a com
 Opening the dashboard or dragging the controls pauses automation. **Stop** pauses moves; **Exit** also ends sharing and closes the engine. After capture loss, screen lock or display changes, reconnect screen sharing rather than expecting old permission tokens to be reused.
 
 **Update:** install the newer APK over the existing app using the same signing key; settings are preserved. An APK signed with a different key cannot update the installed app. Use a matching publisher build instead of uninstalling just to work around a key mismatch. **Uninstall:** Android removes the app and its private settings; export anything you need first.
+
+### Android installation and restricted settings
+
+**“Restricted setting” when enabling touch control:** Android can restrict accessibility for sideloaded apps. If you trust your ChessPilot installation, open **Settings → Apps → ChessPilot → App info → three-dot menu → Allow restricted settings**, follow the device's confirmation, then return to Accessibility and enable **ChessPilot touch control**. The app now includes a disclosure, an App info shortcut and these steps. Menus vary on Realme and other manufacturers; managed-device restrictions may require the device administrator. See [Android's official instructions](https://support.google.com/android/answer/12623953).
+
+**“App blocked to protect your device” / sensitive-data or financial-fraud warning:** Google documents this as enhanced fraud protection that can block internet-sideloaded apps requesting accessibility. It is separate from CPU architecture and Android's restricted-settings toggle. A universal APK, changing the icon or changing the signing key does not establish that the block is resolved. Keep Play Protect enabled. The publisher must review the permissions and distribution against [Google's developer guidance](https://developers.google.com/android/play-protect/warning-dev-guidance), and submit an appeal if the classification is believed to be incorrect. Do not assume an ABI rebuild has been approved by Google.
+
+ChessPilot's release manifest requests foreground screen sharing and notification permissions. Its accessibility service performs user-enabled gestures, does not retrieve accessibility window content, and does not claim to be an accessibility tool for users with disabilities. Actual screenshot reading uses separate Android screen-sharing consent. Screenshots are processed locally; SMS/contacts/notification-listener permissions are not requested.
+
+**Generic “App not installed”:** check the exact package download, device ABI, Android version, storage and whether an installed version has a different signing certificate or higher version code. If Play Protect also shows a block, resolve that classification first. Preserve app data before considering removal of a differently signed installation; installing another ABI cannot repair a certificate mismatch.
 
 ## First game
 

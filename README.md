@@ -68,7 +68,7 @@ Download the app packages from [GitHub Releases](https://github.com/OTAKUWeBer/C
 | --- | --- | --- |
 | Windows x64 | Setup EXE or portable bundle | Native capture and Click/Drag |
 | Linux x64 | Portable executable, AppImage, DEB or `.run` installer | X11/XTEST or supported wlroots Wayland with `grim` |
-| Android ARM64, API 24+ | APK | Whole-display sharing and enabled touch service |
+| Android API 24+ | APK; source builds ARMv7 / ARM64 / x86-64 / universal | Whole-display sharing and enabled touch service |
 
 The model ships with every platform. Desktop checks/downloads a CPU-compatible official Stockfish engine only when missing; Linux portable executables, AppImages and DEBs keep it in persistent user data, while the `.run` installation and desktop bundles keep it beside the app. Android packages its compatible engines/network. Gameplay works offline after setup.
 
@@ -114,6 +114,7 @@ Use [BUILDING.md](docs/BUILDING.md) for pinned SDKs, all platform prerequisites,
 ## 🔧 Troubleshooting and logs
 
 - **Board not detected:** keep it visible, 2D and clear of overlays. Refinement runs automatically; an unreadably small board still fails safely.
+- **Android install/touch control blocked:** see [Play Protect and restricted-settings guidance](docs/INSTALLING.md#android-installation-and-restricted-settings). Additional APK architectures do not remove these platform restrictions.
 - **Capture unavailable:** check the platform capability/permission explanation. On Android, unlock and restart whole-display sharing after capture loss.
 - **Engine setup fails:** use a writable app folder and a working connection, or provide a compatible offline Stockfish executable beside the desktop app.
 - **Play disabled:** choose a color, finish setup, stop Auto, or choose New game after game over.
